@@ -247,14 +247,14 @@ local function SetupCommHooks()
         local playerCount = #MPW.session.players
         local groupCount = #MPW.session.groups
         local entry = string.format(
-            "[%s] SEND | SESSION_UPDATE | status=%s, players=%d, groups=%d",
+            "[%s] SEND | GUILD | SESSION_UPDATE | status=%s, players=%d, groups=%d",
             date("%H:%M:%S"), tostring(MPW.session.status), playerCount, groupCount)
         AddLogEntry(entry)
     end)
 
     -- Hook outbound session end
     hooksecurefunc(MPW, "BroadcastSessionEnd", function(_)
-        local entry = string.format("[%s] SEND | SESSION_END", date("%H:%M:%S"))
+        local entry = string.format("[%s] SEND | GUILD | SESSION_END", date("%H:%M:%S"))
         AddLogEntry(entry)
     end)
 end
