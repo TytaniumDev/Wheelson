@@ -1,0 +1,12 @@
+name: CI Shared
+
+on:
+  workflow_call:
+
+jobs:
+  Lint:
+    uses: TytaniumDev/.github/.github/workflows/lint.yml@main
+  Build:
+    uses: TytaniumDev/.github/.github/workflows/build.yml@main
+  Test:
+    uses: TytaniumDev/.github/.github/workflows/test.yml@main
