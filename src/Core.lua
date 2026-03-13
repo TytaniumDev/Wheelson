@@ -87,7 +87,7 @@ end
 ---------------------------------------------------------------------------
 
 SLASH_WHEELSON1 = "/wheelson"
-SLASH_WHEELSON2 = "/ws"
+SLASH_WHEELSON2 = "/wheel"
 
 SlashCmdList["WHEELSON"] = function(msg)
     local cmd = strtrim(msg):lower()
