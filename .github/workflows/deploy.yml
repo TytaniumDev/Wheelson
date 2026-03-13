@@ -3,7 +3,6 @@ name: Deploy Addon
 on:
   push:
     tags: [v*]
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -22,7 +21,7 @@ jobs:
           fetch-depth: 0
 
       - name: Auto-create version tag
-        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        if: github.event_name == 'workflow_dispatch'
         run: |
           DATE_PREFIX="v$(date -u +'%Y.%-m.%-d')"
           PATCH=0
