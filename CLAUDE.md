@@ -61,3 +61,4 @@ Tests stub WoW APIs and `LibStub` at the top of each file, then `dofile()` the s
 - Serialization for addon comms uses `:ToDict()` / `.FromDict()` pattern on model classes
 - Table append idiom: `t[#t + 1] = value` (not `table.insert`)
 - External libraries (Ace3, LibStub, etc.) are fetched at release time by BigWigsMods packager per `.pkgmeta` — the `libs/` dir is gitignored except `.gitkeep`
+- **CI job naming constraint:** `.github/workflows/ci-shared.yml` is a reusable workflow (`workflow_call` only) that defines three jobs: `Lint`, `Build`, `Test`. It is called by `.github/workflows/ci.yml` (trigger: `pull_request` only) via a calling job with ID `CI`. GitHub Actions names reusable workflow checks as `<calling_job_id> / <reusable_job_id>`, producing `CI / Lint`, `CI / Build`, `CI / Test` — which branch protection requires. Do not rename the calling job ID in `ci.yml` or the job IDs in `ci-shared.yml`, and do not add extra triggers to `ci.yml`.
