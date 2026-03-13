@@ -1,9 +1,9 @@
 ## Interface: 120001
-## Title: Mythic+ Wheel
+## Title: Wheelson
 ## Notes: Form balanced Mythic+ groups from your guild with a wheel-spin reveal
 ## Author: MythicPlusDiscordBot Contributors
 ## Version: @project-version@
-## SavedVariables: MythicPlusWheelDB
+## SavedVariables: WheelsonDB
 ## IconTexture: Interface\Icons\INV_Misc_GroupNeedMore
 ## X-Curse-Project-ID: 1484744
 ## X-Wago-ID: kGryLYKy

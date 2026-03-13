@@ -1,20 +1,20 @@
--- Luacheck configuration for MythicPlusWheel addon
+-- Luacheck configuration for Wheelson addon
 std = "lua51"
 max_line_length = 120
 
 -- Allow setting fields on writable globals (WoW addon pattern where methods
--- are defined across multiple files via `local MPW = _G.MythicPlusWheel`
+-- are defined across multiple files via `local MPW = _G.Wheelson`
 -- then `function MPW:Method() end`).
 globals = {
     -- _G is written to by WoW addons to register their namespace
     _G = { other_fields = true },
 
     -- The addon namespace — methods are added to this table across all files
-    MythicPlusWheel = { other_fields = true },
+    Wheelson = { other_fields = true },
 
     -- WoW slash command globals
-    "SLASH_MYTHICPLUSWHEEL1",
-    "SLASH_MYTHICPLUSWHEEL2",
+    "SLASH_WHEELSON1",
+    "SLASH_WHEELSON2",
     SlashCmdList = { other_fields = true },
     UISpecialFrames = { other_fields = true },
 }
@@ -95,7 +95,7 @@ files["tests/**"] = {
         "os",
         "LibStub",
         "wipe",
-        MythicPlusWheel = { other_fields = true },
+        Wheelson = { other_fields = true },
     },
     read_globals = {
         "dofile",

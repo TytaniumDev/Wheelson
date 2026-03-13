@@ -6,7 +6,7 @@ Add a minimap icon using the already-bundled LibDataBroker-1.1 and LibDBIcon-1.0
 
 ## Minimap Icon
 
-- **Broker object**: Register a LibDataBroker `data source` of type `launcher` with the addon's custom texture. Path: `Interface\AddOns\MythicPlusWheel\textures\minimap-icon` (no file extension — WoW auto-resolves `.tga`).
+- **Broker object**: Register a LibDataBroker `data source` of type `launcher` with the addon's custom texture. Path: `Interface\AddOns\Wheelson\textures\minimap-icon` (no file extension — WoW auto-resolves `.tga`).
 - **Icon registration**: Use LibDBIcon to create the minimap button, backed by `MPW.db.profile.minimap` (already defined in `Config.lua` defaults).
 - **Left-click**: Calls `MPW:ToggleMainFrame()`.
 - **Right-click**: Calls `MPW:ToggleDebugFrame()`.
@@ -14,11 +14,11 @@ Add a minimap icon using the already-bundled LibDataBroker-1.1 and LibDBIcon-1.0
 - **Custom texture**: `textures/minimap-icon.tga` (64x64 TGA, already converted and placed in repo).
 
 ### Files touched
-- `src/Core.lua` — Add minimap icon initialization in `OnInitialize` after AceDB setup. Add `ToggleDebugFrame` stub (like existing `ToggleMainFrame`/`UpdateUI` stubs). Add `/mpw debug` slash command.
+- `src/Core.lua` — Add minimap icon initialization in `OnInitialize` after AceDB setup. Add `ToggleDebugFrame` stub (like existing `ToggleMainFrame`/`UpdateUI` stubs). Add `/wheelson debug` slash command.
 
 ## Slash Command
 
-Add `/mpw debug` to the existing slash command handler in `Core.lua`. This provides an alternative entry point to the debug panel when the minimap icon is hidden (`minimap.hide = true`).
+Add `/wheelson debug` to the existing slash command handler in `Core.lua`. This provides an alternative entry point to the debug panel when the minimap icon is hidden (`minimap.hide = true`).
 
 ## Debug Panel Frame
 
@@ -111,7 +111,7 @@ Queries WoW APIs on demand and displays results.
 
 ## .toc and Load Order
 
-`src/UI/DebugPanel.lua` is added to `MythicPlusWheel.toc` after `src/UI/GroupDisplay.lua` (last UI file). The debug panel has no dependencies on UI files but needs `Core.lua` and services loaded first.
+`src/UI/DebugPanel.lua` is added to `Wheelson.toc` after `src/UI/GroupDisplay.lua` (last UI file). The debug panel has no dependencies on UI files but needs `Core.lua` and services loaded first.
 
 ## .luacheckrc
 

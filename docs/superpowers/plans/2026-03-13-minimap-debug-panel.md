@@ -79,9 +79,9 @@ Add after `self:RegisterComm(self.COMM_PREFIX)` (line 35), before the session re
     local LDB = LibStub("LibDataBroker-1.1")
     local LDBIcon = LibStub("LibDBIcon-1.0")
 
-    local launcher = LDB:NewDataObject("MythicPlusWheel", {
+    local launcher = LDB:NewDataObject("Wheelson", {
         type = "launcher",
-        icon = "Interface\\AddOns\\MythicPlusWheel\\textures\\minimap-icon",
+        icon = "Interface\\AddOns\\Wheelson\\textures\\minimap-icon",
         OnClick = function(_, button)
             if button == "LeftButton" then
                 MPW:ToggleMainFrame()
@@ -103,10 +103,10 @@ Add after `self:RegisterComm(self.COMM_PREFIX)` (line 35), before the session re
             tooltip:AddLine("|cFFFFFFFFRight-click:|r Debug panel", 0.8, 0.8, 0.8)
         end,
     })
-    LDBIcon:Register("MythicPlusWheel", launcher, self.db.profile.minimap)
+    LDBIcon:Register("Wheelson", launcher, self.db.profile.minimap)
 ```
 
-- [ ] **Step 3: Add /mpw debug slash command**
+- [ ] **Step 3: Add /wheelson debug slash command**
 
 Add a new `elseif` branch in the slash command handler, after the `"history"` case and before the `"help"` case:
 
@@ -118,7 +118,7 @@ Add a new `elseif` branch in the slash command handler, after the `"history"` ca
 Also add the debug command to the help text output:
 
 ```lua
-        MPW:Print("  /mpw debug - Toggle the debug panel")
+        MPW:Print("  /wheelson debug - Toggle the debug panel")
 ```
 
 - [ ] **Step 4: Run luacheck**
@@ -149,12 +149,12 @@ This task creates the frame shell, tab buttons, scroll frame with EditBox, and C
 Create `src/UI/DebugPanel.lua`:
 
 ```lua
----@class MythicPlusWheel
-local MPW = _G.MythicPlusWheel
+---@class Wheelson
+local MPW = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- Debug Panel
--- Right-click minimap icon or /mpw debug to toggle.
+-- Right-click minimap icon or /wheelson debug to toggle.
 -- Three tabs: State, Comm Log, WoW API
 ---------------------------------------------------------------------------
 
@@ -597,7 +597,7 @@ git commit -m "feat: add debug panel with state, comm log, and API tabs"
 ### Task 4: Update .toc file
 
 **Files:**
-- Modify: `MythicPlusWheel.toc:42` (after GroupDisplay.lua)
+- Modify: `Wheelson.toc:42` (after GroupDisplay.lua)
 
 - [ ] **Step 1: Add DebugPanel.lua to the .toc**
 
@@ -610,7 +610,7 @@ src\UI\DebugPanel.lua
 - [ ] **Step 2: Commit**
 
 ```bash
-git add MythicPlusWheel.toc
+git add Wheelson.toc
 git commit -m "feat: add DebugPanel.lua to toc load order"
 ```
 

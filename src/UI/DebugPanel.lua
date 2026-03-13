@@ -1,9 +1,9 @@
----@class MythicPlusWheel
-local MPW = _G.MythicPlusWheel
+---@class Wheelson
+local MPW = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- Debug Panel
--- Right-click minimap icon or /mpw debug to toggle.
+-- Right-click minimap icon or /wheelson debug to toggle.
 -- Three tabs: State, Comm Log, WoW API
 ---------------------------------------------------------------------------
 

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to MythicPlusWheel will be documented in this file.
+All notable changes to Wheelson will be documented in this file.
 
 ## [Unreleased]
 
@@ -9,8 +9,8 @@ All notable changes to MythicPlusWheel will be documented in this file.
 - Session management with SavedVariables persistence
 - Session timeout with configurable idle period (default 30 minutes)
 - Host disconnect handling with graceful session end
-- `/mpw status` command showing session info with role composition
-- `/mpw last` command to display saved results from previous session
+- `/wheelson status` command showing session info with role composition
+- `/wheelson last` command to display saved results from previous session
 - Player join flow with offspec toggling and role override dropdown
 - Cross-realm name stripping for consistent guild member handling
 - Guild membership validation on join requests

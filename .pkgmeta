@@ -1,4 +1,4 @@
-package-as: MythicPlusWheel
+package-as: Wheelson
 
 externals:
   libs/LibStub:
