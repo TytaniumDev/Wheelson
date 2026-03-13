@@ -6,6 +6,10 @@ on:
   check_suite:
     types: [completed]
 
+permissions:
+  pull-requests: write
+  checks: read
+
 jobs:
   auto-approve:
     if: >-
