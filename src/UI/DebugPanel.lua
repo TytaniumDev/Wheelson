@@ -257,6 +257,20 @@ local function SetupCommHooks()
         local entry = string.format("[%s] SEND | GUILD | SESSION_END", date("%H:%M:%S"))
         AddLogEntry(entry)
     end)
+
+    -- Hook outbound leave request
+    hooksecurefunc(MPW, "LeaveSession", function(_)
+        local entry = string.format("[%s] SEND | GUILD | LEAVE_REQUEST | player=%s",
+            date("%H:%M:%S"), UnitName("player") or "?")
+        AddLogEntry(entry)
+    end)
+
+    -- Hook outbound join request
+    hooksecurefunc(MPW, "RequestJoin", function(_)
+        local entry = string.format("[%s] SEND | GUILD | JOIN_REQUEST | player=%s",
+            date("%H:%M:%S"), UnitName("player") or "?")
+        AddLogEntry(entry)
+    end)
 end
 
 ---------------------------------------------------------------------------
