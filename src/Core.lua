@@ -66,10 +66,10 @@ function MPW:OnInitialize()
 
     -- Restore last session results from SavedVariables
     if self.db.profile.lastSession then
-        self:Print("Previous session results available. Type /mpw last to view.")
+        self:Print("Previous session results available. Type /wheelson last to view.")
     end
 
-    self:Print("Mythic+ Wheel loaded. Type /mpw to open.")
+    self:Print("Wheelson loaded. Type /wheelson to open.")
 end
 
 function MPW:OnEnable()
@@ -86,8 +86,8 @@ end
 -- Slash Commands
 ---------------------------------------------------------------------------
 
-SLASH_WHEELSON1 = "/mpw"
-SLASH_WHEELSON2 = "/wheelson"
+SLASH_WHEELSON1 = "/wheelson"
+SLASH_WHEELSON2 = "/ws"
 
 SlashCmdList["WHEELSON"] = function(msg)
     local cmd = strtrim(msg):lower()
@@ -109,16 +109,16 @@ SlashCmdList["WHEELSON"] = function(msg)
         MPW:ToggleDebugFrame()
     elseif cmd == "help" then
         MPW:Print("Commands:")
-        MPW:Print("  /mpw - Toggle the main window")
-        MPW:Print("  /mpw host - Start a new session")
-        MPW:Print("  /mpw close - End the current session")
-        MPW:Print("  /mpw status - Show current session info")
-        MPW:Print("  /mpw last - Show last session results")
-        MPW:Print("  /mpw history - Show session history")
-        MPW:Print("  /mpw debug - Toggle the debug panel")
-        MPW:Print("  /mpw leave - Leave the current session")
+        MPW:Print("  /wheelson - Toggle the main window")
+        MPW:Print("  /wheelson host - Start a new session")
+        MPW:Print("  /wheelson close - End the current session")
+        MPW:Print("  /wheelson status - Show current session info")
+        MPW:Print("  /wheelson last - Show last session results")
+        MPW:Print("  /wheelson history - Show session history")
+        MPW:Print("  /wheelson debug - Toggle the debug panel")
+        MPW:Print("  /wheelson leave - Leave the current session")
     else
-        MPW:Print("Unknown command: " .. cmd .. ". Type /mpw help for usage.")
+        MPW:Print("Unknown command: " .. cmd .. ". Type /wheelson help for usage.")
     end
 end
 
@@ -196,7 +196,7 @@ function MPW:StartSession()
     self:ResetSessionTimeout()
     self:ShowMainFrame()
     self:BroadcastSessionUpdate()
-    self:Print("Session started! Guild members can join via /mpw.")
+    self:Print("Session started! Guild members can join via /wheelson.")
 end
 
 --- End the current session and clean up.
@@ -227,7 +227,7 @@ function MPW:LeaveSession()
 
     local myName = UnitName("player")
     if self.session.host == myName then
-        self:Print("You are the host. Use /mpw close to end the session.")
+        self:Print("You are the host. Use /wheelson close to end the session.")
         return
     end
 

@@ -14,11 +14,11 @@ Add a minimap icon using the already-bundled LibDataBroker-1.1 and LibDBIcon-1.0
 - **Custom texture**: `textures/minimap-icon.tga` (64x64 TGA, already converted and placed in repo).
 
 ### Files touched
-- `src/Core.lua` — Add minimap icon initialization in `OnInitialize` after AceDB setup. Add `ToggleDebugFrame` stub (like existing `ToggleMainFrame`/`UpdateUI` stubs). Add `/mpw debug` slash command.
+- `src/Core.lua` — Add minimap icon initialization in `OnInitialize` after AceDB setup. Add `ToggleDebugFrame` stub (like existing `ToggleMainFrame`/`UpdateUI` stubs). Add `/wheelson debug` slash command.
 
 ## Slash Command
 
-Add `/mpw debug` to the existing slash command handler in `Core.lua`. This provides an alternative entry point to the debug panel when the minimap icon is hidden (`minimap.hide = true`).
+Add `/wheelson debug` to the existing slash command handler in `Core.lua`. This provides an alternative entry point to the debug panel when the minimap icon is hidden (`minimap.hide = true`).
 
 ## Debug Panel Frame
 

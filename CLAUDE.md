@@ -39,7 +39,7 @@ The addon registers itself as `Wheelson` via AceAddon in `src/Config.lua`, store
 1. **Config.lua** — Creates the addon object, defines constants (roles, spec→role mapping, session states, saved variable defaults)
 2. **Models.lua** — `MPW.Player` and `MPW.Group` classes (metatables with `:New()`, `:ToDict()`, `.FromDict()` serialization)
 3. **GroupCreator.lua** — Group formation algorithm (port of `parallelGroupCreator.ts`). Assigns tanks → lust → brez → healers → ranged → remaining DPS with duplicate-avoidance across runs
-4. **Core.lua** — Addon lifecycle (`OnInitialize`/`OnEnable`), slash commands (`/mpw`), session state machine (lobby → spinning → completed), addon comm message handling, session timeout
+4. **Core.lua** — Addon lifecycle (`OnInitialize`/`OnEnable`), slash commands (`/wheelson`), session state machine (lobby → spinning → completed), addon comm message handling, session timeout
 5. **Services/** — `SpecService` (local player spec detection, realm name stripping), `GuildService` (roster queries), `PartyService` (party invites)
 6. **UI/** — `MainFrame.xml` + `MainFrame.lua` (window shell, view switching), `Lobby.lua` (player list + join/spin), `Wheel.lua` (animated group reveal), `GroupDisplay.lua` (final results with invite/post/copy actions)
 

@@ -106,7 +106,7 @@ Add after `self:RegisterComm(self.COMM_PREFIX)` (line 35), before the session re
     LDBIcon:Register("Wheelson", launcher, self.db.profile.minimap)
 ```
 
-- [ ] **Step 3: Add /mpw debug slash command**
+- [ ] **Step 3: Add /wheelson debug slash command**
 
 Add a new `elseif` branch in the slash command handler, after the `"history"` case and before the `"help"` case:
 
@@ -118,7 +118,7 @@ Add a new `elseif` branch in the slash command handler, after the `"history"` ca
 Also add the debug command to the help text output:
 
 ```lua
-        MPW:Print("  /mpw debug - Toggle the debug panel")
+        MPW:Print("  /wheelson debug - Toggle the debug panel")
 ```
 
 - [ ] **Step 4: Run luacheck**
@@ -154,7 +154,7 @@ local MPW = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- Debug Panel
--- Right-click minimap icon or /mpw debug to toggle.
+-- Right-click minimap icon or /wheelson debug to toggle.
 -- Three tabs: State, Comm Log, WoW API
 ---------------------------------------------------------------------------
 
