@@ -1,3 +1,9 @@
+# Packager output
+.release/
+
+# External libraries (fetched by BigWigsMods/packager at release time)
+libs/*/
+
 # Compiled Lua sources
 luac.out
 
