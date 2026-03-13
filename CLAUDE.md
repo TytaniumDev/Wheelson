@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MythicPlusWheel is a World of Warcraft addon (Lua, WoW API) that forms balanced Mythic+ dungeon groups from guild members using a wheel-spin reveal animation. It uses AceAddon-3.0 framework and communicates between guild members via AceComm.
+Wheelson is a World of Warcraft addon (Lua, WoW API) that forms balanced Mythic+ dungeon groups from guild members using a wheel-spin reveal animation. It uses AceAddon-3.0 framework and communicates between guild members via AceComm.
 
 ## Commands
 
@@ -33,9 +33,9 @@ Checks that the `.toc` file exists and all source files listed in it are present
 ## Architecture
 
 ### Global namespace pattern
-The addon registers itself as `MythicPlusWheel` via AceAddon in `src/Config.lua`, stored in `_G.MythicPlusWheel`. Every other source file accesses it via `local MPW = _G.MythicPlusWheel` and attaches methods/data to it. There is no module system — all files share the single `MPW` table.
+The addon registers itself as `Wheelson` via AceAddon in `src/Config.lua`, stored in `_G.Wheelson`. Every other source file accesses it via `local MPW = _G.Wheelson` and attaches methods/data to it. There is no module system — all files share the single `MPW` table.
 
-### File load order (defined by `MythicPlusWheel.toc`)
+### File load order (defined by `Wheelson.toc`)
 1. **Config.lua** — Creates the addon object, defines constants (roles, spec→role mapping, session states, saved variable defaults)
 2. **Models.lua** — `MPW.Player` and `MPW.Group` classes (metatables with `:New()`, `:ToDict()`, `.FromDict()` serialization)
 3. **GroupCreator.lua** — Group formation algorithm (port of `parallelGroupCreator.ts`). Assigns tanks → lust → brez → healers → ranged → remaining DPS with duplicate-avoidance across runs

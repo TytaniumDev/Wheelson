@@ -31,7 +31,7 @@ dofile("src/Config.lua")
 dofile("src/Models.lua")
 dofile("src/Services/SpecService.lua")
 
-local MPW = MythicPlusWheel
+local MPW = Wheelson
 local Player = MPW.Player
 
 describe("SpecService", function()

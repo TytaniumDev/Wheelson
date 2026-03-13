@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to MythicPlusWheel will be documented in this file.
+All notable changes to Wheelson will be documented in this file.
 
 ## [Unreleased]
 

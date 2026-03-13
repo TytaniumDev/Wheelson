@@ -1,12 +1,12 @@
----@class MythicPlusWheel
-local MPW = _G.MythicPlusWheel
+---@class Wheelson
+local MPW = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- Addon Lifecycle
 ---------------------------------------------------------------------------
 
 function MPW:OnInitialize()
-    self.db = LibStub("AceDB-3.0"):New("MythicPlusWheelDB", MPW.defaults, true)
+    self.db = LibStub("AceDB-3.0"):New("WheelsonDB", MPW.defaults, true)
 
     -- Current session state
     self.session = {
@@ -38,9 +38,9 @@ function MPW:OnInitialize()
     local LDB = LibStub("LibDataBroker-1.1")
     local LDBIcon = LibStub("LibDBIcon-1.0")
 
-    local launcher = LDB:NewDataObject("MythicPlusWheel", {
+    local launcher = LDB:NewDataObject("Wheelson", {
         type = "launcher",
-        icon = "Interface\\AddOns\\MythicPlusWheel\\textures\\minimap-icon",
+        icon = "Interface\\AddOns\\Wheelson\\textures\\minimap-icon",
         OnClick = function(_, button)
             if button == "LeftButton" then
                 MPW:ToggleMainFrame()
@@ -62,7 +62,7 @@ function MPW:OnInitialize()
             tooltip:AddLine("|cFFFFFFFFRight-click:|r Debug panel", 0.8, 0.8, 0.8)
         end,
     })
-    LDBIcon:Register("MythicPlusWheel", launcher, self.db.profile.minimap)
+    LDBIcon:Register("Wheelson", launcher, self.db.profile.minimap)
 
     -- Restore last session results from SavedVariables
     if self.db.profile.lastSession then
@@ -86,10 +86,10 @@ end
 -- Slash Commands
 ---------------------------------------------------------------------------
 
-SLASH_MYTHICPLUSWHEEL1 = "/mpw"
-SLASH_MYTHICPLUSWHEEL2 = "/mythicpluswheel"
+SLASH_WHEELSON1 = "/mpw"
+SLASH_WHEELSON2 = "/wheelson"
 
-SlashCmdList["MYTHICPLUSWHEEL"] = function(msg)
+SlashCmdList["WHEELSON"] = function(msg)
     local cmd = strtrim(msg):lower()
     if cmd == "" or cmd == "open" then
         MPW:ToggleMainFrame()

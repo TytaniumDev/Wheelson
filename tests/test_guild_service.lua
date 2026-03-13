@@ -31,7 +31,7 @@ dofile("src/Models.lua")
 dofile("src/Services/SpecService.lua") -- needed for StripRealmName
 dofile("src/Services/GuildService.lua")
 
-local MPW = MythicPlusWheel
+local MPW = Wheelson
 
 describe("GuildService", function()
     before_each(function()

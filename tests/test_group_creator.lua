@@ -26,8 +26,8 @@ dofile("src/Config.lua")
 dofile("src/Models.lua")
 dofile("src/GroupCreator.lua")
 
-local Player = MythicPlusWheel.Player
-local MPW = MythicPlusWheel
+local Player = Wheelson.Player
+local MPW = Wheelson
 
 ---------------------------------------------------------------------------
 -- Prebuilt player constructors (port of prebuiltClasses.ts)

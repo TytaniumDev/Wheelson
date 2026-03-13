@@ -23,8 +23,8 @@ end
 dofile("src/Config.lua")
 dofile("src/Models.lua")
 
-local Player = MythicPlusWheel.Player
-local Group = MythicPlusWheel.Group
+local Player = Wheelson.Player
+local Group = Wheelson.Group
 
 describe("Player", function()
     describe(":New()", function()

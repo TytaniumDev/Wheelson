@@ -1,6 +1,6 @@
----@class MythicPlusWheel
-local MPW = LibStub("AceAddon-3.0"):NewAddon("MythicPlusWheel", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0")
-_G.MythicPlusWheel = MPW
+---@class Wheelson
+local MPW = LibStub("AceAddon-3.0"):NewAddon("Wheelson", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0")
+_G.Wheelson = MPW
 
 -- Addon communication prefix (max 16 chars)
 MPW.COMM_PREFIX = "MPWheel"

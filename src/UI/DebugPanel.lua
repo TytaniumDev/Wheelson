@@ -1,5 +1,5 @@
----@class MythicPlusWheel
-local MPW = _G.MythicPlusWheel
+---@class Wheelson
+local MPW = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- Debug Panel
