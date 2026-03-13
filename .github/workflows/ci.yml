@@ -1,0 +1,13 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  CI-Lint:
+    uses: TytaniumDev/.github/.github/workflows/lint.yml@main
+  CI-Build:
+    uses: TytaniumDev/.github/.github/workflows/build.yml@main
+  CI-Test:
+    uses: TytaniumDev/.github/.github/workflows/test.yml@main
