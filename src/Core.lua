@@ -34,6 +34,36 @@ function MPW:OnInitialize()
 
     self:RegisterComm(self.COMM_PREFIX)
 
+    -- Minimap icon via LibDataBroker + LibDBIcon
+    local LDB = LibStub("LibDataBroker-1.1")
+    local LDBIcon = LibStub("LibDBIcon-1.0")
+
+    local launcher = LDB:NewDataObject("MythicPlusWheel", {
+        type = "launcher",
+        icon = "Interface\\AddOns\\MythicPlusWheel\\textures\\minimap-icon",
+        OnClick = function(_, button)
+            if button == "LeftButton" then
+                MPW:ToggleMainFrame()
+            elseif button == "RightButton" then
+                MPW:ToggleDebugFrame()
+            end
+        end,
+        OnTooltipShow = function(tooltip)
+            tooltip:AddLine("Mythic+ Wheel", 1, 0.82, 0)
+            tooltip:AddLine("|cFFAAAAAAv" .. MPW.VERSION .. "|r")
+            if MPW.session.status then
+                tooltip:AddLine("Session: " .. MPW.session.status, 0.5, 1, 0.5)
+                tooltip:AddLine("Host: " .. (MPW.session.host or "Unknown"), 0.7, 0.7, 0.7)
+            else
+                tooltip:AddLine("No active session", 0.5, 0.5, 0.5)
+            end
+            tooltip:AddLine(" ")
+            tooltip:AddLine("|cFFFFFFFFLeft-click:|r Open addon", 0.8, 0.8, 0.8)
+            tooltip:AddLine("|cFFFFFFFFRight-click:|r Debug panel", 0.8, 0.8, 0.8)
+        end,
+    })
+    LDBIcon:Register("MythicPlusWheel", launcher, self.db.profile.minimap)
+
     -- Restore last session results from SavedVariables
     if self.db.profile.lastSession then
         self:Print("Previous session results available. Type /mpw last to view.")
@@ -75,6 +105,8 @@ SlashCmdList["MYTHICPLUSWHEEL"] = function(msg)
         MPW:LeaveSession()
     elseif cmd == "history" then
         MPW:ShowSessionHistory()
+    elseif cmd == "debug" then
+        MPW:ToggleDebugFrame()
     elseif cmd == "help" then
         MPW:Print("Commands:")
         MPW:Print("  /mpw - Toggle the main window")
@@ -83,6 +115,7 @@ SlashCmdList["MYTHICPLUSWHEEL"] = function(msg)
         MPW:Print("  /mpw status - Show current session info")
         MPW:Print("  /mpw last - Show last session results")
         MPW:Print("  /mpw history - Show session history")
+        MPW:Print("  /mpw debug - Toggle the debug panel")
         MPW:Print("  /mpw leave - Leave the current session")
     else
         MPW:Print("Unknown command: " .. cmd .. ". Type /mpw help for usage.")
@@ -574,4 +607,8 @@ end
 
 function MPW:UpdateUI()
     -- Overridden by UI/MainFrame.lua
+end
+
+function MPW:ToggleDebugFrame()
+    -- Overridden by UI/DebugPanel.lua
 end
