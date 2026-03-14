@@ -47,13 +47,16 @@ _G.LibStub = function(name, silent)
 end
 
 -- WoW API stubs
+_G.random = math.random
 _G.wipe = function(t) for k in pairs(t) do t[k] = nil end end
 _G.SlashCmdList = _G.SlashCmdList or {}
 _G.strtrim = function(s) return s:match("^%s*(.-)%s*$") end
 _G.UnitName = function() return "TestPlayer" end
 _G.UnitClass = function() return "Warrior", "WARRIOR" end
-_G.GetSpecialization = function() return 1 end
-_G.GetSpecializationInfo = function() return 71 end
+_G.C_SpecializationInfo = {
+    GetSpecialization = function() return 1 end,
+    GetSpecializationInfo = function() return 71 end,
+}
 _G.GetNumSpecializations = function() return 3 end
 _G.time = os.time
 _G.date = os.date
@@ -61,9 +64,9 @@ _G.C_Timer = {
     NewTimer = function(_, _) return { Cancel = function() end } end,
     After = function(_, _) end,
 }
-_G.InviteUnit = function() end
+_G.C_PartyInfo = { InviteUnit = function() end }
 _G.IsInGuild = function() return true end
-_G.SendChatMessage = function() end
+_G.C_ChatInfo = { SendChatMessage = function() end }
 _G.IsInGroup = function() return false end
 _G.UnitIsGroupLeader = function() return false end
 _G.CreateFrame = function()
@@ -176,9 +179,9 @@ describe("Test Mode", function()
     end)
 
     describe("invite suppression", function()
-        it("should log instead of calling InviteUnit in test mode", function()
+        it("should log instead of calling C_PartyInfo.InviteUnit in test mode", function()
             local invitedNames = {}
-            _G.InviteUnit = function(name) invitedNames[#invitedNames + 1] = name end
+            _G.C_PartyInfo.InviteUnit = function(name) invitedNames[#invitedNames + 1] = name end
 
             local printed = {}
             MPW.Print = function(_, msg) printed[#printed + 1] = msg end
@@ -198,7 +201,7 @@ describe("Test Mode", function()
     describe("guild chat suppression", function()
         it("should not send guild chat messages in test mode", function()
             local chatSent = false
-            _G.SendChatMessage = function() chatSent = true end
+            _G.C_ChatInfo.SendChatMessage = function() chatSent = true end
 
             MPW:StartTestSession()
             MPW.session.groups = MPW:CreateMythicPlusGroups(MPW.session.players)
