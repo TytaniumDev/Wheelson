@@ -224,14 +224,19 @@ function WHLSN:FormatBugReport(snapshot)
         .. (snapshot.seed or "?") .. ')", function()'
     lines[#lines + 1] = "    math.randomseed(" .. (snapshot.seed or 0) .. ")"
 
-    -- Players
-    lines[#lines + 1] = "    local players = {"
-    for _, pd in ipairs(snapshot.players) do
-        lines[#lines + 1] = "        Player:New("
+    local function formatPlayerNew(pd)
+        if not pd then return "nil" end
+        return "Player:New("
             .. '"' .. pd.name .. '", '
             .. (pd.mainRole and ('"' .. pd.mainRole .. '"') or "nil") .. ", "
             .. luaArrayStr(pd.offspecs or {}) .. ", "
-            .. luaArrayStr(pd.utilities or {}) .. "),"
+            .. luaArrayStr(pd.utilities or {}) .. ")"
+    end
+
+    -- Players
+    lines[#lines + 1] = "    local players = {"
+    for _, pd in ipairs(snapshot.players) do
+        lines[#lines + 1] = "        " .. formatPlayerNew(pd) .. ","
     end
     lines[#lines + 1] = "    }"
 
@@ -239,39 +244,20 @@ function WHLSN:FormatBugReport(snapshot)
     if #snapshot.lastGroups > 0 then
         lines[#lines + 1] = "    local lastGroups = {"
         for _, gd in ipairs(snapshot.lastGroups) do
-            local g = Group.FromDict(gd)
             lines[#lines + 1] = "        Group:New("
-            if g.tank then
-                lines[#lines + 1] = "            Player:New("
-                    .. '"' .. g.tank.name .. '", '
-                    .. (g.tank.mainRole and ('"' .. g.tank.mainRole .. '"') or "nil") .. ", "
-                    .. luaArrayStr(g.tank.offspecs or {}) .. ", "
-                    .. luaArrayStr(g.tank.utilities or {}) .. "),"
-            else
-                lines[#lines + 1] = "            nil,"
-            end
-            if g.healer then
-                lines[#lines + 1] = "            Player:New("
-                    .. '"' .. g.healer.name .. '", '
-                    .. (g.healer.mainRole and ('"' .. g.healer.mainRole .. '"') or "nil") .. ", "
-                    .. luaArrayStr(g.healer.offspecs or {}) .. ", "
-                    .. luaArrayStr(g.healer.utilities or {}) .. "),"
-            else
-                lines[#lines + 1] = "            nil,"
-            end
+            lines[#lines + 1] = "            " .. formatPlayerNew(gd.tank) .. ","
+            lines[#lines + 1] = "            " .. formatPlayerNew(gd.healer) .. ","
             lines[#lines + 1] = "            {"
-            for _, dps in ipairs(g.dps) do
-                lines[#lines + 1] = "                Player:New("
-                    .. '"' .. dps.name .. '", '
-                    .. (dps.mainRole and ('"' .. dps.mainRole .. '"') or "nil") .. ", "
-                    .. luaArrayStr(dps.offspecs or {}) .. ", "
-                    .. luaArrayStr(dps.utilities or {}) .. "),"
+            if gd.dps then
+                for _, dpsDict in ipairs(gd.dps) do
+                    lines[#lines + 1] = "                " .. formatPlayerNew(dpsDict) .. ","
+                end
             end
             lines[#lines + 1] = "            }"
             lines[#lines + 1] = "        ),"
         end
         lines[#lines + 1] = "    }"
-        lines[#lines + 1] = '    WHLSN:SetLastGroups(lastGroups, "default")'
+        lines[#lines + 1] = '    WHLSN:SetLastGroups(lastGroups)'
     end
 
     lines[#lines + 1] = "    local groups = WHLSN:CreateMythicPlusGroups(players)"
