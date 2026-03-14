@@ -1,5 +1,7 @@
 ---@class Wheelson
-local MPW = LibStub("AceAddon-3.0"):NewAddon("Wheelson", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0")
+local MPW = LibStub("AceAddon-3.0"):NewAddon(
+    "Wheelson", "AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0"
+)
 _G.Wheelson = MPW
 
 -- Addon communication prefix (max 16 chars)
