@@ -30,6 +30,10 @@ function MPW:OnInitialize()
     self.commThrottleTimer = nil
     self.commPendingUpdate = false
 
+    -- Addon user discovery cache (ephemeral, not saved)
+    self.addonUsersCache = {}
+    self.isScanning = false
+
     -- Initialize random seed for shuffle
     math.randomseed(time())
 
@@ -64,9 +68,6 @@ function MPW:OnInitialize()
         end,
     })
     LDBIcon:Register("Wheelson", launcher, self.db.profile.minimap)
-
-    -- Register options panel in the AddOns section of WoW Settings
-    self:InitOptions()
 
     self:Print("Wheelson loaded. Type /wheelson to open.")
 end
@@ -406,11 +407,13 @@ function MPW:OnCommReceived(prefix, message, _distribution, sender)
     local success, data = self:Deserialize(message)
     if not success then return end
 
-    -- Version handshake warning
-    if data.version and data.version ~= self.VERSION then
-        if data.version ~= "@project-version@" and self.VERSION ~= "@project-version@" then
-            self:Print("Warning: " .. sender .. " is using addon version " .. tostring(data.version)
-                .. " (you have " .. tostring(self.VERSION) .. ")")
+    -- Version handshake warning (skip for discovery messages to avoid noise)
+    if data.type ~= "ADDON_PING" and data.type ~= "ADDON_PONG" then
+        if data.version and data.version ~= self.VERSION then
+            if data.version ~= "@project-version@" and self.VERSION ~= "@project-version@" then
+                self:Print("Warning: " .. sender .. " is using addon version " .. tostring(data.version)
+                    .. " (you have " .. tostring(self.VERSION) .. ")")
+            end
         end
     end
 
@@ -422,6 +425,10 @@ function MPW:OnCommReceived(prefix, message, _distribution, sender)
         self:HandleJoinRequest(data, sender)
     elseif data.type == "LEAVE_REQUEST" then
         self:HandleLeaveRequest(data, sender)
+    elseif data.type == "ADDON_PING" then
+        self:HandleAddonPing(sender)
+    elseif data.type == "ADDON_PONG" then
+        self:HandleAddonPong(data, sender)
     end
 end
 
@@ -512,6 +519,76 @@ function MPW:HandleLeaveRequest(data, sender)
 end
 
 ---------------------------------------------------------------------------
+-- Addon Discovery
+---------------------------------------------------------------------------
+
+function MPW:HandleAddonPing(_sender)
+    -- Reply with our presence info, broadcast to GUILD so all clients can cache
+    local data = {
+        type = "ADDON_PONG",
+        name = UnitName("player"),
+        version = self.VERSION,
+    }
+    local serialized = self:Serialize(data)
+    self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
+end
+
+function MPW:HandleAddonPong(data, sender)
+    local name = self:StripRealmName(sender)
+    self.addonUsersCache[name] = {
+        name = name,
+        version = data.version or "unknown",
+        lastSeen = time(),
+    }
+
+    -- Refresh options panel if open so it live-updates as PONGs arrive
+    local ACR = LibStub("AceConfigRegistry-3.0", true)
+    if ACR then
+        ACR:NotifyChange("Wheelson")
+    end
+end
+
+--- Broadcast a discovery ping to find online addon users.
+function MPW:SendAddonPing()
+    -- Add local player to cache (bypasses self-filter in OnCommReceived)
+    local myName = UnitName("player")
+    self.addonUsersCache[myName] = {
+        name = myName,
+        version = self.VERSION,
+        lastSeen = time(),
+    }
+
+    local data = { type = "ADDON_PING" }
+    local serialized = self:Serialize(data)
+    self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
+
+    self.isScanning = true
+    C_Timer.After(self.DISCOVERY_SCAN_DURATION, function()
+        self.isScanning = false
+        -- Refresh options panel if AceConfigRegistry is available
+        local ACR = LibStub("AceConfigRegistry-3.0", true)
+        if ACR then
+            ACR:NotifyChange("Wheelson")
+        end
+    end)
+end
+
+--- Remove cached addon users who are no longer online in the guild roster.
+function MPW:PruneAddonUsersCache()
+    local onlineMembers = self:GetOnlineGuildMembers()
+    local onlineSet = {}
+    for _, m in ipairs(onlineMembers) do
+        onlineSet[m.name] = true
+    end
+
+    for name in pairs(self.addonUsersCache) do
+        if not onlineSet[name] then
+            self.addonUsersCache[name] = nil
+        end
+    end
+end
+
+---------------------------------------------------------------------------
 -- Event Handlers
 ---------------------------------------------------------------------------
 
@@ -520,6 +597,7 @@ function MPW:GROUP_ROSTER_UPDATE()
 end
 
 function MPW:GUILD_ROSTER_UPDATE()
+    self:PruneAddonUsersCache()
     self:ThrottledUpdateUI()
 end
 
