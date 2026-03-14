@@ -42,3 +42,4 @@ src\UI\Lobby.lua
 src\UI\Wheel.lua
 src\UI\GroupDisplay.lua
 src\UI\DebugPanel.lua
+src\UI\Options.lua

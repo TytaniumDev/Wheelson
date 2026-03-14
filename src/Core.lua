@@ -64,6 +64,9 @@ function MPW:OnInitialize()
     })
     LDBIcon:Register("Wheelson", launcher, self.db.profile.minimap)
 
+    -- Register options panel in the AddOns section of WoW Settings
+    self:InitOptions()
+
     -- Restore last session results from SavedVariables
     if self.db.profile.lastSession then
         self:Print("Previous session results available. Type /wheelson last to view.")
