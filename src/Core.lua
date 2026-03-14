@@ -34,9 +34,6 @@ function MPW:OnInitialize()
     self.addonUsersCache = {}
     self.isScanning = false
 
-    -- Initialize random seed for shuffle
-    math.randomseed(time())
-
     self:RegisterComm(self.COMM_PREFIX)
 
     -- Minimap icon via LibDataBroker + LibDBIcon
