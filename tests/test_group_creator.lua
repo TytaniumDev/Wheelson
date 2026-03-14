@@ -3,7 +3,6 @@
 
 -- Minimal stubs for WoW APIs and libraries
 _G.wipe = function(t) for k in pairs(t) do t[k] = nil end end
-_G.os = { time = function() return 12345 end }
 _G.LibStub = function()
     local addon = {}
     addon.NewAddon = function(_, name, ...)
