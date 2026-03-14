@@ -152,15 +152,6 @@ local function RenderGroupCard(parent, index, group, yOffset)
     header:SetPoint("TOPLEFT", 8, -6)
     header:SetText("|cFFFFD100Group " .. index .. "|r  " .. completenessColor .. "(" .. size .. "/5)|r")
 
-    -- Utility badges and quality score
-    local badges = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    badges:SetPoint("TOPRIGHT", -8, -8)
-    local parts = {}
-    if group:HasBrez() then parts[#parts + 1] = "|cFF00FF00Brez|r" end
-    if group:HasLust() then parts[#parts + 1] = "|cFFFF4400Lust|r" end
-    if group:HasRanged() then parts[#parts + 1] = "|cFF87BCDERanged|r" end
-    badges:SetText(table.concat(parts, "  "))
-
     -- Player lines with tooltips
     local lineY = -24
     CreatePlayerLine(card, "TANK", "|cFF87BCDE", group.tank, lineY)

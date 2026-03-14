@@ -78,6 +78,16 @@ local function CreateWheelFrame(parent)
         WHLSN:ReSpin()
     end)
 
+    -- Continue button (navigate to full results view)
+    frame.continueButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    frame.continueButton:SetSize(100, 28)
+    frame.continueButton:SetPoint("BOTTOMRIGHT", -8, 8)
+    frame.continueButton:SetText("Continue")
+    frame.continueButton:Hide()
+    frame.continueButton:SetScript("OnClick", function()
+        WHLSN:UpdateUI()
+    end)
+
     return frame
 end
 
@@ -113,8 +123,16 @@ local function CreateGroupCard(parent, index, group)
     -- Tank line
     local tankText = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     tankText:SetPoint("TOPLEFT", 8, yOff)
-    local tankName = group.tank and group.tank.name or "|cFF666666(no tank)|r"
-    tankText:SetText("|cFF87BCDE[T]|r " .. tankName)
+    local tankLabel
+    if group.tank then
+        local utilStr = ""
+        if group.tank:HasBrez() then utilStr = utilStr .. " |cFF00FF00[BR]|r" end
+        if group.tank:HasLust() then utilStr = utilStr .. " |cFFFF4400[BL]|r" end
+        tankLabel = "|cFF87BCDE[T]|r " .. group.tank.name .. utilStr
+    else
+        tankLabel = "|cFF87BCDE[T]|r |cFF666666(no tank)|r"
+    end
+    tankText:SetText(tankLabel)
     tankText:SetAlpha(0)
     texts[#texts + 1] = tankText
 
@@ -122,8 +140,16 @@ local function CreateGroupCard(parent, index, group)
     yOff = yOff - 16
     local healerText = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     healerText:SetPoint("TOPLEFT", 8, yOff)
-    local healerName = group.healer and group.healer.name or "|cFF666666(no healer)|r"
-    healerText:SetText("|cFF87FF87[H]|r " .. healerName)
+    local healerLabel
+    if group.healer then
+        local utilStr = ""
+        if group.healer:HasBrez() then utilStr = utilStr .. " |cFF00FF00[BR]|r" end
+        if group.healer:HasLust() then utilStr = utilStr .. " |cFFFF4400[BL]|r" end
+        healerLabel = "|cFF87FF87[H]|r " .. group.healer.name .. utilStr
+    else
+        healerLabel = "|cFF87FF87[H]|r |cFF666666(no healer)|r"
+    end
+    healerText:SetText(healerLabel)
     healerText:SetAlpha(0)
     texts[#texts + 1] = healerText
 
@@ -133,20 +159,13 @@ local function CreateGroupCard(parent, index, group)
         local dpsText = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         dpsText:SetPoint("TOPLEFT", 8, yOff)
         local roleTag = dps:IsRanged() and "|cFFFF8787[R]|r" or "|cFFFFD187[M]|r"
-        dpsText:SetText(roleTag .. " " .. dps.name)
+        local utilStr = ""
+        if dps:HasBrez() then utilStr = utilStr .. " |cFF00FF00[BR]|r" end
+        if dps:HasLust() then utilStr = utilStr .. " |cFFFF4400[BL]|r" end
+        dpsText:SetText(roleTag .. " " .. dps.name .. utilStr)
         dpsText:SetAlpha(0)
         texts[#texts + 1] = dpsText
     end
-
-    -- Utility indicators
-    local utilText = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    utilText:SetPoint("BOTTOMRIGHT", -6, 4)
-    local utils = {}
-    if group:HasBrez() then utils[#utils + 1] = "|cFF00FF00BR|r" end
-    if group:HasLust() then utils[#utils + 1] = "|cFFFF4400BL|r" end
-    utilText:SetText(table.concat(utils, " "))
-    utilText:SetAlpha(0)
-    texts[#texts + 1] = utilText
 
     card:SetAlpha(0)
     return card, texts
@@ -292,6 +311,7 @@ function WHLSN:OnWheelComplete()
     if wheelFrame then
         wheelFrame.title:SetText("Groups Complete!")
         wheelFrame.skipButton:Hide()
+        wheelFrame.continueButton:Show()
 
         -- Show re-spin button for host
         if self.session.host == UnitName("player") then
