@@ -21,8 +21,9 @@ function MPW:InvitePlayers(players)
         end
     end
 
+    local prefix = self.session.isTest and "[Test] Would invite: " or "Invited: "
     if #invited > 0 then
-        self:Print("Invited: " .. table.concat(invited, ", "))
+        self:Print(prefix .. table.concat(invited, ", "))
     else
         self:Print("No players to invite.")
     end
