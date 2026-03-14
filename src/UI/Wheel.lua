@@ -283,7 +283,7 @@ function WHLSN:ReSpin()
 
     self.session.status = self.Status.LOBBY
     self.session.groups = {}
-    self:BroadcastSessionUpdate()
+    self:ResetView()
     self:SpinGroups()
 end
 

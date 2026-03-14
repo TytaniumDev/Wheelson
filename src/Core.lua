@@ -217,6 +217,7 @@ function WHLSN:SpinGroups()
 
     self.lastActivity = time()
     self:BroadcastSessionUpdate()
+    self:UpdateUI()
 end
 
 --- Mark session as completed after wheel animation finishes.

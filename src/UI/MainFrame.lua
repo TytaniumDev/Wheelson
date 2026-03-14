@@ -187,5 +187,10 @@ function WHLSN:UpdateUI()
     end
 end
 
+--- Reset the tracked view so the next UpdateUI recreates it.
+function WHLSN:ResetView()
+    currentView = nil
+end
+
 --- Register the frame with ESC key to close.
 table.insert(UISpecialFrames, "WHLSNMainFrame")
