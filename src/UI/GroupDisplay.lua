@@ -200,6 +200,9 @@ function MPW:UpdateGroupDisplayView()
     local isViewing = self.session.viewingHistory or false
     displayFrame.endButton:SetShown(isHost or isViewing)
     displayFrame.newButton:SetShown(isHost and not isViewing)
+    displayFrame.inviteButton:SetShown(not isViewing)
+    displayFrame.postButton:SetShown(not isViewing)
+    displayFrame.copyButton:SetShown(not isViewing)
 
     -- Update title for historical views
     if isViewing then

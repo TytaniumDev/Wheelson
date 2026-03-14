@@ -297,43 +297,43 @@ function MPW:UpdateLobbyView()
     if hasSession then
         -- Update player rows
         for i, player in ipairs(players) do
-        if not playerRows[i] then
-            playerRows[i] = CreatePlayerRow(lobbyFrame.scrollChild, i)
-        end
+            if not playerRows[i] then
+                playerRows[i] = CreatePlayerRow(lobbyFrame.scrollChild, i)
+            end
 
-        local row = playerRows[i]
-        row.playerData = player
-        row.nameText:SetText(player.name)
+            local row = playerRows[i]
+            row.playerData = player
+            row.nameText:SetText(player.name)
 
-        -- Set role icon
-        local role = player.mainRole
-        if role and ROLE_TEXCOORDS[role] then
-            row.roleIcon:SetTexture(ROLE_ICONS[role])
-            local tc = ROLE_TEXCOORDS[role]
-            row.roleIcon:SetTexCoord(tc[1], tc[2], tc[3], tc[4])
-            row.roleIcon:Show()
+            -- Set role icon
+            local role = player.mainRole
+            if role and ROLE_TEXCOORDS[role] then
+                row.roleIcon:SetTexture(ROLE_ICONS[role])
+                local tc = ROLE_TEXCOORDS[role]
+                row.roleIcon:SetTexCoord(tc[1], tc[2], tc[3], tc[4])
+                row.roleIcon:Show()
 
-            local color = ROLE_COLORS[role]
-            row.nameText:SetTextColor(color.r, color.g, color.b)
-        else
-            row.roleIcon:Hide()
-            row.nameText:SetTextColor(1, 1, 1)
-        end
+                local color = ROLE_COLORS[role]
+                row.nameText:SetTextColor(color.r, color.g, color.b)
+            else
+                row.roleIcon:Hide()
+                row.nameText:SetTextColor(1, 1, 1)
+            end
 
-        -- Set class icon (hidden if no class data)
-        row.classIcon:Hide()
+            -- Set class icon (hidden if no class data)
+            row.classIcon:Hide()
 
-        -- Utility icons
-        row.brezIcon:SetShown(player:HasBrez())
-        row.lustIcon:SetShown(player:HasLust())
+            -- Utility icons
+            row.brezIcon:SetShown(player:HasBrez())
+            row.lustIcon:SetShown(player:HasLust())
 
-        -- Set up kick button for this row
-        row.kickButton:SetScript("OnClick", function()
-            MPW:KickPlayer(player.name)
-        end)
-        row.kickButton:Hide()
+            -- Set up kick button for this row
+            row.kickButton:SetScript("OnClick", function()
+                MPW:KickPlayer(player.name)
+            end)
+            row.kickButton:Hide()
 
-        row:Show()
+            row:Show()
         end
 
         lobbyFrame.scrollChild:SetHeight(math.max(1, #players * 26))

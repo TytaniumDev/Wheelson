@@ -15,6 +15,7 @@ function MPW:OnInitialize()
         groups = {},     -- MPWGroup[]
         host = nil,      -- player name who started the session
         locked = false,  -- lobby lock state
+        viewingHistory = false, -- true when displaying a past session
     }
 
     -- Throttle timer for roster update events
@@ -243,6 +244,8 @@ end
 --- View a saved session from history in the GroupDisplay.
 ---@param index number Index into sessionHistory (1 = most recent)
 function MPW:ViewHistorySession(index)
+    if self.session.status and not self.session.viewingHistory then return end
+
     local history = self.db and self.db.profile.sessionHistory
     if not history or not history[index] then
         self:Print("Session not found.")
@@ -459,6 +462,7 @@ function MPW:HandleSessionEnd(sender)
     self.session.players = {}
     self.session.groups = {}
     self.session.locked = false
+    self.session.viewingHistory = false
     self:UpdateUI()
 end
 
