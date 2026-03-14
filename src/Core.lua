@@ -511,6 +511,7 @@ function WHLSN:HandleSessionEnd(sender)
     self.session.host = nil
     self.session.players = {}
     self.session.groups = {}
+    self.session.algorithmSnapshot = nil
     self.session.viewingHistory = false
     self:UpdateUI()
 end

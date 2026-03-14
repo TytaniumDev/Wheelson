@@ -283,14 +283,11 @@ function WHLSN:FormatBugReport(snapshot)
     return table.concat(lines, "\n")
 end
 
---- Copy group results to clipboard (WoW API limitation: uses EditBox workaround).
----@param groups WHLSNGroup[]
-function WHLSN:CopyGroupsToClipboard(groups)
-    local text = self:FormatGroupSummary(groups)
-    -- WoW does not have a direct clipboard API. We create a temporary EditBox.
-    local editBox = self.clipboardEditBox
-    if not editBox then
-        editBox = CreateFrame("EditBox", "WHLSNClipboardEditBox", UIParent)
+--- Get or create the shared clipboard EditBox (WoW has no direct clipboard API).
+---@return table editBox
+local function getClipboardEditBox(self)
+    if not self.clipboardEditBox then
+        local editBox = CreateFrame("EditBox", "WHLSNClipboardEditBox", UIParent)
         editBox:SetMultiLine(true)
         editBox:SetMaxLetters(0)
         editBox:SetAutoFocus(false)
@@ -301,7 +298,14 @@ function WHLSN:CopyGroupsToClipboard(groups)
         editBox:Hide()
         self.clipboardEditBox = editBox
     end
-    editBox:SetText(text)
+    return self.clipboardEditBox
+end
+
+--- Copy group results to clipboard.
+---@param groups WHLSNGroup[]
+function WHLSN:CopyGroupsToClipboard(groups)
+    local editBox = getClipboardEditBox(self)
+    editBox:SetText(self:FormatGroupSummary(groups))
     editBox:HighlightText()
     editBox:SetFocus()
     self:Print("Group results copied. Press Ctrl+C to copy, then Escape.")
@@ -310,21 +314,8 @@ end
 --- Copy a bug report to the clipboard and show instructions.
 ---@param snapshot table  algorithmSnapshot from session
 function WHLSN:CopyReportToClipboard(snapshot)
-    local text = self:FormatBugReport(snapshot)
-    local editBox = self.clipboardEditBox
-    if not editBox then
-        editBox = CreateFrame("EditBox", "WHLSNClipboardEditBox", UIParent)
-        editBox:SetMultiLine(true)
-        editBox:SetMaxLetters(0)
-        editBox:SetAutoFocus(false)
-        editBox:SetFontObject("ChatFontNormal")
-        editBox:SetWidth(0)
-        editBox:SetHeight(0)
-        editBox:SetPoint("CENTER")
-        editBox:Hide()
-        self.clipboardEditBox = editBox
-    end
-    editBox:SetText(text)
+    local editBox = getClipboardEditBox(self)
+    editBox:SetText(self:FormatBugReport(snapshot))
     editBox:HighlightText()
     editBox:SetFocus()
     self:Print("Report copied! Press Ctrl+C, then paste into a new issue at github.com/TytaniumDev/Wheelson/issues")
