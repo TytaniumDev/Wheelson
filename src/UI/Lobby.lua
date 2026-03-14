@@ -100,6 +100,16 @@ local function CreateLobbyFrame(parent)
         MPW:SetLobbyLocked(locked)
     end)
 
+    -- Start Session button (shown when no session is active)
+    frame.startButton = CreateFrame("Button", "MPWStartButton", frame, "UIPanelButtonTemplate")
+    frame.startButton:SetSize(160, 32)
+    frame.startButton:SetPoint("BOTTOM", 0, 8)
+    frame.startButton:SetText("Start Session")
+    frame.startButton:SetScript("OnClick", function()
+        PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+        MPW:StartSession()
+    end)
+
     return frame
 end
 
@@ -238,6 +248,7 @@ function MPW:UpdateLobbyView()
     lobbyFrame.spinButton:SetEnabled(#players >= 5)
     lobbyFrame.joinButton:SetShown(not isHost and hasSession and not isInSession)
     lobbyFrame.leaveButton:SetShown(not isHost and hasSession and isInSession)
+    lobbyFrame.startButton:SetShown(not hasSession)
     lobbyFrame.lockButton:SetShown(isHost and hasSession)
     if isHost and hasSession then
         lobbyFrame.lockButton:SetText(self.session.locked and "Unlock" or "Lock")
