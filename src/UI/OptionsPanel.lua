@@ -16,7 +16,8 @@ local function GetDiscoveryText()
     end
 
     local lines = {}
-    for _, entry in pairs(MPW.addonUsersCache) do
+    local cache = MPW.addonUsersCache or {}
+    for _, entry in pairs(cache) do
         lines[#lines + 1] = entry.name .. "  (v" .. entry.version .. ")"
     end
 
