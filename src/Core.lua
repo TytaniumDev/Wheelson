@@ -15,6 +15,7 @@ function MPW:OnInitialize()
         groups = {},     -- MPWGroup[]
         host = nil,      -- player name who started the session
         locked = false,  -- lobby lock state
+        isTest = false,  -- true when running a test session (no guild comms)
         viewingHistory = false, -- true when displaying a past session
     }
 
