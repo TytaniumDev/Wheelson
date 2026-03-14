@@ -77,6 +77,9 @@ dofile("src/Config.lua")
 dofile("src/Models.lua")
 dofile("src/Core.lua")
 dofile("src/Services/SpecService.lua")
+_G.random = math.random
+_G.wipe = function(t) for k in pairs(t) do t[k] = nil end end
+dofile("src/GroupCreator.lua")
 
 local WHLSN = _G.Wheelson
 
@@ -227,5 +230,84 @@ describe("Discovery", function()
 
             assert.is_nil(WHLSN.addonUsersCache["SomePlayer"])
         end)
+    end)
+end)
+
+describe("SpinGroups", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer"
+        WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.UpdateUI = function() end
+        WHLSN.TouchActivity = function() end
+        WHLSN:ClearLastGroups()
+    end)
+
+    it("should capture algorithmSnapshot with seed, players, and groups", function()
+        local Player = WHLSN.Player
+        WHLSN.session.players = {
+            Player:New("Tank1", "tank", {}, {"brez"}),
+            Player:New("Healer1", "healer", {}, {}),
+            Player:New("DPS1", "ranged", {}, {"lust"}),
+            Player:New("DPS2", "melee", {}, {}),
+            Player:New("DPS3", "ranged", {}, {}),
+        }
+
+        WHLSN:SpinGroups()
+
+        local snap = WHLSN.session.algorithmSnapshot
+        assert.is_not_nil(snap)
+        assert.is_number(snap.seed)
+        assert.is_not_nil(snap.players)
+        assert.equals(5, #snap.players)
+        assert.is_not_nil(snap.groups)
+        assert.is_true(#snap.groups > 0)
+        assert.equals("TestPlayer", snap.host)
+        assert.equals(5, snap.playerCount)
+        assert.is_number(snap.timestamp)
+    end)
+
+    it("should capture lastGroups in snapshot", function()
+        local Player = WHLSN.Player
+        local Group = WHLSN.Group
+        WHLSN:SetLastGroups({
+            Group:New(
+                Player:New("OldTank", "tank", {}, {}),
+                Player:New("OldHealer", "healer", {}, {}),
+                {Player:New("OldDPS1", "melee", {}, {})}
+            ),
+        })
+
+        WHLSN.session.players = {
+            Player:New("Tank1", "tank", {}, {}),
+            Player:New("Healer1", "healer", {}, {}),
+            Player:New("DPS1", "ranged", {}, {}),
+            Player:New("DPS2", "melee", {}, {}),
+            Player:New("DPS3", "ranged", {}, {}),
+        }
+
+        WHLSN:SpinGroups()
+
+        local snap = WHLSN.session.algorithmSnapshot
+        assert.is_not_nil(snap.lastGroups)
+        assert.equals(1, #snap.lastGroups)
+    end)
+
+    it("should store snapshot data as serialized dicts (not live references)", function()
+        local Player = WHLSN.Player
+        WHLSN.session.players = {
+            Player:New("Tank1", "tank", {}, {}),
+            Player:New("Healer1", "healer", {}, {}),
+            Player:New("DPS1", "ranged", {}, {}),
+            Player:New("DPS2", "melee", {}, {}),
+            Player:New("DPS3", "ranged", {}, {}),
+        }
+
+        WHLSN:SpinGroups()
+
+        local snap = WHLSN.session.algorithmSnapshot
+        assert.is_nil(getmetatable(snap.players[1]))
+        assert.equals("Tank1", snap.players[1].name)
     end)
 end)

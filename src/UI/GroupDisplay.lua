@@ -38,7 +38,7 @@ local function CreateGroupDisplayFrame(parent)
     -- Post to Guild Chat button
     frame.postButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     frame.postButton:SetSize(100, 28)
-    frame.postButton:SetPoint("BOTTOM", -60, 8)
+    frame.postButton:SetPoint("BOTTOM", -40, 8)
     frame.postButton:SetText("Post to Guild")
     frame.postButton:SetScript("OnClick", function()
         WHLSN:PostToGuildChat(WHLSN.session.groups)
@@ -51,6 +51,19 @@ local function CreateGroupDisplayFrame(parent)
     frame.copyButton:SetText("Copy")
     frame.copyButton:SetScript("OnClick", function()
         WHLSN:CopyGroupsToClipboard(WHLSN.session.groups)
+    end)
+
+    -- Report Bad Grouping button
+    frame.reportButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    frame.reportButton:SetSize(80, 28)
+    frame.reportButton:SetPoint("BOTTOM", 120, 8)
+    frame.reportButton:SetText("Report")
+    frame.reportButton:SetScript("OnClick", function()
+        if WHLSN.session.algorithmSnapshot then
+            WHLSN:CopyReportToClipboard(WHLSN.session.algorithmSnapshot)
+        else
+            WHLSN:Print("No algorithm data available to report.")
+        end
     end)
 
     -- End Session button (host only)
@@ -199,6 +212,7 @@ function WHLSN:UpdateGroupDisplayView()
     displayFrame.inviteButton:SetShown(not isViewing)
     displayFrame.postButton:SetShown(not isViewing)
     displayFrame.copyButton:SetShown(not isViewing)
+    displayFrame.reportButton:SetShown(not isViewing and WHLSN.session.algorithmSnapshot ~= nil)
 
     -- Update title for historical views
     if isViewing then

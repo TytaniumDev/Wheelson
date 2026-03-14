@@ -134,14 +134,146 @@ function WHLSN:GetGroupQuality(group)
     return table.concat(parts, ", ")
 end
 
---- Copy group results to clipboard (WoW API limitation: uses EditBox workaround).
----@param groups WHLSNGroup[]
-function WHLSN:CopyGroupsToClipboard(groups)
-    local text = self:FormatGroupSummary(groups)
-    -- WoW does not have a direct clipboard API. We create a temporary EditBox.
-    local editBox = self.clipboardEditBox
-    if not editBox then
-        editBox = CreateFrame("EditBox", "WHLSNClipboardEditBox", UIParent)
+--- Format a Lua table literal for a string array (e.g., {"tank", "healer"}).
+---@param arr table
+---@return string
+local function luaArrayStr(arr)
+    if #arr == 0 then return "{}" end
+    local parts = {}
+    for _, v in ipairs(arr) do
+        parts[#parts + 1] = '"' .. tostring(v) .. '"'
+    end
+    return "{" .. table.concat(parts, ", ") .. "}"
+end
+
+--- Format a bug report from an algorithm snapshot.
+--- Returns a string with two sections: human-readable markdown and a Lua test case.
+---@param snapshot table  algorithmSnapshot captured at spin time
+---@return string
+function WHLSN:FormatBugReport(snapshot)
+    local Group = WHLSN.Group
+    local lines = {}
+
+    -- Reconstruct groups from serialized data for display
+    local groups = {}
+    for _, gd in ipairs(snapshot.groups) do
+        groups[#groups + 1] = Group.FromDict(gd)
+    end
+
+    local fullCount = 0
+    local incompleteCount = 0
+    for _, g in ipairs(groups) do
+        if g:IsComplete() then
+            fullCount = fullCount + 1
+        else
+            incompleteCount = incompleteCount + 1
+        end
+    end
+
+    local groupCountDesc = #groups .. " (" .. fullCount .. " full"
+    if incompleteCount > 0 then
+        groupCountDesc = groupCountDesc .. ", " .. incompleteCount .. " incomplete"
+    end
+    groupCountDesc = groupCountDesc .. ")"
+
+    -- Section 1: Human-readable
+    lines[#lines + 1] = "## Bad Grouping Report"
+    lines[#lines + 1] = "- **Host:** " .. (snapshot.host or "Unknown")
+    lines[#lines + 1] = "- **Players:** " .. (snapshot.playerCount or #snapshot.players)
+    lines[#lines + 1] = "- **Groups created:** " .. groupCountDesc
+    lines[#lines + 1] = "- **Timestamp:** "
+        .. (snapshot.timestamp and date("%Y-%m-%d %H:%M:%S", snapshot.timestamp) or "Unknown")
+    lines[#lines + 1] = "- **Seed:** " .. (snapshot.seed or "Unknown")
+    lines[#lines + 1] = ""
+
+    -- Player table
+    lines[#lines + 1] = "### Players"
+    lines[#lines + 1] = "| Name | Main Role | Offspecs | Utilities |"
+    lines[#lines + 1] = "|------|-----------|----------|-----------|"
+    for _, pd in ipairs(snapshot.players) do
+        local offspecs = pd.offspecs and #pd.offspecs > 0 and table.concat(pd.offspecs, ", ") or "-"
+        local utilities = pd.utilities and #pd.utilities > 0 and table.concat(pd.utilities, ", ") or "-"
+        lines[#lines + 1] = "| " .. pd.name .. " | " .. (pd.mainRole or "none") .. " | "
+            .. offspecs .. " | " .. utilities .. " |"
+    end
+    lines[#lines + 1] = ""
+
+    -- Group summary
+    lines[#lines + 1] = "### Groups"
+    lines[#lines + 1] = self:FormatGroupSummary(groups)
+    lines[#lines + 1] = ""
+
+    -- Last groups
+    lines[#lines + 1] = "### Last Groups (duplicate-avoidance context)"
+    if #snapshot.lastGroups > 0 then
+        local lastGroups = {}
+        for _, gd in ipairs(snapshot.lastGroups) do
+            lastGroups[#lastGroups + 1] = Group.FromDict(gd)
+        end
+        lines[#lines + 1] = self:FormatGroupSummary(lastGroups)
+    else
+        lines[#lines + 1] = "None - first session"
+    end
+    lines[#lines + 1] = ""
+
+    -- Section 2: Lua test case
+    lines[#lines + 1] = "--- LUA TEST CASE ---"
+    lines[#lines + 1] = "```lua"
+    lines[#lines + 1] = "-- Paste into tests/test_group_creator.lua"
+    lines[#lines + 1] = 'it("should handle reported bad grouping (seed '
+        .. (snapshot.seed or "?") .. ')", function()'
+    lines[#lines + 1] = "    math.randomseed(" .. (snapshot.seed or 0) .. ")"
+
+    local function formatPlayerNew(pd)
+        if not pd then return "nil" end
+        return "Player:New("
+            .. '"' .. pd.name .. '", '
+            .. (pd.mainRole and ('"' .. pd.mainRole .. '"') or "nil") .. ", "
+            .. luaArrayStr(pd.offspecs or {}) .. ", "
+            .. luaArrayStr(pd.utilities or {}) .. ")"
+    end
+
+    -- Players
+    lines[#lines + 1] = "    local players = {"
+    for _, pd in ipairs(snapshot.players) do
+        lines[#lines + 1] = "        " .. formatPlayerNew(pd) .. ","
+    end
+    lines[#lines + 1] = "    }"
+
+    -- Last groups
+    if #snapshot.lastGroups > 0 then
+        lines[#lines + 1] = "    local lastGroups = {"
+        for _, gd in ipairs(snapshot.lastGroups) do
+            lines[#lines + 1] = "        Group:New("
+            lines[#lines + 1] = "            " .. formatPlayerNew(gd.tank) .. ","
+            lines[#lines + 1] = "            " .. formatPlayerNew(gd.healer) .. ","
+            lines[#lines + 1] = "            {"
+            if gd.dps then
+                for _, dpsDict in ipairs(gd.dps) do
+                    lines[#lines + 1] = "                " .. formatPlayerNew(dpsDict) .. ","
+                end
+            end
+            lines[#lines + 1] = "            }"
+            lines[#lines + 1] = "        ),"
+        end
+        lines[#lines + 1] = "    }"
+        lines[#lines + 1] = '    WHLSN:SetLastGroups(lastGroups)'
+    end
+
+    lines[#lines + 1] = "    local groups = WHLSN:CreateMythicPlusGroups(players)"
+    lines[#lines + 1] = "    -- TODO: Add assertions for expected behavior"
+    lines[#lines + 1] = "    -- Got " .. #groups .. " groups from " .. #snapshot.players .. " players"
+    lines[#lines + 1] = "end)"
+    lines[#lines + 1] = "```"
+
+    return table.concat(lines, "\n")
+end
+
+--- Get or create the shared clipboard EditBox (WoW has no direct clipboard API).
+---@return table editBox
+local function getClipboardEditBox(self)
+    if not self.clipboardEditBox then
+        local editBox = CreateFrame("EditBox", "WHLSNClipboardEditBox", UIParent)
         editBox:SetMultiLine(true)
         editBox:SetMaxLetters(0)
         editBox:SetAutoFocus(false)
@@ -152,8 +284,25 @@ function WHLSN:CopyGroupsToClipboard(groups)
         editBox:Hide()
         self.clipboardEditBox = editBox
     end
-    editBox:SetText(text)
+    return self.clipboardEditBox
+end
+
+--- Copy group results to clipboard.
+---@param groups WHLSNGroup[]
+function WHLSN:CopyGroupsToClipboard(groups)
+    local editBox = getClipboardEditBox(self)
+    editBox:SetText(self:FormatGroupSummary(groups))
     editBox:HighlightText()
     editBox:SetFocus()
     self:Print("Group results copied. Press Ctrl+C to copy, then Escape.")
+end
+
+--- Copy a bug report to the clipboard and show instructions.
+---@param snapshot table  algorithmSnapshot from session
+function WHLSN:CopyReportToClipboard(snapshot)
+    local editBox = getClipboardEditBox(self)
+    editBox:SetText(self:FormatBugReport(snapshot))
+    editBox:HighlightText()
+    editBox:SetFocus()
+    self:Print("Report copied! Press Ctrl+C, then paste into a new issue at github.com/TytaniumDev/Wheelson/issues")
 end
