@@ -48,14 +48,12 @@ describe("SpecService", function()
 
     describe(":DetectLocalPlayer()", function()
         it("should return nil when no specialization is active", function()
-            _G.C_SpecializationInfo.GetSpecialization = function() return nil end
             local result = MPW:DetectLocalPlayer()
             assert.is_nil(result)
         end)
 
         it("should return nil when GetSpecializationInfo returns nil", function()
             _G.C_SpecializationInfo.GetSpecialization = function() return 1 end
-            _G.C_SpecializationInfo.GetSpecializationInfo = function() return nil end
             local result = MPW:DetectLocalPlayer()
             assert.is_nil(result)
         end)
