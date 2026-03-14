@@ -2,6 +2,7 @@
 -- Run with: busted addon/tests/
 
 -- Minimal stubs for WoW APIs and libraries
+math.randomseed(1)
 _G.random = math.random
 _G.wipe = function(t) for k in pairs(t) do t[k] = nil end end
 _G.LibStub = function()
