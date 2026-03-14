@@ -256,9 +256,12 @@ function WHLSN:FormatBugReport(snapshot)
         lines[#lines + 1] = '    WHLSN:SetLastGroups(lastGroups)'
     end
 
-    lines[#lines + 1] = "    local groups = WHLSN:CreateMythicPlusGroups(players)"
-    lines[#lines + 1] = "    -- TODO: Add assertions for expected behavior"
-    lines[#lines + 1] = "    -- Got " .. #groups .. " groups from " .. #snapshot.players .. " players"
+    lines[#lines + 1] = "    for trial = 1, 20 do"
+    lines[#lines + 1] = "        local groups = WHLSN:CreateMythicPlusGroups(players)"
+    lines[#lines + 1] = "        -- TODO: Add assertions for the invariant that was violated"
+    lines[#lines + 1] = "        -- Bad output had " .. #groups .. " groups from "
+        .. #snapshot.players .. " players"
+    lines[#lines + 1] = "    end"
     lines[#lines + 1] = "end)"
     lines[#lines + 1] = "```"
 

@@ -71,8 +71,9 @@ describe("FormatBugReport", function()
         -- Should contain group summary
         assert.truthy(report:find("Group 1"))
 
-        -- Should contain lua test case section
+        -- Should contain lua test case section with multi-trial loop
         assert.truthy(report:find("LUA TEST CASE"))
+        assert.truthy(report:find("for trial = 1, 20 do"))
         assert.truthy(report:find("CreateMythicPlusGroups"))
     end)
 
