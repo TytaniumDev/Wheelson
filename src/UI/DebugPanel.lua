@@ -33,7 +33,6 @@ local function GenerateStateText()
     lines[#lines + 1] = "=== Session State ==="
     lines[#lines + 1] = "status: " .. tostring(WHLSN.session.status or "(none)")
     lines[#lines + 1] = "host: " .. tostring(WHLSN.session.host or "(none)")
-    lines[#lines + 1] = "locked: " .. tostring(WHLSN.session.locked or false)
     lines[#lines + 1] = "playerCount: " .. #WHLSN.session.players
     lines[#lines + 1] = ""
 

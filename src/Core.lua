@@ -14,7 +14,6 @@ function WHLSN:OnInitialize()
         players = {},    -- WHLSNPlayer[]
         groups = {},     -- WHLSNGroup[]
         host = nil,      -- player name who started the session
-        locked = false,  -- lobby lock state
         isTest = false,  -- true when running a test session (no guild comms)
         viewingHistory = false, -- true when displaying a past session
     }
@@ -107,8 +106,6 @@ function WHLSN:StartSession()
     self.session.host = UnitName("player")
     self.session.players = {}
     self.session.groups = {}
-    self.session.locked = false
-
     -- Auto-add the host as the first player
     local hostPlayer = self:DetectLocalPlayer()
     if hostPlayer then
@@ -133,7 +130,6 @@ function WHLSN:StartTestSession()
     self.session.host = UnitName("player")
     self.session.players = self:GetTestPlayers()
     self.session.groups = {}
-    self.session.locked = false
     self.session.isTest = true
 
     self:ShowMainFrame()
@@ -157,7 +153,6 @@ function WHLSN:EndSession()
     self.session.host = nil
     self.session.players = {}
     self.session.groups = {}
-    self.session.locked = false
     self.session.viewingHistory = false
     self.session.isTest = nil
 
@@ -315,17 +310,6 @@ function WHLSN:KickPlayer(playerName)
     end
 end
 
---- Lock/unlock the lobby (host only).
----@param locked boolean
-function WHLSN:SetLobbyLocked(locked)
-    if self.session.host ~= UnitName("player") then return end
-    if self.session.status ~= self.Status.LOBBY then return end
-
-    self.session.locked = locked
-    self:BroadcastSessionUpdate()
-    self:Print("Lobby " .. (locked and "locked." or "unlocked."))
-end
-
 ---------------------------------------------------------------------------
 -- Session Timeout
 ---------------------------------------------------------------------------
@@ -401,7 +385,6 @@ function WHLSN:SendSessionUpdate()
         host = self.session.host,
         playerCount = #self.session.players,
         players = playerList,
-        locked = self.session.locked,
     }
 
     if self.session.status == self.Status.SPINNING or
@@ -467,8 +450,6 @@ function WHLSN:HandleSessionUpdate(data, sender)
     if data.host then
         self.session.status = data.status
         self.session.host = data.host
-        self.session.locked = data.locked or false
-
         -- Update full player list from host
         if data.players then
             self.session.players = {}
@@ -496,7 +477,6 @@ function WHLSN:HandleSessionEnd(sender)
     self.session.host = nil
     self.session.players = {}
     self.session.groups = {}
-    self.session.locked = false
     self.session.viewingHistory = false
     self:UpdateUI()
 end
@@ -505,9 +485,6 @@ function WHLSN:HandleJoinRequest(data, sender)
     -- Only the host processes join requests
     if self.session.host ~= UnitName("player") then return end
     if self.session.status ~= self.Status.LOBBY then return end
-
-    -- Reject if lobby is locked
-    if self.session.locked then return end
 
     -- Validate sender matches the player data to prevent spoofing
     if not data.player or data.player.name ~= sender then return end
