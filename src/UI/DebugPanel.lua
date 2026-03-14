@@ -329,7 +329,7 @@ local function CreateDebugFrame()
     -- Title
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -8)
-    title:SetText("|cFFFFD100WHLSN Debug|r")
+    title:SetText("|cFFFFD100Wheelson Debug|r")
 
     -- Close button
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
