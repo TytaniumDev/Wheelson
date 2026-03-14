@@ -471,11 +471,13 @@ function MPW:OnCommReceived(prefix, message, _distribution, sender)
     local success, data = self:Deserialize(message)
     if not success then return end
 
-    -- Version handshake warning
-    if data.version and data.version ~= self.VERSION then
-        if data.version ~= "@project-version@" and self.VERSION ~= "@project-version@" then
-            self:Print("Warning: " .. sender .. " is using addon version " .. tostring(data.version)
-                .. " (you have " .. tostring(self.VERSION) .. ")")
+    -- Version handshake warning (skip for discovery messages to avoid noise)
+    if data.type ~= "ADDON_PING" and data.type ~= "ADDON_PONG" then
+        if data.version and data.version ~= self.VERSION then
+            if data.version ~= "@project-version@" and self.VERSION ~= "@project-version@" then
+                self:Print("Warning: " .. sender .. " is using addon version " .. tostring(data.version)
+                    .. " (you have " .. tostring(self.VERSION) .. ")")
+            end
         end
     end
 
