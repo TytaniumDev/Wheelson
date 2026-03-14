@@ -124,6 +124,25 @@ function MPW:StartSession()
     self:Print("Session started! Guild members can join via the Wheelson addon.")
 end
 
+--- Start a test session with hardcoded players (no guild comms).
+function MPW:StartTestSession()
+    if self.session.status then
+        self:Print("A session is already active.")
+        return
+    end
+
+    self.session.status = self.Status.LOBBY
+    self.session.host = UnitName("player")
+    self.session.players = self:GetTestPlayers()
+    self.session.groups = {}
+    self.session.locked = false
+    self.session.isTest = true
+
+    self:ShowMainFrame()
+    self:UpdateUI()
+    self:Print("[Test Mode] Session started with " .. #self.session.players .. " test players.")
+end
+
 --- End the current session and clean up.
 function MPW:EndSession()
     if not self.session.status then
@@ -132,6 +151,7 @@ function MPW:EndSession()
     end
 
     local wasViewing = self.session.viewingHistory or false
+    local wasTest = self.session.isTest or false
 
     self:CancelSessionTimeout()
 
@@ -141,10 +161,13 @@ function MPW:EndSession()
     self.session.groups = {}
     self.session.locked = false
     self.session.viewingHistory = false
+    self.session.isTest = nil
 
-    if not wasViewing then
+    if not wasViewing and not wasTest then
         self:BroadcastSessionEnd()
         self:Print("Session ended.")
+    elseif wasTest then
+        self:Print("[Test Mode] Session ended.")
     end
 
     self:UpdateUI()
@@ -207,6 +230,7 @@ end
 
 --- Save session results to SavedVariables.
 function MPW:SaveSessionResults()
+    if self.session.isTest then return end
     if not self.db then return end
 
     local groupData = {}
@@ -344,6 +368,7 @@ end
 
 --- Broadcast session state to the guild (throttled).
 function MPW:BroadcastSessionUpdate()
+    if self.session.isTest then return end
     self:TouchActivity()
 
     -- Throttle broadcasts to avoid flooding
@@ -395,6 +420,7 @@ end
 
 --- Broadcast session end to the guild.
 function MPW:BroadcastSessionEnd()
+    if self.session.isTest then return end
     local serialized = self:Serialize({ type = "SESSION_END" })
     self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
 end
