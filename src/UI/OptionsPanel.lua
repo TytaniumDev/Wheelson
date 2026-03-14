@@ -1,5 +1,5 @@
 ---@class Wheelson
-local MPW = _G.Wheelson
+local WHLSN = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- Options Panel
@@ -11,12 +11,12 @@ local AceConfig = LibStub("AceConfig-3.0")
 local AceConfigDialog = LibStub("AceConfigDialog-3.0")
 
 local function GetDiscoveryText()
-    if MPW.isScanning then
+    if WHLSN.isScanning then
         return "Scanning..."
     end
 
     local lines = {}
-    local cache = MPW.addonUsersCache or {}
+    local cache = WHLSN.addonUsersCache or {}
     for _, entry in pairs(cache) do
         lines[#lines + 1] = entry.name .. "  (" .. entry.version .. ")"
     end
@@ -50,7 +50,7 @@ local options = {
             name = "Refresh",
             desc = "Scan for guild members with Wheelson installed",
             func = function()
-                MPW:SendAddonPing()
+                WHLSN:SendAddonPing()
             end,
         },
         versionHeader = {
@@ -61,7 +61,7 @@ local options = {
         versionDesc = {
             order = 11,
             type = "description",
-            name = MPW.VERSION,
+            name = WHLSN.VERSION,
             fontSize = "medium",
         },
         releaseUrl = {
@@ -69,7 +69,7 @@ local options = {
             type = "input",
             name = "Release Link",
             desc = "Copy this URL to view the release on GitHub",
-            get = function() return MPW.RELEASE_URL end,
+            get = function() return WHLSN.RELEASE_URL end,
             set = function() end,
             width = "full",
         },

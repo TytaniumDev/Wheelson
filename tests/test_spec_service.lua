@@ -33,8 +33,8 @@ dofile("src/Config.lua")
 dofile("src/Models.lua")
 dofile("src/Services/SpecService.lua")
 
-local MPW = Wheelson
-local Player = MPW.Player
+local WHLSN = Wheelson
+local Player = WHLSN.Player
 
 describe("SpecService", function()
     -- Reset mocks before each test
@@ -48,13 +48,13 @@ describe("SpecService", function()
 
     describe(":DetectLocalPlayer()", function()
         it("should return nil when no specialization is active", function()
-            local result = MPW:DetectLocalPlayer()
+            local result = WHLSN:DetectLocalPlayer()
             assert.is_nil(result)
         end)
 
         it("should return nil when GetSpecializationInfo returns nil", function()
             _G.C_SpecializationInfo.GetSpecialization = function() return 1 end
-            local result = MPW:DetectLocalPlayer()
+            local result = WHLSN:DetectLocalPlayer()
             assert.is_nil(result)
         end)
 
@@ -68,7 +68,7 @@ describe("SpecService", function()
             _G.UnitName = function() return "Tankadin" end
             _G.UnitClass = function() return "Paladin", "PALADIN" end
 
-            local result = MPW:DetectLocalPlayer()
+            local result = WHLSN:DetectLocalPlayer()
             assert.is_not_nil(result)
             assert.equal("Tankadin", result.name)
             assert.equal("tank", result.mainRole)
@@ -86,7 +86,7 @@ describe("SpecService", function()
             end
             _G.GetNumSpecializations = function() return 3 end
 
-            local result = MPW:DetectLocalPlayer()
+            local result = WHLSN:DetectLocalPlayer()
             assert.is_not_nil(result)
             assert.equal("tank", result.mainRole)
             -- Should have healer and melee as offspecs
@@ -104,7 +104,7 @@ describe("SpecService", function()
             _G.GetNumSpecializations = function() return 3 end
 
             local selectedOffspecs = { healer = true, melee = false }
-            local result = MPW:DetectLocalPlayer(selectedOffspecs)
+            local result = WHLSN:DetectLocalPlayer(selectedOffspecs)
             assert.is_not_nil(result)
             assert.is_true(result:IsOffhealer())
             assert.is_false(result:IsOffmelee())
@@ -118,7 +118,7 @@ describe("SpecService", function()
             end
             _G.GetNumSpecializations = function() return 3 end
 
-            local result = MPW:DetectLocalPlayer(nil, "healer")
+            local result = WHLSN:DetectLocalPlayer(nil, "healer")
             assert.is_not_nil(result)
             assert.equal("healer", result.mainRole)
             assert.is_true(result:IsHealerMain())
@@ -134,7 +134,7 @@ describe("SpecService", function()
             _G.UnitName = function() return "Healbot" end
             _G.UnitClass = function() return "Shaman", "SHAMAN" end
 
-            local result = MPW:DetectLocalPlayer()
+            local result = WHLSN:DetectLocalPlayer()
             assert.is_not_nil(result)
             assert.equal("healer", result.mainRole)
             assert.is_true(result:HasLust())
@@ -151,7 +151,7 @@ describe("SpecService", function()
             _G.UnitName = function() return "Shadowfiend" end
             _G.UnitClass = function() return "Priest", "PRIEST" end
 
-            local result = MPW:DetectLocalPlayer()
+            local result = WHLSN:DetectLocalPlayer()
             assert.is_not_nil(result)
             assert.equal("ranged", result.mainRole)
             assert.is_true(result:IsDpsMain())
@@ -171,7 +171,7 @@ describe("SpecService", function()
             _G.UnitName = function() return "Boneshield" end
             _G.UnitClass = function() return "Death Knight", "DEATHKNIGHT" end
 
-            local result = MPW:DetectLocalPlayer()
+            local result = WHLSN:DetectLocalPlayer()
             assert.is_not_nil(result)
             assert.equal("tank", result.mainRole)
             assert.is_true(result:HasBrez())
@@ -181,7 +181,7 @@ describe("SpecService", function()
 
         it("should handle UnitName returning nil", function()
             _G.UnitName = function() return nil end
-            local result = MPW:DetectLocalPlayer()
+            local result = WHLSN:DetectLocalPlayer()
             assert.is_nil(result)
         end)
 
@@ -190,7 +190,7 @@ describe("SpecService", function()
             _G.C_SpecializationInfo.GetSpecializationInfo = function() return 99999 end -- Unknown spec
             _G.GetNumSpecializations = function() return 1 end
 
-            local result = MPW:DetectLocalPlayer()
+            local result = WHLSN:DetectLocalPlayer()
             assert.is_nil(result) -- No role mapping for unknown spec
         end)
 
@@ -204,7 +204,7 @@ describe("SpecService", function()
             end
             _G.GetNumSpecializations = function() return 3 end
 
-            local result = MPW:DetectLocalPlayer()
+            local result = WHLSN:DetectLocalPlayer()
             assert.is_not_nil(result)
             -- Count healer offspecs - should only appear once
             local healerCount = 0
@@ -218,7 +218,7 @@ describe("SpecService", function()
     describe(":DetectAllOffspecs()", function()
         it("should return empty when no specialization is active", function()
             _G.C_SpecializationInfo.GetSpecialization = function() return nil end
-            local result = MPW:DetectAllOffspecs()
+            local result = WHLSN:DetectAllOffspecs()
             assert.same({}, result)
         end)
 
@@ -230,7 +230,7 @@ describe("SpecService", function()
             end
             _G.GetNumSpecializations = function() return 3 end
 
-            local result = MPW:DetectAllOffspecs()
+            local result = WHLSN:DetectAllOffspecs()
             -- Prot Paladin offspecs: healer (Holy) and melee (Ret)
             assert.equal(2, #result)
             local hasHealer, hasMelee = false, false
@@ -251,7 +251,7 @@ describe("SpecService", function()
             end
             _G.GetNumSpecializations = function() return 3 end
 
-            local result = MPW:DetectAllOffspecs()
+            local result = WHLSN:DetectAllOffspecs()
             -- All specs are melee, so no different offspec roles
             assert.same({}, result)
         end)
@@ -265,7 +265,7 @@ describe("SpecService", function()
             end
             _G.GetNumSpecializations = function() return 3 end
 
-            local result = MPW:DetectAllOffspecs()
+            local result = WHLSN:DetectAllOffspecs()
             assert.same({}, result)
         end)
 
@@ -278,7 +278,7 @@ describe("SpecService", function()
             end
             _G.GetNumSpecializations = function() return 4 end
 
-            local result = MPW:DetectAllOffspecs()
+            local result = WHLSN:DetectAllOffspecs()
             -- Guardian Druid offspecs: ranged, melee, healer
             assert.equal(3, #result)
         end)
@@ -286,25 +286,25 @@ describe("SpecService", function()
 
     describe(":StripRealmName()", function()
         it("should strip realm name from hyphenated names", function()
-            assert.equal("Player", MPW:StripRealmName("Player-Stormrage"))
+            assert.equal("Player", WHLSN:StripRealmName("Player-Stormrage"))
         end)
 
         it("should handle names without realm", function()
-            assert.equal("Player", MPW:StripRealmName("Player"))
+            assert.equal("Player", WHLSN:StripRealmName("Player"))
         end)
 
         it("should handle nil input", function()
-            assert.is_nil(MPW:StripRealmName(nil))
+            assert.is_nil(WHLSN:StripRealmName(nil))
         end)
 
         it("should handle names with multiple hyphens", function()
-            assert.equal("Player", MPW:StripRealmName("Player-Area-52"))
+            assert.equal("Player", WHLSN:StripRealmName("Player-Area-52"))
         end)
     end)
 
     describe(":DetectGuildMember()", function()
         it("should create a player with no mainRole and correct utilities", function()
-            local result = MPW:DetectGuildMember("GuildTank-Stormrage", "DEATHKNIGHT")
+            local result = WHLSN:DetectGuildMember("GuildTank-Stormrage", "DEATHKNIGHT")
             assert.equal("GuildTank", result.name)
             assert.is_nil(result.mainRole)
             assert.is_true(result:HasBrez())
@@ -312,14 +312,14 @@ describe("SpecService", function()
         end)
 
         it("should detect lust for Shaman", function()
-            local result = MPW:DetectGuildMember("ShamanDude", "SHAMAN")
+            local result = WHLSN:DetectGuildMember("ShamanDude", "SHAMAN")
             assert.equal("ShamanDude", result.name)
             assert.is_true(result:HasLust())
             assert.is_false(result:HasBrez())
         end)
 
         it("should detect no utilities for Rogue", function()
-            local result = MPW:DetectGuildMember("Stabby", "ROGUE")
+            local result = WHLSN:DetectGuildMember("Stabby", "ROGUE")
             assert.equal("Stabby", result.name)
             assert.is_false(result:HasBrez())
             assert.is_false(result:HasLust())
@@ -327,7 +327,7 @@ describe("SpecService", function()
 
         it("should detect both utilities for Druid", function()
             -- Druid has brez but not lust
-            local result = MPW:DetectGuildMember("TreeHugger", "DRUID")
+            local result = WHLSN:DetectGuildMember("TreeHugger", "DRUID")
             assert.equal("TreeHugger", result.name)
             assert.is_true(result:HasBrez())
             assert.is_false(result:HasLust())

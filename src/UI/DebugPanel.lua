@@ -1,5 +1,5 @@
 ---@class Wheelson
-local MPW = _G.Wheelson
+local WHLSN = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- Debug Panel
@@ -11,7 +11,7 @@ local debugFrame = nil
 local currentTab = "state" -- "state" | "comm" | "api"
 
 -- Comm log storage (populated by hooks, capped at 200 entries)
-MPW.debugLog = {}
+WHLSN.debugLog = {}
 local DEBUG_LOG_MAX = 200
 
 local MIN_WIDTH = 400
@@ -26,20 +26,20 @@ local MAX_HEIGHT = 600
 local function GenerateStateText()
     local lines = {}
     lines[#lines + 1] = "=== Addon Info ==="
-    lines[#lines + 1] = "version: " .. tostring(MPW.VERSION)
-    lines[#lines + 1] = "commPrefix: " .. tostring(MPW.COMM_PREFIX)
+    lines[#lines + 1] = "version: " .. tostring(WHLSN.VERSION)
+    lines[#lines + 1] = "commPrefix: " .. tostring(WHLSN.COMM_PREFIX)
     lines[#lines + 1] = ""
 
     lines[#lines + 1] = "=== Session State ==="
-    lines[#lines + 1] = "status: " .. tostring(MPW.session.status or "(none)")
-    lines[#lines + 1] = "host: " .. tostring(MPW.session.host or "(none)")
-    lines[#lines + 1] = "locked: " .. tostring(MPW.session.locked or false)
-    lines[#lines + 1] = "playerCount: " .. #MPW.session.players
+    lines[#lines + 1] = "status: " .. tostring(WHLSN.session.status or "(none)")
+    lines[#lines + 1] = "host: " .. tostring(WHLSN.session.host or "(none)")
+    lines[#lines + 1] = "locked: " .. tostring(WHLSN.session.locked or false)
+    lines[#lines + 1] = "playerCount: " .. #WHLSN.session.players
     lines[#lines + 1] = ""
 
-    if #MPW.session.players > 0 then
+    if #WHLSN.session.players > 0 then
         lines[#lines + 1] = "=== Players ==="
-        for i, p in ipairs(MPW.session.players) do
+        for i, p in ipairs(WHLSN.session.players) do
             lines[#lines + 1] = "  " .. i .. ". " .. p.name
             lines[#lines + 1] = "     mainRole: " .. tostring(p.mainRole or "(none)")
             local offspecs = #p.offspecs > 0 and table.concat(p.offspecs, ", ") or "(none)"
@@ -50,9 +50,9 @@ local function GenerateStateText()
         lines[#lines + 1] = ""
     end
 
-    if #MPW.session.groups > 0 then
+    if #WHLSN.session.groups > 0 then
         lines[#lines + 1] = "=== Groups ==="
-        for i, g in ipairs(MPW.session.groups) do
+        for i, g in ipairs(WHLSN.session.groups) do
             lines[#lines + 1] = "  Group " .. i .. ":"
             lines[#lines + 1] = "    tank: " .. (g.tank and g.tank.name or "(none)")
             lines[#lines + 1] = "    healer: " .. (g.healer and g.healer.name or "(none)")
@@ -67,8 +67,8 @@ local function GenerateStateText()
     end
 
     lines[#lines + 1] = "=== SavedVariables ==="
-    if MPW.db and MPW.db.profile then
-        local prof = MPW.db.profile
+    if WHLSN.db and WHLSN.db.profile then
+        local prof = WHLSN.db.profile
         lines[#lines + 1] = "minimap.hide: " .. tostring(prof.minimap and prof.minimap.hide or false)
         lines[#lines + 1] = "animationSpeed: " .. tostring(prof.animationSpeed)
         lines[#lines + 1] = "soundEnabled: " .. tostring(prof.soundEnabled)
@@ -95,10 +95,10 @@ local function GenerateStateText()
     lines[#lines + 1] = ""
 
     lines[#lines + 1] = "=== Timers ==="
-    if MPW.lastActivity and MPW.lastActivity > 0 then
-        lines[#lines + 1] = "lastActivity: " .. date("%H:%M:%S", MPW.lastActivity)
-        local remaining = (MPW.lastActivity + MPW.SESSION_TIMEOUT) - time()
-        if MPW.session.status and remaining > 0 then
+    if WHLSN.lastActivity and WHLSN.lastActivity > 0 then
+        lines[#lines + 1] = "lastActivity: " .. date("%H:%M:%S", WHLSN.lastActivity)
+        local remaining = (WHLSN.lastActivity + WHLSN.SESSION_TIMEOUT) - time()
+        if WHLSN.session.status and remaining > 0 then
             lines[#lines + 1] = "timeoutRemaining: " .. math.floor(remaining) .. "s"
         else
             lines[#lines + 1] = "timeoutRemaining: (inactive)"
@@ -107,19 +107,19 @@ local function GenerateStateText()
         lines[#lines + 1] = "lastActivity: (none)"
         lines[#lines + 1] = "timeoutRemaining: (inactive)"
     end
-    lines[#lines + 1] = "rosterUpdatePending: " .. tostring(MPW.rosterUpdatePending or false)
-    lines[#lines + 1] = "commPendingUpdate: " .. tostring(MPW.commPendingUpdate or false)
+    lines[#lines + 1] = "rosterUpdatePending: " .. tostring(WHLSN.rosterUpdatePending or false)
+    lines[#lines + 1] = "commPendingUpdate: " .. tostring(WHLSN.commPendingUpdate or false)
 
     return table.concat(lines, "\n")
 end
 
 local function GenerateCommLogText()
-    if #MPW.debugLog == 0 then
+    if #WHLSN.debugLog == 0 then
         return "(No comm messages logged yet)\n\nMessages will appear here as they are sent/received."
     end
 
     local lines = {}
-    for _, entry in ipairs(MPW.debugLog) do
+    for _, entry in ipairs(WHLSN.debugLog) do
         lines[#lines + 1] = entry
     end
     return table.concat(lines, "\n")
@@ -145,17 +145,17 @@ local function GenerateAPIText()
         lines[#lines + 1] = "specID: " .. tostring(specID)
         lines[#lines + 1] = "specName: " .. tostring(specName)
         if specID then
-            lines[#lines + 1] = "mappedRole: " .. tostring(MPW.SpecRoles[specID] or "(unmapped)")
+            lines[#lines + 1] = "mappedRole: " .. tostring(WHLSN.SpecRoles[specID] or "(unmapped)")
         end
     end
-    local allOffspecs = MPW:DetectAllOffspecs()
+    local allOffspecs = WHLSN:DetectAllOffspecs()
     lines[#lines + 1] = "allOffspecs: "
         .. (#allOffspecs > 0 and table.concat(allOffspecs, ", ") or "(none)")
     local detectedUtils = {}
-    if classToken and MPW.BrezClasses[classToken] then
+    if classToken and WHLSN.BrezClasses[classToken] then
         detectedUtils[#detectedUtils + 1] = "brez"
     end
-    if classToken and MPW.LustClasses[classToken] then
+    if classToken and WHLSN.LustClasses[classToken] then
         detectedUtils[#detectedUtils + 1] = "lust"
     end
     lines[#lines + 1] = "detectedUtilities: "
@@ -167,7 +167,7 @@ local function GenerateAPIText()
     lines[#lines + 1] = "GuildInfo: " .. tostring(GetGuildInfo("player"))
     local numTotal = GetNumGuildMembers()
     lines[#lines + 1] = "GetNumGuildMembers: " .. tostring(numTotal)
-    local onlineMembers = MPW:GetOnlineGuildMembers()
+    local onlineMembers = WHLSN:GetOnlineGuildMembers()
     lines[#lines + 1] = "onlineMaxLevel: " .. #onlineMembers
     lines[#lines + 1] = ""
 
@@ -175,11 +175,11 @@ local function GenerateAPIText()
     lines[#lines + 1] = "IsInGroup: " .. tostring(IsInGroup())
     lines[#lines + 1] = "UnitIsGroupLeader: " .. tostring(UnitIsGroupLeader("player"))
     lines[#lines + 1] = "GetNumGroupMembers: " .. tostring(GetNumGroupMembers())
-    lines[#lines + 1] = "CanInvite: " .. tostring(MPW:CanInvite())
+    lines[#lines + 1] = "CanInvite: " .. tostring(WHLSN:CanInvite())
     lines[#lines + 1] = ""
 
     lines[#lines + 1] = "=== DetectLocalPlayer() ==="
-    local player = MPW:DetectLocalPlayer()
+    local player = WHLSN:DetectLocalPlayer()
     if player then
         lines[#lines + 1] = "name: " .. player.name
         lines[#lines + 1] = "mainRole: " .. tostring(player.mainRole or "(none)")
@@ -216,9 +216,9 @@ local function FormatLogPayload(data)
 end
 
 local function AddLogEntry(entry)
-    MPW.debugLog[#MPW.debugLog + 1] = entry
-    while #MPW.debugLog > DEBUG_LOG_MAX do
-        table.remove(MPW.debugLog, 1)
+    WHLSN.debugLog[#WHLSN.debugLog + 1] = entry
+    while #WHLSN.debugLog > DEBUG_LOG_MAX do
+        table.remove(WHLSN.debugLog, 1)
     end
 
     -- Auto-refresh if comm tab is visible
@@ -233,9 +233,9 @@ end
 
 local function SetupCommHooks()
     -- Hook inbound messages
-    hooksecurefunc(MPW, "OnCommReceived", function(_, prefix, message, _, sender)
-        if prefix ~= MPW.COMM_PREFIX then return end
-        local success, data = MPW:Deserialize(message)
+    hooksecurefunc(WHLSN, "OnCommReceived", function(_, prefix, message, _, sender)
+        if prefix ~= WHLSN.COMM_PREFIX then return end
+        local success, data = WHLSN:Deserialize(message)
         local payload = success and FormatLogPayload(data) or "(deserialize failed)"
         local entry = string.format("[%s] RECV | %s | %s | %s",
             date("%H:%M:%S"), sender, success and data.type or "?", payload)
@@ -243,30 +243,30 @@ local function SetupCommHooks()
     end)
 
     -- Hook outbound session updates
-    hooksecurefunc(MPW, "SendSessionUpdate", function(_)
-        local playerCount = #MPW.session.players
-        local groupCount = #MPW.session.groups
+    hooksecurefunc(WHLSN, "SendSessionUpdate", function(_)
+        local playerCount = #WHLSN.session.players
+        local groupCount = #WHLSN.session.groups
         local entry = string.format(
             "[%s] SEND | GUILD | SESSION_UPDATE | status=%s, players=%d, groups=%d",
-            date("%H:%M:%S"), tostring(MPW.session.status), playerCount, groupCount)
+            date("%H:%M:%S"), tostring(WHLSN.session.status), playerCount, groupCount)
         AddLogEntry(entry)
     end)
 
     -- Hook outbound session end
-    hooksecurefunc(MPW, "BroadcastSessionEnd", function(_)
+    hooksecurefunc(WHLSN, "BroadcastSessionEnd", function(_)
         local entry = string.format("[%s] SEND | GUILD | SESSION_END", date("%H:%M:%S"))
         AddLogEntry(entry)
     end)
 
     -- Hook outbound leave request
-    hooksecurefunc(MPW, "LeaveSession", function(_)
+    hooksecurefunc(WHLSN, "LeaveSession", function(_)
         local entry = string.format("[%s] SEND | GUILD | LEAVE_REQUEST | player=%s",
             date("%H:%M:%S"), UnitName("player") or "?")
         AddLogEntry(entry)
     end)
 
     -- Hook outbound join request
-    hooksecurefunc(MPW, "RequestJoin", function(_)
+    hooksecurefunc(WHLSN, "RequestJoin", function(_)
         local entry = string.format("[%s] SEND | GUILD | JOIN_REQUEST | player=%s",
             date("%H:%M:%S"), UnitName("player") or "?")
         AddLogEntry(entry)
@@ -284,7 +284,7 @@ local function CreateTabButton(parent, label, tabKey, xOffset)
     btn:SetText(label)
     btn:SetScript("OnClick", function()
         currentTab = tabKey
-        MPW:RefreshDebugPanel()
+        WHLSN:RefreshDebugPanel()
     end)
     return btn
 end
@@ -301,7 +301,7 @@ local function UpdateTabHighlights(frame)
 end
 
 local function CreateDebugFrame()
-    local frame = CreateFrame("Frame", "MPWDebugPanel", UIParent, "BackdropTemplate")
+    local frame = CreateFrame("Frame", "WHLSNDebugPanel", UIParent, "BackdropTemplate")
     frame:SetSize(500, 400)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
@@ -329,7 +329,7 @@ local function CreateDebugFrame()
     -- Title
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -8)
-    title:SetText("|cFFFFD100MPW Debug|r")
+    title:SetText("|cFFFFD100WHLSN Debug|r")
 
     -- Close button
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
@@ -342,14 +342,14 @@ local function CreateDebugFrame()
 
     -- Scroll frame for content
     local scrollFrame = CreateFrame(
-        "ScrollFrame", "MPWDebugScrollFrame", frame, "UIPanelScrollFrameTemplate"
+        "ScrollFrame", "WHLSNDebugScrollFrame", frame, "UIPanelScrollFrameTemplate"
     )
     scrollFrame:SetPoint("TOPLEFT", 8, -54)
     scrollFrame:SetPoint("BOTTOMRIGHT", -30, 40)
     frame.scrollFrame = scrollFrame
 
     -- EditBox inside scroll frame (read-only-ish, for text selection)
-    local editBox = CreateFrame("EditBox", "MPWDebugEditBox", scrollFrame)
+    local editBox = CreateFrame("EditBox", "WHLSNDebugEditBox", scrollFrame)
     editBox:SetMultiLine(true)
     editBox:SetMaxLetters(0)
     editBox:SetAutoFocus(false)
@@ -387,7 +387,7 @@ local function CreateDebugFrame()
     frame.copyAllBtn:SetScript("OnClick", function()
         frame.editBox:HighlightText()
         frame.editBox:SetFocus()
-        MPW:Print("Text selected. Press Ctrl+C to copy.")
+        WHLSN:Print("Text selected. Press Ctrl+C to copy.")
     end)
 
     frame.refreshBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
@@ -395,7 +395,7 @@ local function CreateDebugFrame()
     frame.refreshBtn:SetPoint("BOTTOMRIGHT", frame.copyAllBtn, "BOTTOMLEFT", -4, 0)
     frame.refreshBtn:SetText("Refresh")
     frame.refreshBtn:SetScript("OnClick", function()
-        MPW:RefreshDebugPanel()
+        WHLSN:RefreshDebugPanel()
     end)
 
     -- Clear button (only visible on comm tab)
@@ -404,8 +404,8 @@ local function CreateDebugFrame()
     frame.clearBtn:SetPoint("BOTTOMLEFT", 8, 8)
     frame.clearBtn:SetText("Clear")
     frame.clearBtn:SetScript("OnClick", function()
-        wipe(MPW.debugLog)
-        MPW:RefreshDebugPanel()
+        wipe(WHLSN.debugLog)
+        WHLSN:RefreshDebugPanel()
     end)
 
     return frame
@@ -416,7 +416,7 @@ end
 ---------------------------------------------------------------------------
 
 --- Refresh the debug panel content for the current tab.
-function MPW:RefreshDebugPanel()
+function WHLSN:RefreshDebugPanel()
     if not debugFrame or not debugFrame:IsShown() then return end
 
     UpdateTabHighlights(debugFrame)
@@ -439,11 +439,11 @@ function MPW:RefreshDebugPanel()
 end
 
 --- Toggle debug frame visibility. Overrides stub in Core.lua.
-function MPW:ToggleDebugFrame()
+function WHLSN:ToggleDebugFrame()
     if not debugFrame then
         debugFrame = CreateDebugFrame()
         SetupCommHooks()
-        UISpecialFrames[#UISpecialFrames + 1] = "MPWDebugPanel"
+        UISpecialFrames[#UISpecialFrames + 1] = "WHLSNDebugPanel"
     end
 
     if debugFrame:IsShown() then

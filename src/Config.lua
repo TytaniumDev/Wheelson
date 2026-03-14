@@ -1,21 +1,21 @@
 ---@class Wheelson
-local MPW = LibStub("AceAddon-3.0"):NewAddon(
+local WHLSN = LibStub("AceAddon-3.0"):NewAddon(
     "Wheelson", "AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0"
 )
-_G.Wheelson = MPW
+_G.Wheelson = WHLSN
 
 -- Addon communication prefix (max 16 chars)
-MPW.COMM_PREFIX = "MPWheel"
+WHLSN.COMM_PREFIX = "WHLSN"
 
 -- Session states (mirrors shared/types.ts SessionStatus)
-MPW.Status = {
+WHLSN.Status = {
     LOBBY = "lobby",
     SPINNING = "spinning",
     COMPLETED = "completed",
 }
 
 -- Role identifiers (mirrors shared/config.ts)
-MPW.Roles = {
+WHLSN.Roles = {
     TANK = "tank",
     HEALER = "healer",
     RANGED = "ranged",
@@ -23,14 +23,14 @@ MPW.Roles = {
 }
 
 -- Utility identifiers
-MPW.Utilities = {
+WHLSN.Utilities = {
     BREZ = "brez",
     LUST = "lust",
 }
 
 -- WoW spec ID → role mapping
 -- Updated for Midnight (12.0.1)
-MPW.SpecRoles = {
+WHLSN.SpecRoles = {
     -- Death Knight
     [250] = "tank",    -- Blood
     [251] = "melee",   -- Frost
@@ -86,7 +86,7 @@ MPW.SpecRoles = {
 }
 
 -- Class IDs that have battle rez capability
-MPW.BrezClasses = {
+WHLSN.BrezClasses = {
     ["DEATHKNIGHT"] = true,
     ["DRUID"] = true,
     ["WARLOCK"] = true,
@@ -94,7 +94,7 @@ MPW.BrezClasses = {
 }
 
 -- Class IDs that have lust/heroism capability
-MPW.LustClasses = {
+WHLSN.LustClasses = {
     ["SHAMAN"] = true,
     ["MAGE"] = true,
     ["EVOKER"] = true,
@@ -102,26 +102,26 @@ MPW.LustClasses = {
 }
 
 -- Max player level for current expansion (Midnight)
-MPW.MAX_LEVEL = 90
+WHLSN.MAX_LEVEL = 90
 
 -- Addon version (replaced by packager with git tag)
-MPW.VERSION = "@project-version@"
-MPW.RELEASE_URL = "https://github.com/TytaniumDev/Wheelson/releases/tag/@project-version@"
+WHLSN.VERSION = "@project-version@"
+WHLSN.RELEASE_URL = "https://github.com/TytaniumDev/Wheelson/releases/tag/@project-version@"
 
 -- Session timeout in seconds (default 30 minutes)
-MPW.SESSION_TIMEOUT = 1800
+WHLSN.SESSION_TIMEOUT = 1800
 
 -- Message throttle interval in seconds
-MPW.COMM_THROTTLE = 0.5
+WHLSN.COMM_THROTTLE = 0.5
 
 -- Duration in seconds to collect ADDON_PONG responses after a ping
-MPW.DISCOVERY_SCAN_DURATION = 2
+WHLSN.DISCOVERY_SCAN_DURATION = 2
 
 -- Max number of sessions to keep in history
-MPW.MAX_HISTORY = 10
+WHLSN.MAX_HISTORY = 10
 
 -- Default saved variables
-MPW.defaults = {
+WHLSN.defaults = {
     profile = {
         minimap = {
             hide = false,

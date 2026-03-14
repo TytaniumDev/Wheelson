@@ -1,18 +1,18 @@
 ---@class Wheelson
-local MPW = _G.Wheelson
+local WHLSN = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- Addon Lifecycle
 ---------------------------------------------------------------------------
 
-function MPW:OnInitialize()
-    self.db = LibStub("AceDB-3.0"):New("WheelsonDB", MPW.defaults, true)
+function WHLSN:OnInitialize()
+    self.db = LibStub("AceDB-3.0"):New("WheelsonDB", WHLSN.defaults, true)
 
     -- Current session state
     self.session = {
         status = nil,    -- nil | "lobby" | "spinning" | "completed"
-        players = {},    -- MPWPlayer[]
-        groups = {},     -- MPWGroup[]
+        players = {},    -- WHLSNPlayer[]
+        groups = {},     -- WHLSNGroup[]
         host = nil,      -- player name who started the session
         locked = false,  -- lobby lock state
         isTest = false,  -- true when running a test session (no guild comms)
@@ -46,17 +46,17 @@ function MPW:OnInitialize()
         icon = "Interface\\AddOns\\Wheelson\\textures\\minimap-icon",
         OnClick = function(_, button)
             if button == "LeftButton" then
-                MPW:ToggleMainFrame()
+                WHLSN:ToggleMainFrame()
             elseif button == "RightButton" then
-                MPW:ToggleDebugFrame()
+                WHLSN:ToggleDebugFrame()
             end
         end,
         OnTooltipShow = function(tooltip)
-            tooltip:AddLine("Mythic+ Wheel", 1, 0.82, 0)
-            tooltip:AddLine("|cFFAAAAAA" .. MPW.VERSION .. "|r")
-            if MPW.session.status then
-                tooltip:AddLine("Session: " .. MPW.session.status, 0.5, 1, 0.5)
-                tooltip:AddLine("Host: " .. (MPW.session.host or "Unknown"), 0.7, 0.7, 0.7)
+            tooltip:AddLine("Wheelson", 1, 0.82, 0)
+            tooltip:AddLine("|cFFAAAAAA" .. WHLSN.VERSION .. "|r")
+            if WHLSN.session.status then
+                tooltip:AddLine("Session: " .. WHLSN.session.status, 0.5, 1, 0.5)
+                tooltip:AddLine("Host: " .. (WHLSN.session.host or "Unknown"), 0.7, 0.7, 0.7)
             else
                 tooltip:AddLine("No active session", 0.5, 0.5, 0.5)
             end
@@ -70,12 +70,12 @@ function MPW:OnInitialize()
     self:Print("Wheelson loaded. Type /wheelson to open.")
 end
 
-function MPW:OnEnable()
+function WHLSN:OnEnable()
     self:RegisterEvent("GROUP_ROSTER_UPDATE")
     self:RegisterEvent("GUILD_ROSTER_UPDATE")
 end
 
-function MPW:OnDisable()
+function WHLSN:OnDisable()
     self:UnregisterAllEvents()
     self:CancelSessionTimeout()
 end
@@ -88,7 +88,7 @@ SLASH_WHEELSON1 = "/wheelson"
 SLASH_WHEELSON2 = "/wheel"
 
 SlashCmdList["WHEELSON"] = function()
-    MPW:ToggleMainFrame()
+    WHLSN:ToggleMainFrame()
 end
 
 ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ end
 ---------------------------------------------------------------------------
 
 --- Start a new lobby session. Any guild member can host.
-function MPW:StartSession()
+function WHLSN:StartSession()
     if self.session.status then
         self:Print("A session is already active.")
         return
@@ -123,7 +123,7 @@ function MPW:StartSession()
 end
 
 --- Start a test session with hardcoded players (no guild comms).
-function MPW:StartTestSession()
+function WHLSN:StartTestSession()
     if self.session.status then
         self:Print("A session is already active.")
         return
@@ -142,7 +142,7 @@ function MPW:StartTestSession()
 end
 
 --- End the current session and clean up.
-function MPW:EndSession()
+function WHLSN:EndSession()
     if not self.session.status then
         self:Print("No active session.")
         return
@@ -172,7 +172,7 @@ function MPW:EndSession()
 end
 
 --- Leave the current session (for non-hosts).
-function MPW:LeaveSession()
+function WHLSN:LeaveSession()
     if not self.session.status then
         self:Print("No active session.")
         return
@@ -201,7 +201,7 @@ function MPW:LeaveSession()
 end
 
 --- Run the group creation algorithm and transition to spinning.
-function MPW:SpinGroups()
+function WHLSN:SpinGroups()
     if self.session.status ~= self.Status.LOBBY then
         self:Print("Can only spin from the lobby.")
         return
@@ -220,14 +220,14 @@ function MPW:SpinGroups()
 end
 
 --- Mark session as completed after wheel animation finishes.
-function MPW:CompleteSession()
+function WHLSN:CompleteSession()
     self.session.status = self.Status.COMPLETED
     self:SaveSessionResults()
     self:BroadcastSessionUpdate()
 end
 
 --- Save session results to SavedVariables.
-function MPW:SaveSessionResults()
+function WHLSN:SaveSessionResults()
     if self.session.isTest then return end
     if not self.db then return end
 
@@ -249,7 +249,7 @@ end
 
 --- Save a session record to the history log.
 ---@param record table Session record with groups, host, playerCount, timestamp
-function MPW:SaveSessionToHistory(record)
+function WHLSN:SaveSessionToHistory(record)
     if not self.db then return end
 
     local history = self.db.profile.sessionHistory
@@ -269,7 +269,7 @@ end
 
 --- View a saved session from history in the GroupDisplay.
 ---@param index number Index into sessionHistory (1 = most recent)
-function MPW:ViewHistorySession(index)
+function WHLSN:ViewHistorySession(index)
     if self.session.status and not self.session.viewingHistory then return end
 
     local history = self.db and self.db.profile.sessionHistory
@@ -287,7 +287,7 @@ function MPW:ViewHistorySession(index)
     -- Load groups into session state for display only (no broadcast)
     self.session.groups = {}
     for _, gd in ipairs(record.groups) do
-        self.session.groups[#self.session.groups + 1] = MPW.Group.FromDict(gd)
+        self.session.groups[#self.session.groups + 1] = WHLSN.Group.FromDict(gd)
     end
 
     self.session.status = self.Status.COMPLETED
@@ -300,7 +300,7 @@ end
 
 --- Remove a player from the session (host only).
 ---@param playerName string
-function MPW:KickPlayer(playerName)
+function WHLSN:KickPlayer(playerName)
     if self.session.host ~= UnitName("player") then return end
     if self.session.status ~= self.Status.LOBBY then return end
 
@@ -316,7 +316,7 @@ end
 
 --- Lock/unlock the lobby (host only).
 ---@param locked boolean
-function MPW:SetLobbyLocked(locked)
+function WHLSN:SetLobbyLocked(locked)
     if self.session.host ~= UnitName("player") then return end
     if self.session.status ~= self.Status.LOBBY then return end
 
@@ -330,16 +330,16 @@ end
 ---------------------------------------------------------------------------
 
 --- Reset the session timeout timer.
-function MPW:ResetSessionTimeout()
+function WHLSN:ResetSessionTimeout()
     self:CancelSessionTimeout()
     self.lastActivity = time()
     self.sessionTimeoutTimer = C_Timer.NewTimer(self.SESSION_TIMEOUT, function()
-        MPW:OnSessionTimeout()
+        WHLSN:OnSessionTimeout()
     end)
 end
 
 --- Cancel the session timeout timer.
-function MPW:CancelSessionTimeout()
+function WHLSN:CancelSessionTimeout()
     if self.sessionTimeoutTimer then
         self.sessionTimeoutTimer:Cancel()
         self.sessionTimeoutTimer = nil
@@ -347,7 +347,7 @@ function MPW:CancelSessionTimeout()
 end
 
 --- Handle session timeout.
-function MPW:OnSessionTimeout()
+function WHLSN:OnSessionTimeout()
     if not self.session.status then return end
 
     self:Print("Session timed out after " .. math.floor(self.SESSION_TIMEOUT / 60) .. " minutes of inactivity.")
@@ -355,7 +355,7 @@ function MPW:OnSessionTimeout()
 end
 
 --- Touch the session activity timer (called on meaningful actions).
-function MPW:TouchActivity()
+function WHLSN:TouchActivity()
     self.lastActivity = time()
     self:ResetSessionTimeout()
 end
@@ -365,7 +365,7 @@ end
 ---------------------------------------------------------------------------
 
 --- Broadcast session state to the guild (throttled).
-function MPW:BroadcastSessionUpdate()
+function WHLSN:BroadcastSessionUpdate()
     if self.session.isTest then return end
     self:TouchActivity()
 
@@ -387,7 +387,7 @@ function MPW:BroadcastSessionUpdate()
 end
 
 --- Send the actual session update message.
-function MPW:SendSessionUpdate()
+function WHLSN:SendSessionUpdate()
     local playerList = {}
     for _, p in ipairs(self.session.players) do
         playerList[#playerList + 1] = p:ToDict()
@@ -417,14 +417,14 @@ function MPW:SendSessionUpdate()
 end
 
 --- Broadcast session end to the guild.
-function MPW:BroadcastSessionEnd()
+function WHLSN:BroadcastSessionEnd()
     if self.session.isTest then return end
     local serialized = self:Serialize({ type = "SESSION_END" })
     self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
 end
 
 --- Handle incoming addon messages.
-function MPW:OnCommReceived(prefix, message, _distribution, sender)
+function WHLSN:OnCommReceived(prefix, message, _distribution, sender)
     if prefix ~= self.COMM_PREFIX then return end
     if sender == UnitName("player") then return end
 
@@ -456,7 +456,7 @@ function MPW:OnCommReceived(prefix, message, _distribution, sender)
     end
 end
 
-function MPW:HandleSessionUpdate(data, sender)
+function WHLSN:HandleSessionUpdate(data, sender)
     -- Ignore updates after intentionally leaving a session
     if self.hasLeftSession then return end
 
@@ -472,14 +472,14 @@ function MPW:HandleSessionUpdate(data, sender)
         if data.players then
             self.session.players = {}
             for _, pd in ipairs(data.players) do
-                self.session.players[#self.session.players + 1] = MPW.Player.FromDict(pd)
+                self.session.players[#self.session.players + 1] = WHLSN.Player.FromDict(pd)
             end
         end
 
         if data.groups then
             self.session.groups = {}
             for _, gd in ipairs(data.groups) do
-                self.session.groups[#self.session.groups + 1] = MPW.Group.FromDict(gd)
+                self.session.groups[#self.session.groups + 1] = WHLSN.Group.FromDict(gd)
             end
         end
 
@@ -487,7 +487,7 @@ function MPW:HandleSessionUpdate(data, sender)
     end
 end
 
-function MPW:HandleSessionEnd(sender)
+function WHLSN:HandleSessionEnd(sender)
     -- Only accept end from the session host
     if self.session.host and sender ~= self.session.host then return end
 
@@ -500,7 +500,7 @@ function MPW:HandleSessionEnd(sender)
     self:UpdateUI()
 end
 
-function MPW:HandleJoinRequest(data, sender)
+function WHLSN:HandleJoinRequest(data, sender)
     -- Only the host processes join requests
     if self.session.host ~= UnitName("player") then return end
     if self.session.status ~= self.Status.LOBBY then return end
@@ -514,7 +514,7 @@ function MPW:HandleJoinRequest(data, sender)
     -- Validate guild membership
     if not self:IsGuildMember(sender) then return end
 
-    local player = MPW.Player.FromDict(data.player)
+    local player = WHLSN.Player.FromDict(data.player)
     -- Replace if already in list
     for i, p in ipairs(self.session.players) do
         if p.name == player.name then
@@ -528,7 +528,7 @@ function MPW:HandleJoinRequest(data, sender)
     self:BroadcastSessionUpdate()
 end
 
-function MPW:HandleLeaveRequest(data, sender)
+function WHLSN:HandleLeaveRequest(data, sender)
     -- Only the host processes leave requests
     if self.session.host ~= UnitName("player") then return end
     if not data.playerName or data.playerName ~= sender then return end
@@ -546,7 +546,7 @@ end
 -- Addon Discovery
 ---------------------------------------------------------------------------
 
-function MPW:HandleAddonPing(_sender)
+function WHLSN:HandleAddonPing(_sender)
     -- Reply with our presence info, broadcast to GUILD so all clients can cache
     local data = {
         type = "ADDON_PONG",
@@ -557,7 +557,7 @@ function MPW:HandleAddonPing(_sender)
     self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
 end
 
-function MPW:HandleAddonPong(data, sender)
+function WHLSN:HandleAddonPong(data, sender)
     local name = self:StripRealmName(sender)
     self.addonUsersCache[name] = {
         name = name,
@@ -573,7 +573,7 @@ function MPW:HandleAddonPong(data, sender)
 end
 
 --- Broadcast a discovery ping to find online addon users.
-function MPW:SendAddonPing()
+function WHLSN:SendAddonPing()
     -- Add local player to cache (bypasses self-filter in OnCommReceived)
     local myName = UnitName("player")
     self.addonUsersCache[myName] = {
@@ -598,7 +598,7 @@ function MPW:SendAddonPing()
 end
 
 --- Remove cached addon users who are no longer online in the guild roster.
-function MPW:PruneAddonUsersCache()
+function WHLSN:PruneAddonUsersCache()
     local onlineMembers = self:GetOnlineGuildMembers()
     local onlineSet = {}
     for _, m in ipairs(onlineMembers) do
@@ -616,17 +616,17 @@ end
 -- Event Handlers
 ---------------------------------------------------------------------------
 
-function MPW:GROUP_ROSTER_UPDATE()
+function WHLSN:GROUP_ROSTER_UPDATE()
     self:ThrottledUpdateUI()
 end
 
-function MPW:GUILD_ROSTER_UPDATE()
+function WHLSN:GUILD_ROSTER_UPDATE()
     self:PruneAddonUsersCache()
     self:ThrottledUpdateUI()
 end
 
 --- Throttle UI updates from rapid roster events (fires at most once per 0.5s).
-function MPW:ThrottledUpdateUI()
+function WHLSN:ThrottledUpdateUI()
     if self.rosterUpdatePending then return end
     self.rosterUpdatePending = true
     C_Timer.After(0.5, function()
@@ -639,18 +639,18 @@ end
 -- UI Stubs (implemented in UI files)
 ---------------------------------------------------------------------------
 
-function MPW:ToggleMainFrame()
+function WHLSN:ToggleMainFrame()
     -- Overridden by UI/MainFrame.lua
 end
 
-function MPW:ShowMainFrame()
+function WHLSN:ShowMainFrame()
     -- Overridden by UI/MainFrame.lua
 end
 
-function MPW:UpdateUI()
+function WHLSN:UpdateUI()
     -- Overridden by UI/MainFrame.lua
 end
 
-function MPW:ToggleDebugFrame()
+function WHLSN:ToggleDebugFrame()
     -- Overridden by UI/DebugPanel.lua
 end

@@ -1,7 +1,7 @@
 ---@class Wheelson
-local MPW = _G.Wheelson
+local WHLSN = _G.Wheelson
 
-local Group = MPW.Group
+local Group = WHLSN.Group
 
 ---------------------------------------------------------------------------
 -- Group Formation Algorithm
@@ -11,21 +11,21 @@ local Group = MPW.Group
 local lastGroups = {}
 
 --- Clear stored last-groups history.
-function MPW:ClearLastGroups()
+function WHLSN:ClearLastGroups()
     wipe(lastGroups)
 end
 
 --- Store groups for the next run's duplicate-avoidance.
----@param groups MPWGroup[]
+---@param groups WHLSNGroup[]
 ---@param guildId? string
-function MPW:SetLastGroups(groups, guildId)
+function WHLSN:SetLastGroups(groups, guildId)
     lastGroups[guildId or "default"] = groups
 end
 
 --- Get stored last groups for a guild.
 ---@param guildId? string
----@return MPWGroup[]
-function MPW:GetLastGroups(guildId)
+---@return WHLSNGroup[]
+function WHLSN:GetLastGroups(guildId)
     return lastGroups[guildId or "default"] or {}
 end
 
@@ -67,10 +67,10 @@ end
 
 --- Create balanced Mythic+ groups from a player list.
 --- Port of createMythicPlusGroups() from parallelGroupCreator.ts.
----@param players MPWPlayer[]
+---@param players WHLSNPlayer[]
 ---@param guildId? string
----@return MPWGroup[]
-function MPW:CreateMythicPlusGroups(players, guildId)
+---@return WHLSNGroup[]
+function WHLSN:CreateMythicPlusGroups(players, guildId)
     guildId = guildId or "default"
     local previousGroups = lastGroups[guildId] or {}
 

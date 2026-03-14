@@ -1,5 +1,5 @@
 ---@class Wheelson
-local MPW = _G.Wheelson
+local WHLSN = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- Group Display View (final results)
@@ -8,7 +8,7 @@ local MPW = _G.Wheelson
 local displayFrame = nil
 
 local function CreateGroupDisplayFrame(parent)
-    local frame = CreateFrame("Frame", "MPWGroupDisplayFrame", parent)
+    local frame = CreateFrame("Frame", "WHLSNGroupDisplayFrame", parent)
     frame:SetAllPoints()
 
     -- Title
@@ -17,7 +17,7 @@ local function CreateGroupDisplayFrame(parent)
     frame.title:SetText("|cFFFFD100Mythic+ Groups|r")
 
     -- Scroll frame for group results
-    frame.scrollFrame = CreateFrame("ScrollFrame", "MPWResultsScrollFrame", frame, "UIPanelScrollFrameTemplate")
+    frame.scrollFrame = CreateFrame("ScrollFrame", "WHLSNResultsScrollFrame", frame, "UIPanelScrollFrameTemplate")
     frame.scrollFrame:SetPoint("TOPLEFT", 4, -28)
     frame.scrollFrame:SetPoint("BOTTOMRIGHT", -28, 48)
 
@@ -32,7 +32,7 @@ local function CreateGroupDisplayFrame(parent)
     frame.inviteButton:SetPoint("BOTTOMLEFT", 8, 8)
     frame.inviteButton:SetText("Invite My Group")
     frame.inviteButton:SetScript("OnClick", function()
-        MPW:InviteMyGroup()
+        WHLSN:InviteMyGroup()
     end)
 
     -- Post to Guild Chat button
@@ -41,7 +41,7 @@ local function CreateGroupDisplayFrame(parent)
     frame.postButton:SetPoint("BOTTOM", -60, 8)
     frame.postButton:SetText("Post to Guild")
     frame.postButton:SetScript("OnClick", function()
-        MPW:PostToGuildChat(MPW.session.groups)
+        WHLSN:PostToGuildChat(WHLSN.session.groups)
     end)
 
     -- Copy to Clipboard button
@@ -50,7 +50,7 @@ local function CreateGroupDisplayFrame(parent)
     frame.copyButton:SetPoint("BOTTOM", 40, 8)
     frame.copyButton:SetText("Copy")
     frame.copyButton:SetScript("OnClick", function()
-        MPW:CopyGroupsToClipboard(MPW.session.groups)
+        WHLSN:CopyGroupsToClipboard(WHLSN.session.groups)
     end)
 
     -- End Session button (host only)
@@ -59,7 +59,7 @@ local function CreateGroupDisplayFrame(parent)
     frame.endButton:SetPoint("BOTTOMRIGHT", -8, 8)
     frame.endButton:SetText("End Session")
     frame.endButton:SetScript("OnClick", function()
-        MPW:EndSession()
+        WHLSN:EndSession()
     end)
 
     -- New Session button (host only)
@@ -68,8 +68,8 @@ local function CreateGroupDisplayFrame(parent)
     frame.newButton:SetPoint("BOTTOMRIGHT", frame.endButton, "BOTTOMLEFT", -4, 0)
     frame.newButton:SetText("New Session")
     frame.newButton:SetScript("OnClick", function()
-        MPW:EndSession()
-        MPW:StartSession()
+        WHLSN:EndSession()
+        WHLSN:StartSession()
     end)
 
     return frame
@@ -178,7 +178,7 @@ local function RenderGroupCard(parent, index, group, yOffset)
 end
 
 --- Show the group display view.
-function MPW:ShowGroupDisplayView(parent)
+function WHLSN:ShowGroupDisplayView(parent)
     if displayFrame then displayFrame:Hide() end
 
     displayFrame = CreateGroupDisplayFrame(parent)
@@ -186,7 +186,7 @@ function MPW:ShowGroupDisplayView(parent)
 end
 
 --- Update the group display with session results.
-function MPW:UpdateGroupDisplayView()
+function WHLSN:UpdateGroupDisplayView()
     if not displayFrame then return end
 
     -- Clear old children from scroll child
@@ -224,7 +224,7 @@ function MPW:UpdateGroupDisplayView()
 end
 
 --- Invite players from the group containing the local player.
-function MPW:InviteMyGroup()
+function WHLSN:InviteMyGroup()
     local myName = UnitName("player")
     for _, group in ipairs(self.session.groups) do
         for _, player in ipairs(group:GetPlayers()) do

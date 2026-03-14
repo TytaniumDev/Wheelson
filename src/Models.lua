@@ -1,25 +1,25 @@
 ---@class Wheelson
-local MPW = _G.Wheelson
+local WHLSN = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- WoWPlayer
 ---------------------------------------------------------------------------
 
----@class MPWPlayer
+---@class WHLSNPlayer
 ---@field name string
 ---@field mainRole string|nil  "tank"|"healer"|"ranged"|"melee"
 ---@field offspecs string[]
 ---@field utilities string[]
 local Player = {}
 Player.__index = Player
-MPW.Player = Player
+WHLSN.Player = Player
 
 --- Create a new player.
 ---@param name string
 ---@param mainRole string|nil
 ---@param offspecs? string[]
 ---@param utilities? string[]
----@return MPWPlayer
+---@return WHLSNPlayer
 function Player:New(name, mainRole, offspecs, utilities)
     local p = setmetatable({}, self)
     p.name = name
@@ -93,7 +93,7 @@ end
 
 --- Deserialize from addon comms table.
 ---@param data table
----@return MPWPlayer
+---@return WHLSNPlayer
 function Player.FromDict(data)
     return Player:New(
         data.name,
@@ -107,19 +107,19 @@ end
 -- WoWGroup
 ---------------------------------------------------------------------------
 
----@class MPWGroup
----@field tank MPWPlayer|nil
----@field healer MPWPlayer|nil
----@field dps MPWPlayer[]
+---@class WHLSNGroup
+---@field tank WHLSNPlayer|nil
+---@field healer WHLSNPlayer|nil
+---@field dps WHLSNPlayer[]
 local Group = {}
 Group.__index = Group
-MPW.Group = Group
+WHLSN.Group = Group
 
 --- Create a new group.
----@param tank? MPWPlayer
----@param healer? MPWPlayer
----@param dps? MPWPlayer[]
----@return MPWGroup
+---@param tank? WHLSNPlayer
+---@param healer? WHLSNPlayer
+---@param dps? WHLSNPlayer[]
+---@return WHLSNGroup
 function Group:New(tank, healer, dps)
     local g = setmetatable({}, self)
     g.tank = tank or nil
@@ -180,7 +180,7 @@ end
 
 --- Deserialize from addon comms table.
 ---@param data table
----@return MPWGroup
+---@return WHLSNGroup
 function Group.FromDict(data)
     local tank = data.tank and Player.FromDict(data.tank) or nil
     local healer = data.healer and Player.FromDict(data.healer) or nil

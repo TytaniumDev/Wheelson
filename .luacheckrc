@@ -3,8 +3,8 @@ std = "lua51"
 max_line_length = 120
 
 -- Allow setting fields on writable globals (WoW addon pattern where methods
--- are defined across multiple files via `local MPW = _G.Wheelson`
--- then `function MPW:Method() end`).
+-- are defined across multiple files via `local WHLSN = _G.Wheelson`
+-- then `function WHLSN:Method() end`).
 globals = {
     -- _G is written to by WoW addons to register their namespace
     _G = { other_fields = true },

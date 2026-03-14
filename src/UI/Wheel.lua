@@ -1,5 +1,5 @@
 ---@class Wheelson
-local MPW = _G.Wheelson
+local WHLSN = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- Wheel View
@@ -19,8 +19,8 @@ local BASE_PLAYER_DELAY = 0.4  -- Delay between each player in a group
 local BASE_FADE_DURATION = 0.4 -- Fade-in duration
 
 local function GetAnimationSpeed()
-    if MPW.db and MPW.db.profile then
-        return MPW.db.profile.animationSpeed or 1.0
+    if WHLSN.db and WHLSN.db.profile then
+        return WHLSN.db.profile.animationSpeed or 1.0
     end
     return 1.0
 end
@@ -38,14 +38,14 @@ local function GetFadeDuration()
 end
 
 local function ShouldPlaySounds()
-    if MPW.db and MPW.db.profile then
-        return MPW.db.profile.soundEnabled ~= false
+    if WHLSN.db and WHLSN.db.profile then
+        return WHLSN.db.profile.soundEnabled ~= false
     end
     return true
 end
 
 local function CreateWheelFrame(parent)
-    local frame = CreateFrame("Frame", "MPWWheelFrame", parent)
+    local frame = CreateFrame("Frame", "WHLSNWheelFrame", parent)
     frame:SetAllPoints()
 
     -- Title
@@ -65,7 +65,7 @@ local function CreateWheelFrame(parent)
     frame.skipButton:SetPoint("BOTTOMRIGHT", -8, 8)
     frame.skipButton:SetText("Skip")
     frame.skipButton:SetScript("OnClick", function()
-        MPW:SkipWheelAnimation()
+        WHLSN:SkipWheelAnimation()
     end)
 
     -- Re-spin button (go back to lobby with same players)
@@ -75,7 +75,7 @@ local function CreateWheelFrame(parent)
     frame.respinButton:SetText("Re-spin")
     frame.respinButton:Hide()
     frame.respinButton:SetScript("OnClick", function()
-        MPW:ReSpin()
+        WHLSN:ReSpin()
     end)
 
     return frame
@@ -153,7 +153,7 @@ local function CreateGroupCard(parent, index, group)
 end
 
 --- Show the wheel view inside the given content frame.
-function MPW:ShowWheelView(parent)
+function WHLSN:ShowWheelView(parent)
     if wheelFrame then wheelFrame:Hide() end
     groupFrames = {}
     playerTexts = {}
@@ -168,12 +168,12 @@ function MPW:ShowWheelView(parent)
 end
 
 --- Update the wheel view.
-function MPW:UpdateWheelView()
+function WHLSN:UpdateWheelView()
     -- Animation is self-driven via timers
 end
 
 --- Start the sequential group reveal animation.
-function MPW:StartWheelReveal()
+function WHLSN:StartWheelReveal()
     if not wheelFrame then return end
 
     -- Create all group cards (hidden)
@@ -195,7 +195,7 @@ function MPW:StartWheelReveal()
 end
 
 --- Reveal the next group card with animation.
-function MPW:RevealNextGroup()
+function WHLSN:RevealNextGroup()
     currentRevealGroup = currentRevealGroup + 1
     currentRevealPlayer = 0
 
@@ -217,7 +217,7 @@ function MPW:RevealNextGroup()
     fadeIn:SetScript("OnFinished", function()
         card:SetAlpha(1)
         -- Start per-player reveal
-        MPW:RevealNextPlayer()
+        WHLSN:RevealNextPlayer()
     end)
     fadeIn:Play()
 
@@ -228,14 +228,14 @@ function MPW:RevealNextGroup()
 end
 
 --- Reveal the next player within the current group.
-function MPW:RevealNextPlayer()
+function WHLSN:RevealNextPlayer()
     currentRevealPlayer = currentRevealPlayer + 1
 
     local texts = playerTexts[currentRevealGroup]
     if not texts or currentRevealPlayer > #texts then
         -- All players in this group revealed, move to next group
         revealTimer = C_Timer.NewTimer(GetGroupDelay(), function()
-            MPW:RevealNextGroup()
+            WHLSN:RevealNextGroup()
         end)
         return
     end
@@ -245,12 +245,12 @@ function MPW:RevealNextPlayer()
 
     -- Schedule next player reveal
     revealTimer = C_Timer.NewTimer(GetPlayerDelay(), function()
-        MPW:RevealNextPlayer()
+        WHLSN:RevealNextPlayer()
     end)
 end
 
 --- Skip remaining animation and show all groups.
-function MPW:SkipWheelAnimation()
+function WHLSN:SkipWheelAnimation()
     if revealTimer then
         revealTimer:Cancel()
         revealTimer = nil
@@ -269,7 +269,7 @@ function MPW:SkipWheelAnimation()
 end
 
 --- Go back to lobby with same players and re-spin.
-function MPW:ReSpin()
+function WHLSN:ReSpin()
     if self.session.host ~= UnitName("player") then return end
 
     self.session.status = self.Status.LOBBY
@@ -279,7 +279,7 @@ function MPW:ReSpin()
 end
 
 --- Called when all groups have been revealed.
-function MPW:OnWheelComplete()
+function WHLSN:OnWheelComplete()
     if wheelFrame then
         wheelFrame.title:SetText("Groups Complete!")
         wheelFrame.skipButton:Hide()

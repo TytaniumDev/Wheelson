@@ -33,18 +33,18 @@ Checks that the `.toc` file exists and all source files listed in it are present
 ## Architecture
 
 ### Global namespace pattern
-The addon registers itself as `Wheelson` via AceAddon in `src/Config.lua`, stored in `_G.Wheelson`. Every other source file accesses it via `local MPW = _G.Wheelson` and attaches methods/data to it. There is no module system — all files share the single `MPW` table.
+The addon registers itself as `Wheelson` via AceAddon in `src/Config.lua`, stored in `_G.Wheelson`. Every other source file accesses it via `local WHLSN = _G.Wheelson` and attaches methods/data to it. There is no module system — all files share the single `WHLSN` table.
 
 ### File load order (defined by `Wheelson.toc`)
 1. **Config.lua** — Creates the addon object, defines constants (roles, spec→role mapping, session states, saved variable defaults)
-2. **Models.lua** — `MPW.Player` and `MPW.Group` classes (metatables with `:New()`, `:ToDict()`, `.FromDict()` serialization)
+2. **Models.lua** — `WHLSN.Player` and `WHLSN.Group` classes (metatables with `:New()`, `:ToDict()`, `.FromDict()` serialization)
 3. **GroupCreator.lua** — Group formation algorithm (port of `parallelGroupCreator.ts`). Assigns tanks → lust → brez → healers → ranged → remaining DPS with duplicate-avoidance across runs
 4. **Core.lua** — Addon lifecycle (`OnInitialize`/`OnEnable`), slash commands (`/wheelson`), session state machine (lobby → spinning → completed), addon comm message handling, session timeout
 5. **Services/** — `SpecService` (local player spec detection, realm name stripping), `GuildService` (roster queries), `PartyService` (party invites)
 6. **UI/** — `MainFrame.xml` + `MainFrame.lua` (window shell, view switching), `Lobby.lua` (player list + join/spin), `Wheel.lua` (animated group reveal), `GroupDisplay.lua` (final results with invite/post/copy actions)
 
 ### Session state machine
-`MPW.session.status`: `nil` → `"lobby"` → `"spinning"` → `"completed"`. The host broadcasts state to guild via `AceComm` (`GUILD` channel, prefix `MPWheel`). Non-hosts send `JOIN_REQUEST`/`LEAVE_REQUEST` messages.
+`WHLSN.session.status`: `nil` → `"lobby"` → `"spinning"` → `"completed"`. The host broadcasts state to guild via `AceComm` (`GUILD` channel, prefix `WHLSN`). Non-hosts send `JOIN_REQUEST`/`LEAVE_REQUEST` messages.
 
 ### Group creation algorithm
 `GroupCreator.lua` is a direct port of `parallelGroupCreator.ts` from a companion TypeScript project. It fills groups in priority order: tanks, lust providers, brez providers, healers, ranged DPS, remaining DPS. It tracks previous group compositions per guild to avoid repeat teammate assignments.
