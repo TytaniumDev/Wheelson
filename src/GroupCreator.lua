@@ -34,7 +34,7 @@ end
 ---@return any[]
 local function shuffle(arr)
     for i = #arr, 2, -1 do
-        local j = math.random(1, i)
+        local j = random(1, i)
         arr[i], arr[j] = arr[j], arr[i]
     end
     return arr

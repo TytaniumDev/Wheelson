@@ -68,6 +68,7 @@ read_globals = {
     "LibStub",
 
     -- Lua builtins in WoW
+    "random",
     "strtrim",
     "wipe",
     "table",
