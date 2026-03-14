@@ -4,7 +4,7 @@
 ## Author: MythicPlusDiscordBot Contributors
 ## Version: @project-version@
 ## SavedVariables: WheelsonDB
-## IconTexture: Interface\Icons\INV_Misc_GroupNeedMore
+## IconTexture: Interface\AddOns\Wheelson\textures\minimap-icon
 ## X-Curse-Project-ID: 1484744
 ## X-Wago-ID: kGryLYKy
 
@@ -17,6 +17,7 @@ libs\AceSerializer-3.0\AceSerializer-3.0.lua
 libs\AceDB-3.0\AceDB-3.0.lua
 libs\AceConfig-3.0\AceConfig-3.0.lua
 libs\AceGUI-3.0\AceGUI-3.0.lua
+libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
 libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
 
