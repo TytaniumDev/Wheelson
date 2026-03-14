@@ -18,7 +18,7 @@ local function GetDiscoveryText()
     local lines = {}
     local cache = MPW.addonUsersCache or {}
     for _, entry in pairs(cache) do
-        lines[#lines + 1] = entry.name .. "  (v" .. entry.version .. ")"
+        lines[#lines + 1] = entry.name .. "  (" .. entry.version .. ")"
     end
 
     if #lines == 0 then
@@ -52,6 +52,26 @@ local options = {
             func = function()
                 MPW:SendAddonPing()
             end,
+        },
+        versionHeader = {
+            order = 10,
+            type = "header",
+            name = "Version",
+        },
+        versionDesc = {
+            order = 11,
+            type = "description",
+            name = MPW.VERSION,
+            fontSize = "medium",
+        },
+        releaseUrl = {
+            order = 12,
+            type = "input",
+            name = "Release Link",
+            desc = "Copy this URL to view the release on GitHub",
+            get = function() return MPW.RELEASE_URL end,
+            set = function() end,
+            width = "full",
         },
     },
 }

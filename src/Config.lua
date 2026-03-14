@@ -106,6 +106,7 @@ MPW.MAX_LEVEL = 90
 
 -- Addon version (replaced by packager with git tag)
 MPW.VERSION = "@project-version@"
+MPW.RELEASE_URL = "https://github.com/TytaniumDev/Wheelson/releases/tag/@project-version@"
 
 -- Session timeout in seconds (default 30 minutes)
 MPW.SESSION_TIMEOUT = 1800
