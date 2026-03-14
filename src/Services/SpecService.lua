@@ -9,10 +9,10 @@ local MPW = _G.Wheelson
 --- Detect all available offspecs for the local player.
 ---@return string[] allOffspecs All possible offspec roles
 function MPW:DetectAllOffspecs()
-    local specIndex = GetSpecialization()
+    local specIndex = C_SpecializationInfo.GetSpecialization()
     if not specIndex then return {} end
 
-    local specID = GetSpecializationInfo(specIndex)
+    local specID = C_SpecializationInfo.GetSpecializationInfo(specIndex)
     if not specID then return {} end
 
     local mainRole = MPW.SpecRoles[specID]
@@ -21,7 +21,7 @@ function MPW:DetectAllOffspecs()
 
     for i = 1, numSpecs do
         if i ~= specIndex then
-            local otherSpecID = GetSpecializationInfo(i)
+            local otherSpecID = C_SpecializationInfo.GetSpecializationInfo(i)
             if otherSpecID then
                 local otherRole = MPW.SpecRoles[otherSpecID]
                 if otherRole and otherRole ~= mainRole then
@@ -48,10 +48,10 @@ function MPW:DetectLocalPlayer(selectedOffspecs, overrideRole)
     local name = UnitName("player")
     if not name then return nil end
 
-    local specIndex = GetSpecialization()
+    local specIndex = C_SpecializationInfo.GetSpecialization()
     if not specIndex then return nil end
 
-    local specID = GetSpecializationInfo(specIndex)
+    local specID = C_SpecializationInfo.GetSpecializationInfo(specIndex)
     if not specID then return nil end
 
     local mainRole = overrideRole or MPW.SpecRoles[specID]

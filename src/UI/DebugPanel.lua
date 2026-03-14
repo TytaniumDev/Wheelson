@@ -138,10 +138,10 @@ local function GenerateAPIText()
     lines[#lines + 1] = ""
 
     lines[#lines + 1] = "=== Specialization ==="
-    local specIndex = GetSpecialization()
-    lines[#lines + 1] = "GetSpecialization(): " .. tostring(specIndex)
+    local specIndex = C_SpecializationInfo.GetSpecialization()
+    lines[#lines + 1] = "C_SpecializationInfo.GetSpecialization(): " .. tostring(specIndex)
     if specIndex then
-        local specID, specName = GetSpecializationInfo(specIndex)
+        local specID, specName = C_SpecializationInfo.GetSpecializationInfo(specIndex)
         lines[#lines + 1] = "specID: " .. tostring(specID)
         lines[#lines + 1] = "specName: " .. tostring(specName)
         if specID then
