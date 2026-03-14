@@ -14,13 +14,16 @@ function MPW:InvitePlayers(players)
 
     for _, player in ipairs(players) do
         if player.name ~= myName then
-            C_PartyInfo.InviteUnit(player.name)
+            if not self.session.isTest then
+                C_PartyInfo.InviteUnit(player.name)
+            end
             invited[#invited + 1] = player.name
         end
     end
 
+    local prefix = self.session.isTest and "[Test] Would invite: " or "Invited: "
     if #invited > 0 then
-        self:Print("Invited: " .. table.concat(invited, ", "))
+        self:Print(prefix .. table.concat(invited, ", "))
     else
         self:Print("No players to invite.")
     end

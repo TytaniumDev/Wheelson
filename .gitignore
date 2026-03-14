@@ -37,6 +37,9 @@ luac.out
 *.so.*
 *.dylib
 
+# Superpowers planning documents
+docs/superpowers/
+
 # Executables
 *.exe
 *.out
