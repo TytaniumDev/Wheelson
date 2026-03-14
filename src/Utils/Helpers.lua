@@ -306,3 +306,26 @@ function WHLSN:CopyGroupsToClipboard(groups)
     editBox:SetFocus()
     self:Print("Group results copied. Press Ctrl+C to copy, then Escape.")
 end
+
+--- Copy a bug report to the clipboard and show instructions.
+---@param snapshot table  algorithmSnapshot from session
+function WHLSN:CopyReportToClipboard(snapshot)
+    local text = self:FormatBugReport(snapshot)
+    local editBox = self.clipboardEditBox
+    if not editBox then
+        editBox = CreateFrame("EditBox", "WHLSNClipboardEditBox", UIParent)
+        editBox:SetMultiLine(true)
+        editBox:SetMaxLetters(0)
+        editBox:SetAutoFocus(false)
+        editBox:SetFontObject("ChatFontNormal")
+        editBox:SetWidth(0)
+        editBox:SetHeight(0)
+        editBox:SetPoint("CENTER")
+        editBox:Hide()
+        self.clipboardEditBox = editBox
+    end
+    editBox:SetText(text)
+    editBox:HighlightText()
+    editBox:SetFocus()
+    self:Print("Report copied! Press Ctrl+C, then paste into a new issue at github.com/TytaniumDev/Wheelson/issues")
+end
