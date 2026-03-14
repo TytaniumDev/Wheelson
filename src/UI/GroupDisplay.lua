@@ -177,6 +177,11 @@ local function RenderGroupCard(parent, index, group, yOffset)
     return cardHeight + 8
 end
 
+--- Hide the group display view.
+function WHLSN:HideGroupDisplayView()
+    if displayFrame then displayFrame:Hide() end
+end
+
 --- Show the group display view.
 function WHLSN:ShowGroupDisplayView(parent)
     if displayFrame then displayFrame:Hide() end

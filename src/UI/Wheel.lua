@@ -152,6 +152,15 @@ local function CreateGroupCard(parent, index, group)
     return card, texts
 end
 
+--- Hide the wheel view and cancel any pending animation timers.
+function WHLSN:HideWheelView()
+    if revealTimer then
+        revealTimer:Cancel()
+        revealTimer = nil
+    end
+    if wheelFrame then wheelFrame:Hide() end
+end
+
 --- Show the wheel view inside the given content frame.
 function WHLSN:ShowWheelView(parent)
     if wheelFrame then wheelFrame:Hide() end

@@ -140,6 +140,13 @@ function WHLSN:ShowMainFrame()
     self:UpdateUI()
 end
 
+--- Hide all view frames so only the next shown view is visible.
+function WHLSN:HideAllViews()
+    self:HideLobbyView()
+    self:HideWheelView()
+    self:HideGroupDisplayView()
+end
+
 --- Update the UI based on current session state.
 function WHLSN:UpdateUI()
     local frame = GetMainFrame()
@@ -150,18 +157,21 @@ function WHLSN:UpdateUI()
 
     if status == self.Status.LOBBY then
         if currentView ~= "lobby" then
+            self:HideAllViews()
             self:ShowLobbyView(frame.Content)
             currentView = "lobby"
         end
         self:UpdateLobbyView()
     elseif status == self.Status.SPINNING then
         if currentView ~= "wheel" then
+            self:HideAllViews()
             self:ShowWheelView(frame.Content)
             currentView = "wheel"
         end
         self:UpdateWheelView()
     elseif status == self.Status.COMPLETED then
         if currentView ~= "results" then
+            self:HideAllViews()
             self:ShowGroupDisplayView(frame.Content)
             currentView = "results"
         end
@@ -169,6 +179,7 @@ function WHLSN:UpdateUI()
     else
         -- No session: show idle/join state
         if currentView ~= "lobby" then
+            self:HideAllViews()
             self:ShowLobbyView(frame.Content)
             currentView = "lobby"
         end

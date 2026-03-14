@@ -241,6 +241,11 @@ local function CreateHistoryRow(parent, index)
     return row
 end
 
+--- Hide the lobby view.
+function WHLSN:HideLobbyView()
+    if lobbyFrame then lobbyFrame:Hide() end
+end
+
 --- Show the lobby view inside the given content frame.
 function WHLSN:ShowLobbyView(parent)
     if lobbyFrame then lobbyFrame:Hide() end
