@@ -55,6 +55,12 @@ end
 --- Post group results to guild chat.
 ---@param groups MPWGroup[]
 function MPW:PostToGuildChat(groups)
+    if self.session.isTest then
+        self:Print("[Test] Would post group results to guild chat:")
+        self:Print(self:FormatGroupSummary(groups))
+        return
+    end
+
     if not IsInGuild() then
         self:Print("Not in a guild.")
         return

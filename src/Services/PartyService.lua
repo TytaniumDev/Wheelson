@@ -14,7 +14,11 @@ function MPW:InvitePlayers(players)
 
     for _, player in ipairs(players) do
         if player.name ~= myName then
-            InviteUnit(player.name)
+            if self.session.isTest then
+                self:Print("[Test] Would invite: " .. player.name)
+            else
+                InviteUnit(player.name)
+            end
             invited[#invited + 1] = player.name
         end
     end

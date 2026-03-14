@@ -229,17 +229,7 @@ function MPW:InviteMyGroup()
     for _, group in ipairs(self.session.groups) do
         for _, player in ipairs(group:GetPlayers()) do
             if player.name == myName then
-                -- Found my group, invite everyone else
-                local invited = {}
-                for _, member in ipairs(group:GetPlayers()) do
-                    if member.name ~= myName then
-                        InviteUnit(member.name)
-                        invited[#invited + 1] = member.name
-                    end
-                end
-                if #invited > 0 then
-                    self:Print("Invited: " .. table.concat(invited, ", "))
-                end
+                self:InvitePlayers(group:GetPlayers())
                 return
             end
         end
