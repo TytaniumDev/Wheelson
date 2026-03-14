@@ -32,4 +32,3 @@ ignore:
   - .luacheckrc
   - "*.md"
   - .github
-  - src/TestData.lua
