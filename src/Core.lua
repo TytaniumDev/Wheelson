@@ -30,7 +30,7 @@ function MPW:OnInitialize()
     self.commPendingUpdate = false
 
     -- Initialize random seed for shuffle
-    math.randomseed(tonumber(tostring({}):sub(8)) + os.time())
+    math.randomseed(tonumber(tostring({}):sub(8)) + time())
 
     self:RegisterComm(self.COMM_PREFIX)
 
