@@ -53,10 +53,19 @@ local function CreateGroupDisplayFrame(parent)
         MPW:CopyGroupsToClipboard(MPW.session.groups)
     end)
 
+    -- End Session button (host only)
+    frame.endButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    frame.endButton:SetSize(100, 28)
+    frame.endButton:SetPoint("BOTTOMRIGHT", -8, 8)
+    frame.endButton:SetText("End Session")
+    frame.endButton:SetScript("OnClick", function()
+        MPW:EndSession()
+    end)
+
     -- New Session button (host only)
     frame.newButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     frame.newButton:SetSize(100, 28)
-    frame.newButton:SetPoint("BOTTOMRIGHT", -8, 8)
+    frame.newButton:SetPoint("BOTTOMRIGHT", frame.endButton, "BOTTOMLEFT", -4, 0)
     frame.newButton:SetText("New Session")
     frame.newButton:SetScript("OnClick", function()
         MPW:EndSession()
@@ -188,7 +197,18 @@ function MPW:UpdateGroupDisplayView()
     end
 
     local isHost = self.session.host == UnitName("player")
-    displayFrame.newButton:SetShown(isHost)
+    local isViewing = self.session.viewingHistory or false
+    displayFrame.endButton:SetShown(isHost or isViewing)
+    displayFrame.newButton:SetShown(isHost and not isViewing)
+
+    -- Update title for historical views
+    if isViewing then
+        displayFrame.title:SetText("|cFFFFD100Past Session Results|r")
+        displayFrame.endButton:SetText("Close")
+    else
+        displayFrame.title:SetText("|cFFFFD100Mythic+ Groups|r")
+        displayFrame.endButton:SetText("End Session")
+    end
 
     -- Render each group
     local yOffset = 0

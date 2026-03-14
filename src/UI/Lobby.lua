@@ -8,6 +8,7 @@ local MPW = _G.Wheelson
 
 local lobbyFrame = nil
 local playerRows = {}
+local historyRows = {}
 
 local ROLE_ICONS = {
     tank = "Interface\\LFGFrame\\LFGRole_BW",
@@ -100,6 +101,26 @@ local function CreateLobbyFrame(parent)
         MPW:SetLobbyLocked(locked)
     end)
 
+    -- Host Session button (shown when no active session)
+    frame.hostButton = CreateFrame("Button", "MPWHostButton", frame, "UIPanelButtonTemplate")
+    frame.hostButton:SetSize(160, 32)
+    frame.hostButton:SetPoint("BOTTOM", 0, 8)
+    frame.hostButton:SetText("Host Session")
+    frame.hostButton:SetScript("OnClick", function()
+        PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+        MPW:StartSession()
+    end)
+
+    -- End Session button (host only, active session)
+    frame.endButton = CreateFrame("Button", "MPWEndButton", frame, "UIPanelButtonTemplate")
+    frame.endButton:SetSize(100, 32)
+    frame.endButton:SetPoint("BOTTOMLEFT", 8, 8)
+    frame.endButton:SetText("End Session")
+    frame.endButton:SetScript("OnClick", function()
+        PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+        MPW:EndSession()
+    end)
+
     return frame
 end
 
@@ -186,6 +207,30 @@ local function CreatePlayerRow(parent, index)
     return row
 end
 
+local function CreateHistoryRow(parent, index)
+    local row = CreateFrame("Button", nil, parent)
+    row:SetHeight(20)
+    row:SetPoint("TOPLEFT", 0, -(index - 1) * 22)
+    row:SetPoint("TOPRIGHT", 0, -(index - 1) * 22)
+
+    local highlight = row:CreateTexture(nil, "HIGHLIGHT")
+    highlight:SetAllPoints()
+    highlight:SetColorTexture(1, 0.82, 0, 0.1)
+
+    row.dateText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.dateText:SetPoint("LEFT", 4, 0)
+    row.dateText:SetWidth(100)
+    row.dateText:SetJustifyH("LEFT")
+    row.dateText:SetTextColor(0.7, 0.7, 0.7)
+
+    row.infoText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.infoText:SetPoint("LEFT", row.dateText, "RIGHT", 8, 0)
+    row.infoText:SetPoint("RIGHT", -4, 0)
+    row.infoText:SetJustifyH("LEFT")
+
+    return row
+end
+
 --- Show the lobby view inside the given content frame.
 function MPW:ShowLobbyView(parent)
     if lobbyFrame then lobbyFrame:Hide() end
@@ -239,14 +284,19 @@ function MPW:UpdateLobbyView()
     lobbyFrame.joinButton:SetShown(not isHost and hasSession and not isInSession)
     lobbyFrame.leaveButton:SetShown(not isHost and hasSession and isInSession)
     lobbyFrame.lockButton:SetShown(isHost and hasSession)
+    lobbyFrame.hostButton:SetShown(not hasSession)
+    lobbyFrame.endButton:SetShown(isHost and hasSession)
     if isHost and hasSession then
         lobbyFrame.lockButton:SetText(self.session.locked and "Unlock" or "Lock")
     end
 
-    -- Update player rows
+    -- Hide all dynamic rows before repopulating
     for _, row in ipairs(playerRows) do row:Hide() end
+    for _, row in ipairs(historyRows) do row:Hide() end
 
-    for i, player in ipairs(players) do
+    if hasSession then
+        -- Update player rows
+        for i, player in ipairs(players) do
         if not playerRows[i] then
             playerRows[i] = CreatePlayerRow(lobbyFrame.scrollChild, i)
         end
@@ -284,9 +334,44 @@ function MPW:UpdateLobbyView()
         row.kickButton:Hide()
 
         row:Show()
-    end
+        end
 
-    lobbyFrame.scrollChild:SetHeight(math.max(1, #players * 26))
+        lobbyFrame.scrollChild:SetHeight(math.max(1, #players * 26))
+    else
+        -- Show session history when idle
+        local history = self.db and self.db.profile.sessionHistory
+        if history and #history > 0 then
+            lobbyFrame.statusText:SetText("Recent Sessions")
+            lobbyFrame.countText:SetText(#history .. " sessions")
+
+            for i, record in ipairs(history) do
+                if not historyRows[i] then
+                    historyRows[i] = CreateHistoryRow(lobbyFrame.scrollChild, i)
+                end
+
+                local row = historyRows[i]
+                local dateStr = record.timestamp and date("%m/%d %H:%M", record.timestamp) or "Unknown"
+                local groupCount = record.groups and #record.groups or 0
+                local playerCount = record.playerCount or 0
+
+                row.dateText:SetText(dateStr)
+                row.infoText:SetText(string.format("%s  |  %d players, %d groups",
+                    record.host or "Unknown", playerCount, groupCount))
+
+                local idx = i
+                row:SetScript("OnClick", function()
+                    PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+                    MPW:ViewHistorySession(idx)
+                end)
+
+                row:Show()
+            end
+
+            lobbyFrame.scrollChild:SetHeight(math.max(1, #history * 22))
+        else
+            lobbyFrame.scrollChild:SetHeight(1)
+        end
+    end
 end
 
 --- Send a join request to the session host.
