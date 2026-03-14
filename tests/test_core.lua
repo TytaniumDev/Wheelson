@@ -54,11 +54,21 @@ _G.C_Timer = {
     NewTimer = function(_, cb) return { Cancel = function() end } end,
     After = function(_, cb) end,
 }
+_G.CreateFrame = function()
+    return {
+        CreateFontString = function() return { SetPoint = function() end, SetText = function() end } end,
+    }
+end
+_G.Settings = {
+    RegisterCanvasLayoutCategory = function(_, name) return { ID = name } end,
+    RegisterAddOnCategory = function() end,
+}
 
 -- Load source files in order
 dofile("src/Config.lua")
 dofile("src/Models.lua")
 dofile("src/Core.lua")
+dofile("src/UI/Options.lua")
 
 local MPW = _G.Wheelson
 

@@ -65,6 +65,9 @@ function MPW:OnInitialize()
     })
     LDBIcon:Register("Wheelson", launcher, self.db.profile.minimap)
 
+    -- Register options panel in the AddOns section of WoW Settings
+    self:InitOptions()
+
     self:Print("Wheelson loaded. Type /wheelson to open.")
 end
 
