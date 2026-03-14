@@ -91,6 +91,14 @@ local function CreateWheelFrame(parent)
     return frame
 end
 
+local function GetUtilString(player)
+    if not player then return "" end
+    local utilStr = ""
+    if player:HasBrez() then utilStr = utilStr .. " |cFF00FF00[BR]|r" end
+    if player:HasLust() then utilStr = utilStr .. " |cFFFF4400[BL]|r" end
+    return utilStr
+end
+
 local function CreateGroupCard(parent, index, group)
     local card = CreateFrame("Frame", nil, parent, "BackdropTemplate")
 
@@ -123,16 +131,11 @@ local function CreateGroupCard(parent, index, group)
     -- Tank line
     local tankText = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     tankText:SetPoint("TOPLEFT", 8, yOff)
-    local tankLabel
     if group.tank then
-        local utilStr = ""
-        if group.tank:HasBrez() then utilStr = utilStr .. " |cFF00FF00[BR]|r" end
-        if group.tank:HasLust() then utilStr = utilStr .. " |cFFFF4400[BL]|r" end
-        tankLabel = "|cFF87BCDE[T]|r " .. group.tank.name .. utilStr
+        tankText:SetText("|cFF87BCDE[T]|r " .. group.tank.name .. GetUtilString(group.tank))
     else
-        tankLabel = "|cFF87BCDE[T]|r |cFF666666(no tank)|r"
+        tankText:SetText("|cFF87BCDE[T]|r |cFF666666(no tank)|r")
     end
-    tankText:SetText(tankLabel)
     tankText:SetAlpha(0)
     texts[#texts + 1] = tankText
 
@@ -140,16 +143,11 @@ local function CreateGroupCard(parent, index, group)
     yOff = yOff - 16
     local healerText = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     healerText:SetPoint("TOPLEFT", 8, yOff)
-    local healerLabel
     if group.healer then
-        local utilStr = ""
-        if group.healer:HasBrez() then utilStr = utilStr .. " |cFF00FF00[BR]|r" end
-        if group.healer:HasLust() then utilStr = utilStr .. " |cFFFF4400[BL]|r" end
-        healerLabel = "|cFF87FF87[H]|r " .. group.healer.name .. utilStr
+        healerText:SetText("|cFF87FF87[H]|r " .. group.healer.name .. GetUtilString(group.healer))
     else
-        healerLabel = "|cFF87FF87[H]|r |cFF666666(no healer)|r"
+        healerText:SetText("|cFF87FF87[H]|r |cFF666666(no healer)|r")
     end
-    healerText:SetText(healerLabel)
     healerText:SetAlpha(0)
     texts[#texts + 1] = healerText
 
@@ -159,10 +157,7 @@ local function CreateGroupCard(parent, index, group)
         local dpsText = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         dpsText:SetPoint("TOPLEFT", 8, yOff)
         local roleTag = dps:IsRanged() and "|cFFFF8787[R]|r" or "|cFFFFD187[M]|r"
-        local utilStr = ""
-        if dps:HasBrez() then utilStr = utilStr .. " |cFF00FF00[BR]|r" end
-        if dps:HasLust() then utilStr = utilStr .. " |cFFFF4400[BL]|r" end
-        dpsText:SetText(roleTag .. " " .. dps.name .. utilStr)
+        dpsText:SetText(roleTag .. " " .. dps.name .. GetUtilString(dps))
         dpsText:SetAlpha(0)
         texts[#texts + 1] = dpsText
     end
