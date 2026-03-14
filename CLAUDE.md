@@ -52,6 +52,12 @@ The addon registers itself as `Wheelson` via AceAddon in `src/Config.lua`, store
 ### Test structure
 Tests stub WoW APIs and `LibStub` at the top of each file, then `dofile()` the source files in load order. Only non-UI logic is tested (Models, GroupCreator, GuildService, SpecService). The test stubs pattern is consistent across all test files — copy from an existing test when adding new ones.
 
+## Git Workflow
+
+- **Never push directly to `main`.** Always create a feature branch, push there, and open a PR.
+- When using `/commit-push`, push to the current feature branch (not `origin main`).
+- Use `/ship-it` to create the PR, get reviews, and merge.
+
 ## Key Conventions
 
 - Lua 5.1 target (`std = "lua51"` in `.luacheckrc`), 120 char line limit
