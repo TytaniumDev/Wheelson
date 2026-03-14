@@ -183,8 +183,6 @@ function WHLSN:FormatBugReport(snapshot)
     lines[#lines + 1] = "- **Groups created:** " .. groupCountDesc
     lines[#lines + 1] = "- **Timestamp:** "
         .. (snapshot.timestamp and date("%Y-%m-%d %H:%M:%S", snapshot.timestamp) or "Unknown")
-    lines[#lines + 1] = "- **Seed:** " .. (snapshot.seed or "Unknown")
-    lines[#lines + 1] = ""
 
     -- Player table
     lines[#lines + 1] = "### Players"
@@ -220,9 +218,7 @@ function WHLSN:FormatBugReport(snapshot)
     lines[#lines + 1] = "--- LUA TEST CASE ---"
     lines[#lines + 1] = "```lua"
     lines[#lines + 1] = "-- Paste into tests/test_group_creator.lua"
-    lines[#lines + 1] = 'it("should handle reported bad grouping (seed '
-        .. (snapshot.seed or "?") .. ')", function()'
-    lines[#lines + 1] = "    math.randomseed(" .. (snapshot.seed or 0) .. ")"
+    lines[#lines + 1] = 'it("should handle reported bad grouping", function()'
 
     local function formatPlayerNew(pd)
         if not pd then return "nil" end

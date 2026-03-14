@@ -34,7 +34,6 @@ local Group = WHLSN.Group
 describe("FormatBugReport", function()
     it("should contain both human-readable and lua test case sections", function()
         local snapshot = {
-            seed = 12345,
             timestamp = 1710460542,
             host = "TestHost",
             playerCount = 5,
@@ -65,8 +64,6 @@ describe("FormatBugReport", function()
         assert.truthy(report:find("Bad Grouping Report"))
         assert.truthy(report:find("Host:.*TestHost"))
         assert.truthy(report:find("Players:.*5"))
-        assert.truthy(report:find("Seed:.*12345"))
-
         -- Should contain player table
         assert.truthy(report:find("Tank1"))
         assert.truthy(report:find("Healer1"))
@@ -76,13 +73,11 @@ describe("FormatBugReport", function()
 
         -- Should contain lua test case section
         assert.truthy(report:find("LUA TEST CASE"))
-        assert.truthy(report:find("math.randomseed%(12345%)"))
         assert.truthy(report:find("CreateMythicPlusGroups"))
     end)
 
     it("should show full and incomplete group counts", function()
         local snapshot = {
-            seed = 99,
             timestamp = 1710460542,
             host = "Host",
             playerCount = 7,
@@ -117,7 +112,6 @@ describe("FormatBugReport", function()
 
     it("should include lastGroups when present", function()
         local snapshot = {
-            seed = 1,
             timestamp = 1710460542,
             host = "Host",
             playerCount = 5,
@@ -151,7 +145,6 @@ describe("FormatBugReport", function()
 
     it("should show 'None' for lastGroups when empty", function()
         local snapshot = {
-            seed = 1,
             timestamp = 1710460542,
             host = "Host",
             playerCount = 5,
@@ -166,7 +159,6 @@ describe("FormatBugReport", function()
 
     it("should produce valid lua table syntax in test case", function()
         local snapshot = {
-            seed = 42,
             timestamp = 1710460542,
             host = "Host",
             playerCount = 1,
