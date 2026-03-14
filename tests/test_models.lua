@@ -1,4 +1,4 @@
--- Tests for MPW.Player and MPW.Group models
+-- Tests for WHLSN.Player and WHLSN.Group models
 -- Run with: busted addon/tests/
 
 -- Minimal stubs for WoW APIs and libraries

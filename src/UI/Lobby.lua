@@ -1,5 +1,5 @@
 ---@class Wheelson
-local MPW = _G.Wheelson
+local WHLSN = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- Lobby View
@@ -33,7 +33,7 @@ local ROLE_COLORS = {
 
 
 local function CreateLobbyFrame(parent)
-    local frame = CreateFrame("Frame", "MPWLobbyFrame", parent)
+    local frame = CreateFrame("Frame", "WHLSNLobbyFrame", parent)
     frame:SetAllPoints()
 
     -- Status text
@@ -52,7 +52,7 @@ local function CreateLobbyFrame(parent)
     frame.roleText:SetTextColor(0.6, 0.6, 0.6)
 
     -- Scroll frame for player list
-    frame.scrollFrame = CreateFrame("ScrollFrame", "MPWLobbyScrollFrame", frame, "UIPanelScrollFrameTemplate")
+    frame.scrollFrame = CreateFrame("ScrollFrame", "WHLSNLobbyScrollFrame", frame, "UIPanelScrollFrameTemplate")
     frame.scrollFrame:SetPoint("TOPLEFT", 4, -32)
     frame.scrollFrame:SetPoint("BOTTOMRIGHT", -28, 48)
 
@@ -62,73 +62,73 @@ local function CreateLobbyFrame(parent)
     frame.scrollFrame:SetScrollChild(frame.scrollChild)
 
     -- Spin button (host only)
-    frame.spinButton = CreateFrame("Button", "MPWSpinButton", frame, "UIPanelButtonTemplate")
+    frame.spinButton = CreateFrame("Button", "WHLSNSpinButton", frame, "UIPanelButtonTemplate")
     frame.spinButton:SetSize(160, 32)
     frame.spinButton:SetPoint("BOTTOM", 0, 8)
     frame.spinButton:SetText("Spin the Wheel!")
     frame.spinButton:SetScript("OnClick", function()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-        MPW:SpinGroups()
+        WHLSN:SpinGroups()
     end)
 
     -- Join button (for non-hosts)
-    frame.joinButton = CreateFrame("Button", "MPWJoinButton", frame, "UIPanelButtonTemplate")
+    frame.joinButton = CreateFrame("Button", "WHLSNJoinButton", frame, "UIPanelButtonTemplate")
     frame.joinButton:SetSize(100, 32)
     frame.joinButton:SetPoint("BOTTOMLEFT", 8, 8)
     frame.joinButton:SetText("Join Session")
     frame.joinButton:SetScript("OnClick", function()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-        MPW:RequestJoin()
+        WHLSN:RequestJoin()
     end)
 
     -- Leave button (for non-hosts who have joined)
-    frame.leaveButton = CreateFrame("Button", "MPWLeaveButton", frame, "UIPanelButtonTemplate")
+    frame.leaveButton = CreateFrame("Button", "WHLSNLeaveButton", frame, "UIPanelButtonTemplate")
     frame.leaveButton:SetSize(100, 32)
     frame.leaveButton:SetPoint("BOTTOMLEFT", 8, 8)
     frame.leaveButton:SetText("Leave")
     frame.leaveButton:SetScript("OnClick", function()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-        MPW:LeaveSession()
+        WHLSN:LeaveSession()
     end)
 
     -- Lock lobby button (host only)
-    frame.lockButton = CreateFrame("Button", "MPWLockButton", frame, "UIPanelButtonTemplate")
+    frame.lockButton = CreateFrame("Button", "WHLSNLockButton", frame, "UIPanelButtonTemplate")
     frame.lockButton:SetSize(80, 24)
     frame.lockButton:SetPoint("BOTTOMRIGHT", -8, 44)
     frame.lockButton:SetText("Lock")
     frame.lockButton:SetScript("OnClick", function()
-        local locked = not (MPW.session.locked or false)
-        MPW:SetLobbyLocked(locked)
+        local locked = not (WHLSN.session.locked or false)
+        WHLSN:SetLobbyLocked(locked)
     end)
 
     -- Start Session button (shown when no session is active)
-    frame.startButton = CreateFrame("Button", "MPWStartButton", frame, "UIPanelButtonTemplate")
+    frame.startButton = CreateFrame("Button", "WHLSNStartButton", frame, "UIPanelButtonTemplate")
     frame.startButton:SetSize(140, 32)
     frame.startButton:SetPoint("BOTTOMLEFT", 8, 8)
     frame.startButton:SetText("Start Session")
     frame.startButton:SetScript("OnClick", function()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-        MPW:StartSession()
+        WHLSN:StartSession()
     end)
 
     -- Test button (shown when no session is active, next to Start Session)
-    frame.testButton = CreateFrame("Button", "MPWTestButton", frame, "UIPanelButtonTemplate")
+    frame.testButton = CreateFrame("Button", "WHLSNTestButton", frame, "UIPanelButtonTemplate")
     frame.testButton:SetSize(80, 32)
     frame.testButton:SetPoint("BOTTOMRIGHT", -8, 8)
     frame.testButton:SetText("Test")
     frame.testButton:SetScript("OnClick", function()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-        MPW:StartTestSession()
+        WHLSN:StartTestSession()
     end)
 
     -- End Session button (host only, active session)
-    frame.endButton = CreateFrame("Button", "MPWEndButton", frame, "UIPanelButtonTemplate")
+    frame.endButton = CreateFrame("Button", "WHLSNEndButton", frame, "UIPanelButtonTemplate")
     frame.endButton:SetSize(100, 32)
     frame.endButton:SetPoint("BOTTOMLEFT", 8, 8)
     frame.endButton:SetText("End Session")
     frame.endButton:SetScript("OnClick", function()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-        MPW:EndSession()
+        WHLSN:EndSession()
     end)
 
     return frame
@@ -202,7 +202,7 @@ local function CreatePlayerRow(parent, index)
         end
 
         -- Show kick button if host
-        if MPW.session.host == UnitName("player") and self.playerData then
+        if WHLSN.session.host == UnitName("player") and self.playerData then
             if self.playerData.name ~= UnitName("player") then
                 self.kickButton:Show()
             end
@@ -242,7 +242,7 @@ local function CreateHistoryRow(parent, index)
 end
 
 --- Show the lobby view inside the given content frame.
-function MPW:ShowLobbyView(parent)
+function WHLSN:ShowLobbyView(parent)
     if lobbyFrame then lobbyFrame:Hide() end
 
     lobbyFrame = CreateLobbyFrame(parent)
@@ -250,7 +250,7 @@ function MPW:ShowLobbyView(parent)
 end
 
 --- Update the lobby view with current session data.
-function MPW:UpdateLobbyView()
+function WHLSN:UpdateLobbyView()
     if not lobbyFrame then return end
 
     local players = self.session.players
@@ -340,7 +340,7 @@ function MPW:UpdateLobbyView()
 
             -- Set up kick button for this row
             row.kickButton:SetScript("OnClick", function()
-                MPW:KickPlayer(player.name)
+                WHLSN:KickPlayer(player.name)
             end)
             row.kickButton:Hide()
 
@@ -372,7 +372,7 @@ function MPW:UpdateLobbyView()
                 local idx = i
                 row:SetScript("OnClick", function()
                     PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-                    MPW:ViewHistorySession(idx)
+                    WHLSN:ViewHistorySession(idx)
                 end)
 
                 row:Show()
@@ -386,7 +386,7 @@ function MPW:UpdateLobbyView()
 end
 
 --- Send a join request to the session host.
-function MPW:RequestJoin()
+function WHLSN:RequestJoin()
     if not self.session.host then
         self:Print("No active session to join.")
         return
@@ -394,7 +394,7 @@ function MPW:RequestJoin()
 
     self.hasLeftSession = false
 
-    local playerData = MPW:DetectLocalPlayer()
+    local playerData = WHLSN:DetectLocalPlayer()
     if not playerData then
         self:Print("Could not detect your spec. Make sure you have a specialization active.")
         return

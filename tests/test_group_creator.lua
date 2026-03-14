@@ -28,7 +28,7 @@ dofile("src/Models.lua")
 dofile("src/GroupCreator.lua")
 
 local Player = Wheelson.Player
-local MPW = Wheelson
+local WHLSN = Wheelson
 
 ---------------------------------------------------------------------------
 -- Prebuilt player constructors (port of prebuiltClasses.ts)
@@ -220,7 +220,7 @@ end
 
 describe("CreateMythicPlusGroups", function()
     before_each(function()
-        MPW:ClearLastGroups()
+        WHLSN:ClearLastGroups()
     end)
 
     it("should create one group from exactly 5 players", function()
@@ -232,7 +232,7 @@ describe("CreateMythicPlusGroups", function()
             Hunter("DPS3"),
         }
 
-        local groups = MPW:CreateMythicPlusGroups(players)
+        local groups = WHLSN:CreateMythicPlusGroups(players)
         assert.equal(1, #groups)
         assert.equal(5, groups[1]:GetSize())
     end)
@@ -251,7 +251,7 @@ describe("CreateMythicPlusGroups", function()
             Warrior("DPS6"),
         }
 
-        local groups = MPW:CreateMythicPlusGroups(players)
+        local groups = WHLSN:CreateMythicPlusGroups(players)
         assert.equal(2, #groups)
 
         -- All players should be assigned
@@ -271,7 +271,7 @@ describe("CreateMythicPlusGroups", function()
             Hunter("DPS3"),
         }
 
-        local groups = MPW:CreateMythicPlusGroups(players)
+        local groups = WHLSN:CreateMythicPlusGroups(players)
         local group = groups[1]
 
         assert.is_not_nil(group.tank)
@@ -292,7 +292,7 @@ describe("CreateMythicPlusGroups", function()
             Warlock("DPS5"),
         }
 
-        local groups = MPW:CreateMythicPlusGroups(players)
+        local groups = WHLSN:CreateMythicPlusGroups(players)
 
         -- Should have one full group and a remainder group
         local totalPlayers = 0
@@ -311,7 +311,7 @@ describe("CreateMythicPlusGroups", function()
             Hunter("DPS3"),
         }
 
-        local groups = MPW:CreateMythicPlusGroups(players)
+        local groups = WHLSN:CreateMythicPlusGroups(players)
         assert.is_not_nil(groups[1].tank)
         assert.equal("OfftankDPS", groups[1].tank.name)
     end)
@@ -330,7 +330,7 @@ describe("CreateMythicPlusGroups", function()
             Warrior("DPS6"),
         }
 
-        local groups = MPW:CreateMythicPlusGroups(players)
+        local groups = WHLSN:CreateMythicPlusGroups(players)
         assert.equal(2, #groups)
 
         -- At least one group should have brez
@@ -348,7 +348,7 @@ describe("CreateMythicPlusGroups", function()
             Mage("DPS1"),
         }
 
-        local groups = MPW:CreateMythicPlusGroups(players)
+        local groups = WHLSN:CreateMythicPlusGroups(players)
         -- With < 5 players, maxGroups = 0, so only remainder groups
         local totalPlayers = 0
         for _, g in ipairs(groups) do
@@ -359,13 +359,13 @@ describe("CreateMythicPlusGroups", function()
 
     -- Edge case tests
     it("should handle 0 players", function()
-        local groups = MPW:CreateMythicPlusGroups({})
+        local groups = WHLSN:CreateMythicPlusGroups({})
         assert.equal(0, #groups)
     end)
 
     it("should handle 1 player", function()
         local players = { Mage("Solo") }
-        local groups = MPW:CreateMythicPlusGroups(players)
+        local groups = WHLSN:CreateMythicPlusGroups(players)
 
         local totalPlayers = 0
         for _, g in ipairs(groups) do
@@ -383,7 +383,7 @@ describe("CreateMythicPlusGroups", function()
             Warrior("DPS5"),
         }
 
-        local groups = MPW:CreateMythicPlusGroups(players)
+        local groups = WHLSN:CreateMythicPlusGroups(players)
         -- Should still create groups even without tanks/healers
         local totalPlayers = 0
         for _, g in ipairs(groups) do
@@ -401,7 +401,7 @@ describe("CreateMythicPlusGroups", function()
             Warlock("DPS4"),
         }
 
-        local groups = MPW:CreateMythicPlusGroups(players)
+        local groups = WHLSN:CreateMythicPlusGroups(players)
         -- All players should be assigned (may span multiple groups due to role limits)
         local totalPlayers = 0
         for _, g in ipairs(groups) do
@@ -419,7 +419,7 @@ describe("CreateMythicPlusGroups", function()
             Warlock("DPS4"),
         }
 
-        local groups = MPW:CreateMythicPlusGroups(players)
+        local groups = WHLSN:CreateMythicPlusGroups(players)
         -- All players should be assigned (may span multiple groups due to role limits)
         local totalPlayers = 0
         for _, g in ipairs(groups) do
@@ -447,7 +447,7 @@ describe("CreateMythicPlusGroups", function()
             Priest("DPS9"),
         }
 
-        local groups = MPW:CreateMythicPlusGroups(players)
+        local groups = WHLSN:CreateMythicPlusGroups(players)
         assert.equal(3, #groups)
 
         local totalPlayers = 0
@@ -481,7 +481,7 @@ describe("CreateMythicPlusGroups", function()
             FeralDruid("DPS12"),
         }
 
-        local groups = MPW:CreateMythicPlusGroups(players)
+        local groups = WHLSN:CreateMythicPlusGroups(players)
         assert.equal(4, #groups)
 
         local totalPlayers = 0
@@ -506,11 +506,11 @@ describe("CreateMythicPlusGroups", function()
             DeathKnight("DPS6"),
         }
 
-        local groups1 = MPW:CreateMythicPlusGroups(players, "testGuild")
+        local groups1 = WHLSN:CreateMythicPlusGroups(players, "testGuild")
         assert.equal(2, #groups1)
 
         -- Running again should use last groups for avoidance
-        local groups2 = MPW:CreateMythicPlusGroups(players, "testGuild")
+        local groups2 = WHLSN:CreateMythicPlusGroups(players, "testGuild")
         assert.equal(2, #groups2)
 
         -- All players should still be assigned
@@ -530,12 +530,12 @@ describe("CreateMythicPlusGroups", function()
             Hunter("DPS3"),
         }
 
-        MPW:CreateMythicPlusGroups(players, "testGuild")
-        local lastGroups = MPW:GetLastGroups("testGuild")
+        WHLSN:CreateMythicPlusGroups(players, "testGuild")
+        local lastGroups = WHLSN:GetLastGroups("testGuild")
         assert.is_true(#lastGroups > 0)
 
-        MPW:ClearLastGroups()
-        lastGroups = MPW:GetLastGroups("testGuild")
+        WHLSN:ClearLastGroups()
+        lastGroups = WHLSN:GetLastGroups("testGuild")
         assert.equal(0, #lastGroups)
     end)
 
@@ -553,7 +553,7 @@ describe("CreateMythicPlusGroups", function()
             DeathKnight("DPS6"),
         }
 
-        local groups = MPW:CreateMythicPlusGroups(players)
+        local groups = WHLSN:CreateMythicPlusGroups(players)
         assert.equal(2, #groups)
 
         -- Both groups should have something in the healer slot
@@ -573,7 +573,7 @@ describe("CreateMythicPlusGroups", function()
             Warrior("MeleeDPS2"),
         }
 
-        local groups = MPW:CreateMythicPlusGroups(players)
+        local groups = WHLSN:CreateMythicPlusGroups(players)
         assert.equal(1, #groups)
         assert.is_true(groups[1]:HasRanged())
     end)

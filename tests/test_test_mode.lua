@@ -89,36 +89,36 @@ dofile("src/Services/GuildService.lua")
 dofile("src/Services/PartyService.lua")
 dofile("src/Utils/Helpers.lua")
 
-local MPW = _G.Wheelson
+local WHLSN = _G.Wheelson
 
 describe("Test Mode", function()
     before_each(function()
-        MPW:ClearLastGroups()
-        MPW:OnInitialize()
+        WHLSN:ClearLastGroups()
+        WHLSN:OnInitialize()
     end)
 
     describe("StartTestSession", function()
         it("should populate session with 15 test players in lobby status", function()
-            MPW:StartTestSession()
+            WHLSN:StartTestSession()
 
-            assert.equal("lobby", MPW.session.status)
-            assert.equal(15, #MPW.session.players)
-            assert.is_true(MPW.session.isTest)
-            assert.equal(UnitName("player"), MPW.session.host)
+            assert.equal("lobby", WHLSN.session.status)
+            assert.equal(15, #WHLSN.session.players)
+            assert.is_true(WHLSN.session.isTest)
+            assert.equal(UnitName("player"), WHLSN.session.host)
         end)
 
         it("should not start if a session is already active", function()
-            MPW.session.status = "lobby"
-            MPW:StartTestSession()
+            WHLSN.session.status = "lobby"
+            WHLSN:StartTestSession()
 
             -- Players should not be overwritten
-            assert.equal(0, #MPW.session.players)
+            assert.equal(0, #WHLSN.session.players)
         end)
 
         it("should include correct player data", function()
-            MPW:StartTestSession()
+            WHLSN:StartTestSession()
 
-            local players = MPW.session.players
+            local players = WHLSN.session.players
             -- Check first player
             assert.equal("Temma", players[1].name)
             assert.equal("tank", players[1].mainRole)
@@ -133,46 +133,46 @@ describe("Test Mode", function()
     describe("isTest guards", function()
         it("should not broadcast session updates in test mode", function()
             local commSent = false
-            MPW.SendCommMessage = function() commSent = true end
+            WHLSN.SendCommMessage = function() commSent = true end
 
-            MPW:StartTestSession()
-            MPW:BroadcastSessionUpdate()
+            WHLSN:StartTestSession()
+            WHLSN:BroadcastSessionUpdate()
 
             assert.is_false(commSent)
         end)
 
         it("should not broadcast session end in test mode", function()
             local commSent = false
-            MPW.SendCommMessage = function() commSent = true end
+            WHLSN.SendCommMessage = function() commSent = true end
 
-            MPW:StartTestSession()
-            MPW:BroadcastSessionEnd()
+            WHLSN:StartTestSession()
+            WHLSN:BroadcastSessionEnd()
 
             assert.is_false(commSent)
         end)
 
         it("should not save session results in test mode", function()
-            MPW:StartTestSession()
-            MPW.session.groups = MPW:CreateMythicPlusGroups(MPW.session.players)
-            MPW:SaveSessionResults()
+            WHLSN:StartTestSession()
+            WHLSN.session.groups = WHLSN:CreateMythicPlusGroups(WHLSN.session.players)
+            WHLSN:SaveSessionResults()
 
-            assert.is_nil(MPW.db.profile.lastSession)
+            assert.is_nil(WHLSN.db.profile.lastSession)
         end)
 
         it("should clean up isTest flag on EndSession", function()
-            MPW:StartTestSession()
-            MPW:EndSession()
+            WHLSN:StartTestSession()
+            WHLSN:EndSession()
 
-            assert.is_nil(MPW.session.isTest)
-            assert.is_nil(MPW.session.status)
+            assert.is_nil(WHLSN.session.isTest)
+            assert.is_nil(WHLSN.session.status)
         end)
 
         it("should not broadcast session end when ending a test session", function()
             local commSent = false
-            MPW.SendCommMessage = function() commSent = true end
+            WHLSN.SendCommMessage = function() commSent = true end
 
-            MPW:StartTestSession()
-            MPW:EndSession()
+            WHLSN:StartTestSession()
+            WHLSN:EndSession()
 
             assert.is_false(commSent)
         end)
@@ -184,14 +184,14 @@ describe("Test Mode", function()
             _G.C_PartyInfo.InviteUnit = function(name) invitedNames[#invitedNames + 1] = name end
 
             local printed = {}
-            MPW.Print = function(_, msg) printed[#printed + 1] = msg end
+            WHLSN.Print = function(_, msg) printed[#printed + 1] = msg end
 
-            MPW:StartTestSession()
+            WHLSN:StartTestSession()
             local players = {
-                MPW.Player:New("Alice", "tank"),
-                MPW.Player:New("Bob", "melee"),
+                WHLSN.Player:New("Alice", "tank"),
+                WHLSN.Player:New("Bob", "melee"),
             }
-            MPW:InvitePlayers(players)
+            WHLSN:InvitePlayers(players)
 
             assert.equal(0, #invitedNames)
             assert.is_true(#printed > 0)
@@ -203,9 +203,9 @@ describe("Test Mode", function()
             local chatSent = false
             _G.C_ChatInfo.SendChatMessage = function() chatSent = true end
 
-            MPW:StartTestSession()
-            MPW.session.groups = MPW:CreateMythicPlusGroups(MPW.session.players)
-            MPW:PostToGuildChat(MPW.session.groups)
+            WHLSN:StartTestSession()
+            WHLSN.session.groups = WHLSN:CreateMythicPlusGroups(WHLSN.session.players)
+            WHLSN:PostToGuildChat(WHLSN.session.groups)
 
             assert.is_false(chatSent)
         end)
@@ -213,12 +213,12 @@ describe("Test Mode", function()
 
     describe("GetTestPlayers", function()
         it("should return exactly 15 players", function()
-            local players = MPW:GetTestPlayers()
+            local players = WHLSN:GetTestPlayers()
             assert.equal(15, #players)
         end)
 
         it("should have 2 tanks, 2 healers, 6 ranged, 5 melee", function()
-            local players = MPW:GetTestPlayers()
+            local players = WHLSN:GetTestPlayers()
             local tanks, healers, ranged, melee = 0, 0, 0, 0
             for _, p in ipairs(players) do
                 if p:IsTankMain() then tanks = tanks + 1
@@ -234,8 +234,8 @@ describe("Test Mode", function()
         end)
 
         it("should form groups from 15 players", function()
-            local players = MPW:GetTestPlayers()
-            local groups = MPW:CreateMythicPlusGroups(players)
+            local players = WHLSN:GetTestPlayers()
+            local groups = WHLSN:CreateMythicPlusGroups(players)
             assert.is_true(#groups >= 3)
             -- At least 3 complete groups should form from 15 players
             local complete = 0

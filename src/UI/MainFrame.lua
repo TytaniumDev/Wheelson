@@ -1,5 +1,5 @@
 ---@class Wheelson
-local MPW = _G.Wheelson
+local WHLSN = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- Main Frame Controller
@@ -16,14 +16,14 @@ local MAX_HEIGHT = 700
 
 local function GetMainFrame()
     if not mainFrame then
-        mainFrame = _G["MPWMainFrame"]
+        mainFrame = _G["WHLSNMainFrame"]
         if mainFrame then
-            mainFrame.CloseButton = _G["MPWMainFrameCloseButton"]
-            mainFrame.Content = _G["MPWMainFrameContent"]
+            mainFrame.CloseButton = _G["WHLSNMainFrameCloseButton"]
+            mainFrame.Content = _G["WHLSNMainFrameContent"]
 
             -- Restore saved position
-            if MPW.db and MPW.db.profile.framePosition then
-                local pos = MPW.db.profile.framePosition
+            if WHLSN.db and WHLSN.db.profile.framePosition then
+                local pos = WHLSN.db.profile.framePosition
                 mainFrame:ClearAllPoints()
                 mainFrame:SetPoint(pos.point, UIParent, pos.relPoint, pos.x, pos.y)
             end
@@ -44,17 +44,17 @@ local function GetMainFrame()
             end)
             resizer:SetScript("OnMouseUp", function()
                 mainFrame:StopMovingOrSizing()
-                MPW:SaveFramePosition()
+                WHLSN:SaveFramePosition()
             end)
 
             -- Save position on drag stop
             mainFrame:SetScript("OnDragStop", function(self)
                 self:StopMovingOrSizing()
-                MPW:SaveFramePosition()
+                WHLSN:SaveFramePosition()
             end)
             mainFrame:SetScript("OnMouseUp", function(self)
                 self:StopMovingOrSizing()
-                MPW:SaveFramePosition()
+                WHLSN:SaveFramePosition()
             end)
 
             -- Minimize button
@@ -68,7 +68,7 @@ local function GetMainFrame()
             minText:SetText("_")
             minText:SetTextColor(1, 0.82, 0)
             minimizeBtn:SetScript("OnClick", function()
-                MPW:ToggleMinimize()
+                WHLSN:ToggleMinimize()
             end)
             mainFrame.minimizeButton = minimizeBtn
         end
@@ -77,7 +77,7 @@ local function GetMainFrame()
 end
 
 --- Save the current frame position to SavedVariables.
-function MPW:SaveFramePosition()
+function WHLSN:SaveFramePosition()
     local frame = GetMainFrame()
     if not frame or not self.db then return end
 
@@ -91,7 +91,7 @@ function MPW:SaveFramePosition()
 end
 
 --- Toggle frame minimize state.
-function MPW:ToggleMinimize()
+function WHLSN:ToggleMinimize()
     local frame = GetMainFrame()
     if not frame then return end
 
@@ -107,7 +107,7 @@ function MPW:ToggleMinimize()
 end
 
 --- Toggle main frame visibility.
-function MPW:ToggleMainFrame()
+function WHLSN:ToggleMainFrame()
     local frame = GetMainFrame()
     if not frame then
         self:Print("Error: Main frame not found.")
@@ -127,7 +127,7 @@ function MPW:ToggleMainFrame()
 end
 
 --- Show the main frame (without toggling).
-function MPW:ShowMainFrame()
+function WHLSN:ShowMainFrame()
     local frame = GetMainFrame()
     if not frame then return end
 
@@ -141,7 +141,7 @@ function MPW:ShowMainFrame()
 end
 
 --- Update the UI based on current session state.
-function MPW:UpdateUI()
+function WHLSN:UpdateUI()
     local frame = GetMainFrame()
     if not frame or not frame:IsShown() then return end
     if isMinimized then return end
@@ -177,4 +177,4 @@ function MPW:UpdateUI()
 end
 
 --- Register the frame with ESC key to close.
-table.insert(UISpecialFrames, "MPWMainFrame")
+table.insert(UISpecialFrames, "WHLSNMainFrame")

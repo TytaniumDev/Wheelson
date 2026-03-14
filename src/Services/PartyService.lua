@@ -1,5 +1,5 @@
 ---@class Wheelson
-local MPW = _G.Wheelson
+local WHLSN = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- Party Service
@@ -7,8 +7,8 @@ local MPW = _G.Wheelson
 ---------------------------------------------------------------------------
 
 --- Invite a list of players to a party.
----@param players MPWPlayer[]
-function MPW:InvitePlayers(players)
+---@param players WHLSNPlayer[]
+function WHLSN:InvitePlayers(players)
     local myName = UnitName("player")
     local invited = {}
 
@@ -31,7 +31,7 @@ end
 
 --- Check if we can invite players (are we leader or not in a group).
 ---@return boolean
-function MPW:CanInvite()
+function WHLSN:CanInvite()
     if IsInGroup() then
         return UnitIsGroupLeader("player")
     end

@@ -1,5 +1,5 @@
 ---@class Wheelson
-local MPW = _G.Wheelson
+local WHLSN = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- Spec Detection Service
@@ -8,14 +8,14 @@ local MPW = _G.Wheelson
 
 --- Detect all available offspecs for the local player.
 ---@return string[] allOffspecs All possible offspec roles
-function MPW:DetectAllOffspecs()
+function WHLSN:DetectAllOffspecs()
     local specIndex = C_SpecializationInfo.GetSpecialization()
     if not specIndex then return {} end
 
     local specID = C_SpecializationInfo.GetSpecializationInfo(specIndex)
     if not specID then return {} end
 
-    local mainRole = MPW.SpecRoles[specID]
+    local mainRole = WHLSN.SpecRoles[specID]
     local offspecs = {}
     local numSpecs = GetNumSpecializations()
 
@@ -23,7 +23,7 @@ function MPW:DetectAllOffspecs()
         if i ~= specIndex then
             local otherSpecID = C_SpecializationInfo.GetSpecializationInfo(i)
             if otherSpecID then
-                local otherRole = MPW.SpecRoles[otherSpecID]
+                local otherRole = WHLSN.SpecRoles[otherSpecID]
                 if otherRole and otherRole ~= mainRole then
                     local found = false
                     for _, existing in ipairs(offspecs) do
@@ -40,11 +40,11 @@ function MPW:DetectAllOffspecs()
     return offspecs
 end
 
---- Detect the local player and build an MPWPlayer from their current spec.
+--- Detect the local player and build an WHLSNPlayer from their current spec.
 ---@param selectedOffspecs? table<string, boolean> Map of offspec role -> enabled
 ---@param overrideRole? string Optional role override from the UI dropdown
----@return MPWPlayer|nil
-function MPW:DetectLocalPlayer(selectedOffspecs, overrideRole)
+---@return WHLSNPlayer|nil
+function WHLSN:DetectLocalPlayer(selectedOffspecs, overrideRole)
     local name = UnitName("player")
     if not name then return nil end
 
@@ -54,7 +54,7 @@ function MPW:DetectLocalPlayer(selectedOffspecs, overrideRole)
     local specID = C_SpecializationInfo.GetSpecializationInfo(specIndex)
     if not specID then return nil end
 
-    local mainRole = overrideRole or MPW.SpecRoles[specID]
+    local mainRole = overrideRole or WHLSN.SpecRoles[specID]
     if not mainRole then return nil end
 
     -- Detect offspecs from other specializations
@@ -76,20 +76,20 @@ function MPW:DetectLocalPlayer(selectedOffspecs, overrideRole)
     -- Detect utilities from class
     local utilities = {}
     local _, classToken = UnitClass("player")
-    if MPW.BrezClasses[classToken] then
+    if WHLSN.BrezClasses[classToken] then
         utilities[#utilities + 1] = "brez"
     end
-    if MPW.LustClasses[classToken] then
+    if WHLSN.LustClasses[classToken] then
         utilities[#utilities + 1] = "lust"
     end
 
-    return MPW.Player:New(name, mainRole, offspecs, utilities)
+    return WHLSN.Player:New(name, mainRole, offspecs, utilities)
 end
 
 --- Strip realm name from a character name.
 ---@param name string
 ---@return string
-function MPW:StripRealmName(name)
+function WHLSN:StripRealmName(name)
     if not name then return name end
     return name:match("^([^%-]+)") or name
 end
@@ -98,20 +98,20 @@ end
 --- Less accurate than DetectLocalPlayer since we can't see their spec directly.
 ---@param name string
 ---@param classToken string
----@return MPWPlayer
-function MPW:DetectGuildMember(name, classToken)
+---@return WHLSNPlayer
+function WHLSN:DetectGuildMember(name, classToken)
     -- Strip realm name for consistency
     name = self:StripRealmName(name)
 
     -- Without inspect data, we can only infer from class
     -- The player will correct via join request with actual spec data
     local utilities = {}
-    if MPW.BrezClasses[classToken] then
+    if WHLSN.BrezClasses[classToken] then
         utilities[#utilities + 1] = "brez"
     end
-    if MPW.LustClasses[classToken] then
+    if WHLSN.LustClasses[classToken] then
         utilities[#utilities + 1] = "lust"
     end
 
-    return MPW.Player:New(name, nil, {}, utilities)
+    return WHLSN.Player:New(name, nil, {}, utilities)
 end

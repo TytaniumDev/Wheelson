@@ -31,7 +31,7 @@ dofile("src/Models.lua")
 dofile("src/Services/SpecService.lua") -- needed for StripRealmName
 dofile("src/Services/GuildService.lua")
 
-local MPW = Wheelson
+local WHLSN = Wheelson
 
 describe("GuildService", function()
     before_each(function()
@@ -44,7 +44,7 @@ describe("GuildService", function()
     describe(":GetOnlineGuildMembers()", function()
         it("should return empty array when no guild members", function()
             _G.GetNumGuildMembers = function() return 0 end
-            local result = MPW:GetOnlineGuildMembers()
+            local result = WHLSN:GetOnlineGuildMembers()
             assert.same({}, result)
         end)
 
@@ -62,7 +62,7 @@ describe("GuildService", function()
                 end
             end
 
-            local result = MPW:GetOnlineGuildMembers()
+            local result = WHLSN:GetOnlineGuildMembers()
             assert.equal(2, #result)
             assert.equal("Tank", result[1].name)
             assert.equal("WARRIOR", result[1].classToken)
@@ -83,7 +83,7 @@ describe("GuildService", function()
                 end
             end
 
-            local result = MPW:GetOnlineGuildMembers()
+            local result = WHLSN:GetOnlineGuildMembers()
             assert.equal(1, #result)
             assert.equal("Online", result[1].name)
         end)
@@ -96,7 +96,7 @@ describe("GuildService", function()
                 end
             end
 
-            local result = MPW:GetOnlineGuildMembers()
+            local result = WHLSN:GetOnlineGuildMembers()
             assert.equal(1, #result)
             assert.equal("CrossRealm", result[1].name)
         end)
@@ -112,7 +112,7 @@ describe("GuildService", function()
                 end
             end
 
-            local result = MPW:GetOnlineGuildMembers()
+            local result = WHLSN:GetOnlineGuildMembers()
             -- Only online (odd indices) and max level (indices 1-40) qualify
             -- Odd indices from 1-40: 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39 = 20
             assert.equal(20, #result)
@@ -126,7 +126,7 @@ describe("GuildService", function()
                 end
             end
 
-            local result = MPW:GetOnlineGuildMembers()
+            local result = WHLSN:GetOnlineGuildMembers()
             assert.equal(0, #result) -- nil level should be filtered out
         end)
     end)
@@ -136,14 +136,14 @@ describe("GuildService", function()
             _G.IsInGuild = function() return true end
             _G.GetGuildInfo = function() return "Awesome Guild" end
 
-            local result = MPW:GetGuildName()
+            local result = WHLSN:GetGuildName()
             assert.equal("Awesome Guild", result)
         end)
 
         it("should return nil when not in a guild", function()
             _G.IsInGuild = function() return false end
 
-            local result = MPW:GetGuildName()
+            local result = WHLSN:GetGuildName()
             assert.is_nil(result)
         end)
     end)
@@ -156,7 +156,7 @@ describe("GuildService", function()
                 return names[index]
             end
 
-            assert.is_true(MPW:IsGuildMember("Bob"))
+            assert.is_true(WHLSN:IsGuildMember("Bob"))
         end)
 
         it("should return false for a non-member", function()
@@ -166,7 +166,7 @@ describe("GuildService", function()
                 return names[index]
             end
 
-            assert.is_false(MPW:IsGuildMember("Dave"))
+            assert.is_false(WHLSN:IsGuildMember("Dave"))
         end)
 
         it("should match cross-realm names by stripping realm", function()
@@ -175,13 +175,13 @@ describe("GuildService", function()
                 if index == 1 then return "Alice-Stormrage" end
             end
 
-            assert.is_true(MPW:IsGuildMember("Alice"))
+            assert.is_true(WHLSN:IsGuildMember("Alice"))
         end)
 
         it("should return false when roster is empty", function()
             _G.GetNumGuildMembers = function() return 0 end
 
-            assert.is_false(MPW:IsGuildMember("Anyone"))
+            assert.is_false(WHLSN:IsGuildMember("Anyone"))
         end)
 
         it("should handle nil from GetGuildRosterInfo", function()
@@ -191,8 +191,8 @@ describe("GuildService", function()
                 if index == 2 then return "ValidPlayer" end
             end
 
-            assert.is_false(MPW:IsGuildMember("Ghost"))
-            assert.is_true(MPW:IsGuildMember("ValidPlayer"))
+            assert.is_false(WHLSN:IsGuildMember("Ghost"))
+            assert.is_true(WHLSN:IsGuildMember("ValidPlayer"))
         end)
     end)
 end)

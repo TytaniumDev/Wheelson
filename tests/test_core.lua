@@ -78,7 +78,7 @@ dofile("src/Models.lua")
 dofile("src/Core.lua")
 dofile("src/Services/SpecService.lua")
 
-local MPW = _G.Wheelson
+local WHLSN = _G.Wheelson
 
 describe("Core", function()
     describe("OnInitialize", function()
@@ -105,7 +105,7 @@ describe("Core", function()
             end
 
             assert.has_no.errors(function()
-                MPW:OnInitialize()
+                WHLSN:OnInitialize()
             end)
         end)
     end)
@@ -113,119 +113,119 @@ end)
 
 describe("Discovery", function()
     before_each(function()
-        MPW.addonUsersCache = {}
-        MPW.isScanning = false
-        MPW.sent_messages = {}
-        MPW.SendCommMessage = function(self, prefix, msg, channel)
+        WHLSN.addonUsersCache = {}
+        WHLSN.isScanning = false
+        WHLSN.sent_messages = {}
+        WHLSN.SendCommMessage = function(self, prefix, msg, channel)
             self.sent_messages[#self.sent_messages + 1] = { prefix = prefix, msg = msg, channel = channel }
         end
-        MPW.Serialize = function(self, data) return data end
-        MPW.Deserialize = function(self, msg) return true, msg end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
     end)
 
     describe("OnCommReceived ADDON_PING", function()
         it("should reply with ADDON_PONG when receiving ADDON_PING", function()
             local message = { type = "ADDON_PING" }
-            MPW:OnCommReceived(MPW.COMM_PREFIX, message, "GUILD", "OtherPlayer")
+            WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, message, "GUILD", "OtherPlayer")
 
-            assert.equals(1, #MPW.sent_messages)
-            local sent = MPW.sent_messages[1]
-            assert.equals(MPW.COMM_PREFIX, sent.prefix)
+            assert.equals(1, #WHLSN.sent_messages)
+            local sent = WHLSN.sent_messages[1]
+            assert.equals(WHLSN.COMM_PREFIX, sent.prefix)
             assert.equals("GUILD", sent.channel)
             assert.equals("ADDON_PONG", sent.msg.type)
             assert.equals("TestPlayer", sent.msg.name)
-            assert.equals(MPW.VERSION, sent.msg.version)
+            assert.equals(WHLSN.VERSION, sent.msg.version)
         end)
 
         it("should not reply to own ADDON_PING", function()
             local message = { type = "ADDON_PING" }
-            MPW:OnCommReceived(MPW.COMM_PREFIX, message, "GUILD", "TestPlayer")
-            assert.equals(0, #MPW.sent_messages)
+            WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, message, "GUILD", "TestPlayer")
+            assert.equals(0, #WHLSN.sent_messages)
         end)
     end)
 
     describe("OnCommReceived ADDON_PONG", function()
         it("should add sender to addonUsersCache", function()
             local message = { type = "ADDON_PONG", name = "OtherPlayer", version = "1.0.0" }
-            MPW:OnCommReceived(MPW.COMM_PREFIX, message, "GUILD", "OtherPlayer")
+            WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, message, "GUILD", "OtherPlayer")
 
-            assert.is_not_nil(MPW.addonUsersCache["OtherPlayer"])
-            assert.equals("OtherPlayer", MPW.addonUsersCache["OtherPlayer"].name)
-            assert.equals("1.0.0", MPW.addonUsersCache["OtherPlayer"].version)
+            assert.is_not_nil(WHLSN.addonUsersCache["OtherPlayer"])
+            assert.equals("OtherPlayer", WHLSN.addonUsersCache["OtherPlayer"].name)
+            assert.equals("1.0.0", WHLSN.addonUsersCache["OtherPlayer"].version)
         end)
 
         it("should strip realm name from sender", function()
             local message = { type = "ADDON_PONG", name = "OtherPlayer-Sargeras", version = "1.0.0" }
-            MPW:OnCommReceived(MPW.COMM_PREFIX, message, "GUILD", "OtherPlayer-Sargeras")
+            WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, message, "GUILD", "OtherPlayer-Sargeras")
 
-            assert.is_not_nil(MPW.addonUsersCache["OtherPlayer"])
-            assert.is_nil(MPW.addonUsersCache["OtherPlayer-Sargeras"])
+            assert.is_not_nil(WHLSN.addonUsersCache["OtherPlayer"])
+            assert.is_nil(WHLSN.addonUsersCache["OtherPlayer-Sargeras"])
         end)
 
         it("should update existing entry on repeated PONG", function()
-            MPW.addonUsersCache["OtherPlayer"] = { name = "OtherPlayer", version = "0.9.0", lastSeen = 100 }
+            WHLSN.addonUsersCache["OtherPlayer"] = { name = "OtherPlayer", version = "0.9.0", lastSeen = 100 }
 
             local message = { type = "ADDON_PONG", name = "OtherPlayer", version = "1.0.0" }
-            MPW:OnCommReceived(MPW.COMM_PREFIX, message, "GUILD", "OtherPlayer")
+            WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, message, "GUILD", "OtherPlayer")
 
-            assert.equals("1.0.0", MPW.addonUsersCache["OtherPlayer"].version)
+            assert.equals("1.0.0", WHLSN.addonUsersCache["OtherPlayer"].version)
         end)
 
         it("should not cache own PONG (self-filter blocks it)", function()
             local message = { type = "ADDON_PONG", name = "TestPlayer", version = "1.0.0" }
-            MPW:OnCommReceived(MPW.COMM_PREFIX, message, "GUILD", "TestPlayer")
+            WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, message, "GUILD", "TestPlayer")
 
-            assert.is_nil(MPW.addonUsersCache["TestPlayer"])
+            assert.is_nil(WHLSN.addonUsersCache["TestPlayer"])
         end)
     end)
 
     describe("SendAddonPing", function()
         it("should broadcast ADDON_PING to GUILD", function()
-            MPW:SendAddonPing()
+            WHLSN:SendAddonPing()
 
-            assert.is_true(#MPW.sent_messages > 0)
-            local sent = MPW.sent_messages[1]
+            assert.is_true(#WHLSN.sent_messages > 0)
+            local sent = WHLSN.sent_messages[1]
             assert.equals("GUILD", sent.channel)
             assert.equals("ADDON_PING", sent.msg.type)
         end)
 
         it("should add local player to cache", function()
-            MPW:SendAddonPing()
+            WHLSN:SendAddonPing()
 
-            assert.is_not_nil(MPW.addonUsersCache["TestPlayer"])
-            assert.equals("TestPlayer", MPW.addonUsersCache["TestPlayer"].name)
-            assert.equals(MPW.VERSION, MPW.addonUsersCache["TestPlayer"].version)
+            assert.is_not_nil(WHLSN.addonUsersCache["TestPlayer"])
+            assert.equals("TestPlayer", WHLSN.addonUsersCache["TestPlayer"].name)
+            assert.equals(WHLSN.VERSION, WHLSN.addonUsersCache["TestPlayer"].version)
         end)
 
         it("should set isScanning to true", function()
-            MPW:SendAddonPing()
-            assert.is_true(MPW.isScanning)
+            WHLSN:SendAddonPing()
+            assert.is_true(WHLSN.isScanning)
         end)
     end)
 
     describe("PruneAddonUsersCache", function()
         it("should remove players not in online roster", function()
-            MPW.addonUsersCache["OnlinePlayer"] = { name = "OnlinePlayer", version = "1.0", lastSeen = 100 }
-            MPW.addonUsersCache["OfflinePlayer"] = { name = "OfflinePlayer", version = "1.0", lastSeen = 100 }
+            WHLSN.addonUsersCache["OnlinePlayer"] = { name = "OnlinePlayer", version = "1.0", lastSeen = 100 }
+            WHLSN.addonUsersCache["OfflinePlayer"] = { name = "OfflinePlayer", version = "1.0", lastSeen = 100 }
 
-            MPW.GetOnlineGuildMembers = function()
+            WHLSN.GetOnlineGuildMembers = function()
                 return { { name = "OnlinePlayer", classToken = "WARRIOR", level = 90, online = true } }
             end
 
-            MPW:PruneAddonUsersCache()
+            WHLSN:PruneAddonUsersCache()
 
-            assert.is_not_nil(MPW.addonUsersCache["OnlinePlayer"])
-            assert.is_nil(MPW.addonUsersCache["OfflinePlayer"])
+            assert.is_not_nil(WHLSN.addonUsersCache["OnlinePlayer"])
+            assert.is_nil(WHLSN.addonUsersCache["OfflinePlayer"])
         end)
 
         it("should keep cache empty if no online members", function()
-            MPW.addonUsersCache["SomePlayer"] = { name = "SomePlayer", version = "1.0", lastSeen = 100 }
+            WHLSN.addonUsersCache["SomePlayer"] = { name = "SomePlayer", version = "1.0", lastSeen = 100 }
 
-            MPW.GetOnlineGuildMembers = function() return {} end
+            WHLSN.GetOnlineGuildMembers = function() return {} end
 
-            MPW:PruneAddonUsersCache()
+            WHLSN:PruneAddonUsersCache()
 
-            assert.is_nil(MPW.addonUsersCache["SomePlayer"])
+            assert.is_nil(WHLSN.addonUsersCache["SomePlayer"])
         end)
     end)
 end)

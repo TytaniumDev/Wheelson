@@ -1,9 +1,9 @@
 ---@class Wheelson
-local MPW = _G.Wheelson
+local WHLSN = _G.Wheelson
 
 --- Return the 15-player test roster from MythicPlusDiscordBot PR #254.
----@return MPWPlayer[]
-function MPW:GetTestPlayers()
+---@return WHLSNPlayer[]
+function WHLSN:GetTestPlayers()
     local P = self.Player
     return {
         P:New("Temma",       "tank",   {"melee"},                    {"brez"}),
