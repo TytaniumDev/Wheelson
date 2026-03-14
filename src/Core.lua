@@ -106,6 +106,7 @@ function WHLSN:StartSession()
     self.session.host = UnitName("player")
     self.session.players = {}
     self.session.groups = {}
+    self.session.algorithmSnapshot = nil
     -- Auto-add the host as the first player
     local hostPlayer = self:DetectLocalPlayer()
     if hostPlayer then
@@ -155,6 +156,7 @@ function WHLSN:EndSession()
     self.session.groups = {}
     self.session.viewingHistory = false
     self.session.isTest = nil
+    self.session.algorithmSnapshot = nil
 
     if not wasViewing and not wasTest then
         self:BroadcastSessionEnd()
@@ -207,8 +209,40 @@ function WHLSN:SpinGroups()
         return
     end
 
+    -- Capture algorithm inputs before running
+    local playerDicts = {}
+    for _, p in ipairs(self.session.players) do
+        playerDicts[#playerDicts + 1] = p:ToDict()
+    end
+
+    local previousGroups = self:GetLastGroups()
+    local lastGroupDicts = {}
+    for _, g in ipairs(previousGroups) do
+        lastGroupDicts[#lastGroupDicts + 1] = g:ToDict()
+    end
+
+    -- Generate and set a deterministic seed
+    local seed = math.random(2147483647)
+    math.randomseed(seed)
+
     self.session.groups = self:CreateMythicPlusGroups(self.session.players)
     self.session.status = self.Status.SPINNING
+
+    -- Capture algorithm outputs
+    local groupDicts = {}
+    for _, g in ipairs(self.session.groups) do
+        groupDicts[#groupDicts + 1] = g:ToDict()
+    end
+
+    self.session.algorithmSnapshot = {
+        seed = seed,
+        players = playerDicts,
+        lastGroups = lastGroupDicts,
+        groups = groupDicts,
+        timestamp = time(),
+        host = self.session.host,
+        playerCount = #self.session.players,
+    }
 
     self.lastActivity = time()
     self:BroadcastSessionUpdate()
