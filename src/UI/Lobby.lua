@@ -91,16 +91,6 @@ local function CreateLobbyFrame(parent)
         WHLSN:LeaveSession()
     end)
 
-    -- Lock lobby button (host only)
-    frame.lockButton = CreateFrame("Button", "WHLSNLockButton", frame, "UIPanelButtonTemplate")
-    frame.lockButton:SetSize(80, 24)
-    frame.lockButton:SetPoint("BOTTOMRIGHT", -8, 44)
-    frame.lockButton:SetText("Lock")
-    frame.lockButton:SetScript("OnClick", function()
-        local locked = not (WHLSN.session.locked or false)
-        WHLSN:SetLobbyLocked(locked)
-    end)
-
     -- Start Session button (shown when no session is active)
     frame.startButton = CreateFrame("Button", "WHLSNStartButton", frame, "UIPanelButtonTemplate")
     frame.startButton:SetSize(140, 32)
@@ -266,9 +256,6 @@ function WHLSN:UpdateLobbyView()
     -- Update status text
     if hasSession then
         local statusStr = "Lobby - Hosted by " .. (self.session.host or "Unknown")
-        if self.session.locked then
-            statusStr = statusStr .. " |cFFFF0000[LOCKED]|r"
-        end
         lobbyFrame.statusText:SetText(statusStr)
     else
         lobbyFrame.statusText:SetText("No active session")
@@ -300,11 +287,7 @@ function WHLSN:UpdateLobbyView()
     lobbyFrame.leaveButton:SetShown(not isHost and hasSession and isInSession)
     lobbyFrame.startButton:SetShown(not hasSession)
     lobbyFrame.testButton:SetShown(not hasSession)
-    lobbyFrame.lockButton:SetShown(isHost and hasSession)
     lobbyFrame.endButton:SetShown(isHost and hasSession)
-    if isHost and hasSession then
-        lobbyFrame.lockButton:SetText(self.session.locked and "Unlock" or "Lock")
-    end
 
     -- Hide all dynamic rows before repopulating
     for _, row in ipairs(playerRows) do row:Hide() end
