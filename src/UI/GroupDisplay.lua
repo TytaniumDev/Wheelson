@@ -233,7 +233,7 @@ function MPW:InviteMyGroup()
                 local invited = {}
                 for _, member in ipairs(group:GetPlayers()) do
                     if member.name ~= myName then
-                        InviteUnit(member.name)
+                        C_PartyInfo.InviteUnit(member.name)
                         invited[#invited + 1] = member.name
                     end
                 end

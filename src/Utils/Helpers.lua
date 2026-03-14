@@ -60,7 +60,7 @@ function MPW:PostToGuildChat(groups)
         return
     end
 
-    SendChatMessage("=== Mythic+ Groups ===", "GUILD")
+    C_ChatInfo.SendChatMessage("=== Mythic+ Groups ===", "GUILD")
     for i, group in ipairs(groups) do
         local tankName = group.tank and group.tank.name or "(none)"
         local healerName = group.healer and group.healer.name or "(none)"
@@ -73,7 +73,7 @@ function MPW:PostToGuildChat(groups)
             "Group %d: T=%s H=%s D=%s",
             i, tankName, healerName, table.concat(dpsNames, ",")
         )
-        SendChatMessage(msg, "GUILD")
+        C_ChatInfo.SendChatMessage(msg, "GUILD")
     end
 end
 

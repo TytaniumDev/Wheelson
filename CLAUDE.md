@@ -58,6 +58,19 @@ Tests stub WoW APIs and `LibStub` at the top of each file, then `dofile()` the s
 - When using `/commit-push`, push to the current feature branch (not `origin main`).
 - Use `/ship-it` to create the PR, get reviews, and merge.
 
+## WoW API Version
+
+This addon targets **WoW 12.0 (Midnight)** (`## Interface: 120001`). Use the modern `C_` namespaced APIs — do not use their deprecated predecessors:
+
+| Deprecated (do NOT use) | Use instead |
+|---|---|
+| `GetSpecialization()` | `C_SpecializationInfo.GetSpecialization()` |
+| `GetSpecializationInfo()` | `C_SpecializationInfo.GetSpecializationInfo()` |
+| `SendChatMessage()` | `C_ChatInfo.SendChatMessage()` |
+| `InviteUnit()` | `C_PartyInfo.InviteUnit()` |
+
+When adding new WoW API calls, check [Warcraft Wiki API changes](https://warcraft.wiki.gg/wiki/Patch_12.0.0/API_changes) to confirm the function hasn't been removed or moved to a `C_` namespace in 12.0.
+
 ## Key Conventions
 
 - Lua 5.1 target (`std = "lua51"` in `.luacheckrc`), 120 char line limit

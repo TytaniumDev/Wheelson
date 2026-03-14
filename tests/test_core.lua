@@ -51,8 +51,10 @@ _G.SlashCmdList = _G.SlashCmdList or {}
 _G.strtrim = function(s) return s:match("^%s*(.-)%s*$") end
 _G.UnitName = function() return "TestPlayer" end
 _G.UnitClass = function() return "Warrior", "WARRIOR" end
-_G.GetSpecialization = function() return 1 end
-_G.GetSpecializationInfo = function() return 71 end
+_G.C_SpecializationInfo = {
+    GetSpecialization = function() return 1 end,
+    GetSpecializationInfo = function() return 71 end,
+}
 _G.GetNumSpecializations = function() return 3 end
 _G.time = os.time
 _G.date = os.date

@@ -14,7 +14,7 @@ function MPW:InvitePlayers(players)
 
     for _, player in ipairs(players) do
         if player.name ~= myName then
-            InviteUnit(player.name)
+            C_PartyInfo.InviteUnit(player.name)
             invited[#invited + 1] = player.name
         end
     end

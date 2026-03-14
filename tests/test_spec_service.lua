@@ -20,8 +20,10 @@ _G.LibStub = function()
 end
 
 -- WoW API mocks (overridden per test)
-_G.GetSpecialization = function() return nil end
-_G.GetSpecializationInfo = function() return nil end
+_G.C_SpecializationInfo = {
+    GetSpecialization = function() return nil end,
+    GetSpecializationInfo = function() return nil end,
+}
 _G.GetNumSpecializations = function() return 0 end
 _G.UnitName = function() return "TestPlayer" end
 _G.UnitClass = function() return "Paladin", "PALADIN" end
@@ -37,8 +39,8 @@ local Player = MPW.Player
 describe("SpecService", function()
     -- Reset mocks before each test
     before_each(function()
-        _G.GetSpecialization = function() return nil end
-        _G.GetSpecializationInfo = function() return nil end
+        _G.C_SpecializationInfo.GetSpecialization = function() return nil end
+        _G.C_SpecializationInfo.GetSpecializationInfo = function() return nil end
         _G.GetNumSpecializations = function() return 0 end
         _G.UnitName = function() return "TestPlayer" end
         _G.UnitClass = function() return "Paladin", "PALADIN" end
@@ -46,21 +48,19 @@ describe("SpecService", function()
 
     describe(":DetectLocalPlayer()", function()
         it("should return nil when no specialization is active", function()
-            _G.GetSpecialization = function() return nil end
             local result = MPW:DetectLocalPlayer()
             assert.is_nil(result)
         end)
 
         it("should return nil when GetSpecializationInfo returns nil", function()
-            _G.GetSpecialization = function() return 1 end
-            _G.GetSpecializationInfo = function() return nil end
+            _G.C_SpecializationInfo.GetSpecialization = function() return 1 end
             local result = MPW:DetectLocalPlayer()
             assert.is_nil(result)
         end)
 
         it("should detect a Protection Paladin as tank with brez", function()
-            _G.GetSpecialization = function() return 2 end
-            _G.GetSpecializationInfo = function(index)
+            _G.C_SpecializationInfo.GetSpecialization = function() return 2 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
                 local specs = { [1] = 65, [2] = 66, [3] = 70 } -- Holy, Prot, Ret
                 return specs[index]
             end
@@ -79,8 +79,8 @@ describe("SpecService", function()
         it("should detect offspecs from other specializations", function()
             -- Paladin: Holy (65)=healer, Prot (66)=tank, Ret (70)=melee
             -- If main is Prot (tank), offspecs should be healer and melee
-            _G.GetSpecialization = function() return 2 end
-            _G.GetSpecializationInfo = function(index)
+            _G.C_SpecializationInfo.GetSpecialization = function() return 2 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
                 local specs = { [1] = 65, [2] = 66, [3] = 70 }
                 return specs[index]
             end
@@ -96,8 +96,8 @@ describe("SpecService", function()
 
         it("should respect selectedOffspecs filter", function()
             -- Paladin with only healer offspec selected (not melee)
-            _G.GetSpecialization = function() return 2 end
-            _G.GetSpecializationInfo = function(index)
+            _G.C_SpecializationInfo.GetSpecialization = function() return 2 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
                 local specs = { [1] = 65, [2] = 66, [3] = 70 }
                 return specs[index]
             end
@@ -111,8 +111,8 @@ describe("SpecService", function()
         end)
 
         it("should respect overrideRole", function()
-            _G.GetSpecialization = function() return 2 end
-            _G.GetSpecializationInfo = function(index)
+            _G.C_SpecializationInfo.GetSpecialization = function() return 2 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
                 local specs = { [1] = 65, [2] = 66, [3] = 70 }
                 return specs[index]
             end
@@ -125,8 +125,8 @@ describe("SpecService", function()
         end)
 
         it("should detect a Restoration Shaman as healer with lust", function()
-            _G.GetSpecialization = function() return 3 end
-            _G.GetSpecializationInfo = function(index)
+            _G.C_SpecializationInfo.GetSpecialization = function() return 3 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
                 local specs = { [1] = 262, [2] = 263, [3] = 264 } -- Ele, Enh, Resto
                 return specs[index]
             end
@@ -142,8 +142,8 @@ describe("SpecService", function()
         end)
 
         it("should detect a Shadow Priest as ranged DPS with no utilities", function()
-            _G.GetSpecialization = function() return 3 end
-            _G.GetSpecializationInfo = function(index)
+            _G.C_SpecializationInfo.GetSpecialization = function() return 3 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
                 local specs = { [1] = 256, [2] = 257, [3] = 258 } -- Disc, Holy, Shadow
                 return specs[index]
             end
@@ -162,8 +162,8 @@ describe("SpecService", function()
         end)
 
         it("should detect a Blood DK as tank with brez and melee offspecs", function()
-            _G.GetSpecialization = function() return 1 end
-            _G.GetSpecializationInfo = function(index)
+            _G.C_SpecializationInfo.GetSpecialization = function() return 1 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
                 local specs = { [1] = 250, [2] = 251, [3] = 252 } -- Blood, Frost, Unholy
                 return specs[index]
             end
@@ -186,8 +186,8 @@ describe("SpecService", function()
         end)
 
         it("should handle unknown spec IDs gracefully", function()
-            _G.GetSpecialization = function() return 1 end
-            _G.GetSpecializationInfo = function() return 99999 end -- Unknown spec
+            _G.C_SpecializationInfo.GetSpecialization = function() return 1 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function() return 99999 end -- Unknown spec
             _G.GetNumSpecializations = function() return 1 end
 
             local result = MPW:DetectLocalPlayer()
@@ -197,8 +197,8 @@ describe("SpecService", function()
         it("should not duplicate offspec roles", function()
             -- Priest: Disc (256)=healer, Holy (257)=healer, Shadow (258)=ranged
             -- When main is Shadow, offspecs should be just "healer" (not "healer, healer")
-            _G.GetSpecialization = function() return 3 end
-            _G.GetSpecializationInfo = function(index)
+            _G.C_SpecializationInfo.GetSpecialization = function() return 3 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
                 local specs = { [1] = 256, [2] = 257, [3] = 258 }
                 return specs[index]
             end
@@ -217,14 +217,14 @@ describe("SpecService", function()
 
     describe(":DetectAllOffspecs()", function()
         it("should return empty when no specialization is active", function()
-            _G.GetSpecialization = function() return nil end
+            _G.C_SpecializationInfo.GetSpecialization = function() return nil end
             local result = MPW:DetectAllOffspecs()
             assert.same({}, result)
         end)
 
         it("should return offspec roles for a Paladin (tank main)", function()
-            _G.GetSpecialization = function() return 2 end
-            _G.GetSpecializationInfo = function(index)
+            _G.C_SpecializationInfo.GetSpecialization = function() return 2 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
                 local specs = { [1] = 65, [2] = 66, [3] = 70 }
                 return specs[index]
             end
@@ -244,8 +244,8 @@ describe("SpecService", function()
 
         it("should return empty for pure DPS class (Rogue)", function()
             -- Rogue: all 3 specs are melee
-            _G.GetSpecialization = function() return 1 end
-            _G.GetSpecializationInfo = function(index)
+            _G.C_SpecializationInfo.GetSpecialization = function() return 1 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
                 local specs = { [1] = 259, [2] = 260, [3] = 261 }
                 return specs[index]
             end
@@ -258,8 +258,8 @@ describe("SpecService", function()
 
         it("should return empty for pure DPS class (Mage)", function()
             -- Mage: all 3 specs are ranged
-            _G.GetSpecialization = function() return 1 end
-            _G.GetSpecializationInfo = function(index)
+            _G.C_SpecializationInfo.GetSpecialization = function() return 1 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
                 local specs = { [1] = 62, [2] = 63, [3] = 64 }
                 return specs[index]
             end
@@ -271,8 +271,8 @@ describe("SpecService", function()
 
         it("should handle Druid with 4 specs", function()
             -- Druid: Balance (102)=ranged, Feral (103)=melee, Guardian (104)=tank, Resto (105)=healer
-            _G.GetSpecialization = function() return 3 end -- Guardian (tank)
-            _G.GetSpecializationInfo = function(index)
+            _G.C_SpecializationInfo.GetSpecialization = function() return 3 end -- Guardian (tank)
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
                 local specs = { [1] = 102, [2] = 103, [3] = 104, [4] = 105 }
                 return specs[index]
             end
