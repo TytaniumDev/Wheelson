@@ -15,6 +15,7 @@ function MPW:OnInitialize()
         groups = {},     -- MPWGroup[]
         host = nil,      -- player name who started the session
         locked = false,  -- lobby lock state
+        viewingHistory = false, -- true when displaying a past session
     }
 
     -- Throttle timer for roster update events
@@ -68,11 +69,6 @@ function MPW:OnInitialize()
     })
     LDBIcon:Register("Wheelson", launcher, self.db.profile.minimap)
 
-    -- Restore last session results from SavedVariables
-    if self.db.profile.lastSession then
-        self:Print("Previous session results available. Type /wheelson last to view.")
-    end
-
     self:Print("Wheelson loaded. Type /wheelson to open.")
 end
 
@@ -93,88 +89,13 @@ end
 SLASH_WHEELSON1 = "/wheelson"
 SLASH_WHEELSON2 = "/wheel"
 
-SlashCmdList["WHEELSON"] = function(msg)
-    local cmd = strtrim(msg):lower()
-    if cmd == "" or cmd == "open" then
-        MPW:ToggleMainFrame()
-    elseif cmd == "host" then
-        MPW:StartSession()
-    elseif cmd == "close" then
-        MPW:EndSession()
-    elseif cmd == "status" then
-        MPW:PrintStatus()
-    elseif cmd == "last" then
-        MPW:ShowLastSession()
-    elseif cmd == "leave" then
-        MPW:LeaveSession()
-    elseif cmd == "history" then
-        MPW:ShowSessionHistory()
-    elseif cmd == "debug" then
-        MPW:ToggleDebugFrame()
-    elseif cmd == "help" then
-        MPW:Print("Commands:")
-        MPW:Print("  /wheelson - Toggle the main window")
-        MPW:Print("  /wheelson host - Start a new session")
-        MPW:Print("  /wheelson close - End the current session")
-        MPW:Print("  /wheelson status - Show current session info")
-        MPW:Print("  /wheelson last - Show last session results")
-        MPW:Print("  /wheelson history - Show session history")
-        MPW:Print("  /wheelson debug - Toggle the debug panel")
-        MPW:Print("  /wheelson leave - Leave the current session")
-    else
-        MPW:Print("Unknown command: " .. cmd .. ". Type /wheelson help for usage.")
-    end
+SlashCmdList["WHEELSON"] = function()
+    MPW:ToggleMainFrame()
 end
 
 ---------------------------------------------------------------------------
 -- Session Management
 ---------------------------------------------------------------------------
-
---- Show current session info.
-function MPW:PrintStatus()
-    if not self.session.status then
-        self:Print("No active session.")
-        return
-    end
-
-    self:Print("=== Session Status ===")
-    self:Print("  Status: " .. self.session.status)
-    self:Print("  Host: " .. (self.session.host or "Unknown"))
-    self:Print("  Players: " .. #self.session.players)
-    if self.session.locked then
-        self:Print("  Lobby: LOCKED")
-    end
-
-    if #self.session.players > 0 then
-        local tanks, healers, dps = 0, 0, 0
-        for _, p in ipairs(self.session.players) do
-            if p:IsTankMain() then tanks = tanks + 1
-            elseif p:IsHealerMain() then healers = healers + 1
-            else dps = dps + 1 end
-        end
-        self:Print(string.format("  Composition: %d Tank, %d Healer, %d DPS", tanks, healers, dps))
-    end
-
-    if self.session.status == self.Status.COMPLETED and #self.session.groups > 0 then
-        self:Print("  Groups: " .. #self.session.groups)
-    end
-end
-
---- Show last session results from SavedVariables.
-function MPW:ShowLastSession()
-    local lastSession = self.db.profile.lastSession
-    if not lastSession or not lastSession.groups or #lastSession.groups == 0 then
-        self:Print("No previous session results saved.")
-        return
-    end
-
-    self:Print("=== Last Session Results ===")
-    local groups = {}
-    for _, gd in ipairs(lastSession.groups) do
-        groups[#groups + 1] = MPW.Group.FromDict(gd)
-    end
-    self:Print(self:FormatGroupSummary(groups))
-end
 
 --- Start a new lobby session. Any guild member can host.
 function MPW:StartSession()
@@ -200,7 +121,7 @@ function MPW:StartSession()
     self:ResetSessionTimeout()
     self:ShowMainFrame()
     self:BroadcastSessionUpdate()
-    self:Print("Session started! Guild members can join via /wheelson.")
+    self:Print("Session started! Guild members can join via the Wheelson addon.")
 end
 
 --- End the current session and clean up.
@@ -210,6 +131,8 @@ function MPW:EndSession()
         return
     end
 
+    local wasViewing = self.session.viewingHistory or false
+
     self:CancelSessionTimeout()
 
     self.session.status = nil
@@ -217,9 +140,14 @@ function MPW:EndSession()
     self.session.players = {}
     self.session.groups = {}
     self.session.locked = false
+    self.session.viewingHistory = false
 
-    self:BroadcastSessionEnd()
-    self:Print("Session ended.")
+    if not wasViewing then
+        self:BroadcastSessionEnd()
+        self:Print("Session ended.")
+    end
+
+    self:UpdateUI()
 end
 
 --- Leave the current session (for non-hosts).
@@ -231,7 +159,7 @@ function MPW:LeaveSession()
 
     local myName = UnitName("player")
     if self.session.host == myName then
-        self:Print("You are the host. Use /wheelson close to end the session.")
+        self:Print("You are the host. Use the End Session button to end the session.")
         return
     end
 
@@ -317,27 +245,35 @@ function MPW:SaveSessionToHistory(record)
     end
 end
 
---- Show session history log.
-function MPW:ShowSessionHistory()
-    if not self.db then
-        self:Print("No session history available.")
+--- View a saved session from history in the GroupDisplay.
+---@param index number Index into sessionHistory (1 = most recent)
+function MPW:ViewHistorySession(index)
+    if self.session.status and not self.session.viewingHistory then return end
+
+    local history = self.db and self.db.profile.sessionHistory
+    if not history or not history[index] then
+        self:Print("Session not found.")
         return
     end
 
-    local history = self.db.profile.sessionHistory
-    if not history or #history == 0 then
-        self:Print("No session history available.")
+    local record = history[index]
+    if not record.groups or #record.groups == 0 then
+        self:Print("No group data for that session.")
         return
     end
 
-    self:Print("=== Session History (" .. #history .. " sessions) ===")
-    for i, record in ipairs(history) do
-        local dateStr = record.timestamp and date("%Y-%m-%d %H:%M", record.timestamp) or "Unknown"
-        local groupCount = record.groups and #record.groups or 0
-        local playerCount = record.playerCount or 0
-        self:Print(string.format("  %d. %s - Host: %s, %d players, %d groups",
-            i, dateStr, record.host or "Unknown", playerCount, groupCount))
+    -- Load groups into session state for display only (no broadcast)
+    self.session.groups = {}
+    for _, gd in ipairs(record.groups) do
+        self.session.groups[#self.session.groups + 1] = MPW.Group.FromDict(gd)
     end
+
+    self.session.status = self.Status.COMPLETED
+    self.session.host = record.host
+    self.session.players = {}
+    self.session.viewingHistory = true
+
+    self:ShowMainFrame()
 end
 
 --- Remove a player from the session (host only).
@@ -536,6 +472,7 @@ function MPW:HandleSessionEnd(sender)
     self.session.players = {}
     self.session.groups = {}
     self.session.locked = false
+    self.session.viewingHistory = false
     self:UpdateUI()
 end
 
