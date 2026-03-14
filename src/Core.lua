@@ -14,7 +14,6 @@ function WHLSN:OnInitialize()
         players = {},    -- WHLSNPlayer[]
         groups = {},     -- WHLSNGroup[]
         host = nil,      -- player name who started the session
-
         isTest = false,  -- true when running a test session (no guild comms)
         viewingHistory = false, -- true when displaying a past session
     }
@@ -386,7 +385,6 @@ function WHLSN:SendSessionUpdate()
         host = self.session.host,
         playerCount = #self.session.players,
         players = playerList,
-
     }
 
     if self.session.status == self.Status.SPINNING or
