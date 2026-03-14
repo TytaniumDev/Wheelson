@@ -43,7 +43,7 @@ Wheelson remembers your recent group history. When forming new groups, it active
 
 - **Real-time guild sync** — Session state is broadcast to all guild members via addon-to-addon communication. No setup required beyond installing the addon.
 - **Role-aware** — Automatically detects each player's current spec and maps it to tank, healer, ranged DPS, or melee DPS. Supports offspecs for flexible players.
-- **Animated reveal** — Groups are revealed sequentially with fade-in animations and sound effects. Skip the animation if you're impatient, or adjust the speed in settings.
+- **Animated reveal** — Groups are revealed sequentially with fade-in animations and sound effects. Skip the animation if you're impatient.
 - **One-click party invites** — After groups are formed, invite your entire group to a party with a single button.
 - **Session history** — Your last 10 sessions are saved. Review past group assignments any time.
 - **Minimap button** — Quick access to open the addon or check session status.
