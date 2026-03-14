@@ -25,6 +25,7 @@ libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
 # Core
 src\Config.lua
 src\Models.lua
+src\TestData.lua
 src\GroupCreator.lua
 src\Core.lua
 
