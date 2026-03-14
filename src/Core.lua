@@ -53,7 +53,7 @@ function MPW:OnInitialize()
         end,
         OnTooltipShow = function(tooltip)
             tooltip:AddLine("Mythic+ Wheel", 1, 0.82, 0)
-            tooltip:AddLine("|cFFAAAAAAv" .. MPW.VERSION .. "|r")
+            tooltip:AddLine("|cFFAAAAAA" .. MPW.VERSION .. "|r")
             if MPW.session.status then
                 tooltip:AddLine("Session: " .. MPW.session.status, 0.5, 1, 0.5)
                 tooltip:AddLine("Host: " .. (MPW.session.host or "Unknown"), 0.7, 0.7, 0.7)
