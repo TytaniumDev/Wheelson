@@ -111,6 +111,9 @@ MPW.SESSION_TIMEOUT = 1800
 -- Message throttle interval in seconds
 MPW.COMM_THROTTLE = 0.5
 
+-- Duration in seconds to collect ADDON_PONG responses after a ping
+MPW.DISCOVERY_SCAN_DURATION = 2
+
 -- Max number of sessions to keep in history
 MPW.MAX_HISTORY = 10
 

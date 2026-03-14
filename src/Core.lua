@@ -626,7 +626,7 @@ function MPW:SendAddonPing()
     self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
 
     self.isScanning = true
-    C_Timer.After(2, function()
+    C_Timer.After(self.DISCOVERY_SCAN_DURATION, function()
         self.isScanning = false
         -- Refresh options panel if AceConfigRegistry is available
         local ACR = LibStub("AceConfigRegistry-3.0", true)
