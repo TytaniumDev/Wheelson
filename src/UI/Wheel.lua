@@ -79,18 +79,14 @@ end
 
 ---------------------------------------------------------------------------
 -- Sound Helpers
--- SoundKit IDs sourced from the One-Armed Bandit (Liberation of Undermine)
--- and the WoW 12.0 UI alert sounds database.
---
--- SOUND_START   : Goblin Casino Slot Machine – Arm Crank Start (11.1)
--- SOUND_TICK    : Goblin Casino Slot Machine – Tri-Face Vertical Spin (11.1)
--- SOUND_LAND    : Goblin Casino Slot Machine – Wheel Face Spin End (11.1)
--- SOUND_VICTORY : WoW 12.0 UI Alert – Slot Machine Coins (jackpot payout)
+-- Custom .ogg files for tick/land/victory (generated via sox, matching
+-- MythicPlusDiscordBot audio.ts synthesis parameters).
+-- Start sound uses WoW SoundKit (slot machine arm crank).
 ---------------------------------------------------------------------------
 
-local SOUND_TICK    = 856     -- igMainMenuOptionCheckboxOn (ultra-short click)
-local SOUND_LAND    = 316717  -- 12.0_UI_Alert_Devices_Slot_Machine_Bell (short slot bell)
-local SOUND_VICTORY = 316769  -- 12.0_UI_Alert_War3_Fanfare (big fanfare)
+local SOUND_TICK    = "Interface\\AddOns\\Wheelson\\sounds\\tick.ogg"
+local SOUND_LAND    = "Interface\\AddOns\\Wheelson\\sounds\\land.ogg"
+local SOUND_VICTORY = "Interface\\AddOns\\Wheelson\\sounds\\victory.ogg"
 local SOUND_START   = 271526  -- Foley_Goblin_Casino_Slot_Machine_Arm_Crank_Start (keep)
 
 local TICK_THROTTLE = 0.15    -- seconds; at most one tick sound per 150ms across all reels
@@ -101,17 +97,17 @@ local function PlayTick()
     local now = GetTime()
     if now - lastTickTime < TICK_THROTTLE then return end
     lastTickTime = now
-    PlaySound(SOUND_TICK, "SFX")
+    PlaySoundFile(SOUND_TICK, "SFX")
 end
 
 local function PlayLand()
     if not ShouldPlaySounds() then return end
-    PlaySound(SOUND_LAND, "SFX")
+    PlaySoundFile(SOUND_LAND, "SFX")
 end
 
 local function PlayVictory()
     if not ShouldPlaySounds() then return end
-    PlaySound(SOUND_VICTORY, "SFX")
+    PlaySoundFile(SOUND_VICTORY, "SFX")
 end
 
 local function PlayStart()
