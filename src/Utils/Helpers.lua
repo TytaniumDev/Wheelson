@@ -282,17 +282,24 @@ local function getClipboardFrame(self)
             insets = { left = 8, right = 8, top = 8, bottom = 8 },
         })
         frame:SetBackdropColor(0, 0, 0, 1)
-        frame:SetFrameStrata("DIALOG")
+        frame:SetFrameStrata("FULLSCREEN_DIALOG")
+        frame:SetToplevel(true)
+        frame:SetMovable(true)
         frame:EnableMouse(true)
+        frame:RegisterForDrag("LeftButton")
+        frame:SetScript("OnDragStart", frame.StartMoving)
+        frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
         frame:Hide()
 
-        local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        title:SetPoint("TOP", 0, -12)
-        title:SetText("|cFFFFD100Copy to Clipboard|r")
+        frame.titleText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        frame.titleText:SetPoint("TOP", 0, -12)
+
+        local xButton = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+        xButton:SetPoint("TOPRIGHT", -2, -2)
 
         local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         hint:SetPoint("BOTTOM", 0, 36)
-        hint:SetText("Press Ctrl+C to copy, then close this window")
+        hint:SetText("Press Ctrl+A to select all, then Ctrl+C to copy")
 
         local scrollFrame = CreateFrame("ScrollFrame", "WHLSNClipboardScrollFrame", frame,
             "UIPanelScrollFrameTemplate")
@@ -311,6 +318,9 @@ local function getClipboardFrame(self)
             frame:Hide()
         end)
         scrollFrame:SetScrollChild(editBox)
+        editBox:SetWidth(scrollFrame:GetWidth() - 20)
+
+        UISpecialFrames[#UISpecialFrames + 1] = "WHLSNClipboardFrame"
 
         local closeButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
         closeButton:SetSize(80, 22)
@@ -326,8 +336,9 @@ local function getClipboardFrame(self)
     return self.clipboardFrame
 end
 
-local function showClipboardPopup(self, text)
+local function showClipboardPopup(self, title, text)
     local frame = getClipboardFrame(self)
+    frame.titleText:SetText("|cFFFFD100" .. title .. "|r")
     frame:Show()
     self.clipboardEditBox:SetText(text)
     self.clipboardEditBox:HighlightText()
@@ -337,11 +348,11 @@ end
 --- Copy group results to clipboard.
 ---@param groups WHLSNGroup[]
 function WHLSN:CopyGroupsToClipboard(groups)
-    showClipboardPopup(self, self:FormatGroupSummary(groups))
+    showClipboardPopup(self, "Copy Group Results", self:FormatGroupSummary(groups))
 end
 
 --- Copy a bug report to the clipboard and show instructions.
 ---@param snapshot table  algorithmSnapshot from session
 function WHLSN:CopyReportToClipboard(snapshot)
-    showClipboardPopup(self, self:FormatBugReport(snapshot))
+    showClipboardPopup(self, "Copy Bug Report", self:FormatBugReport(snapshot))
 end
