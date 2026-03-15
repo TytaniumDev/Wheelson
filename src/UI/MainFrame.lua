@@ -7,6 +7,7 @@ local WHLSN = _G.Wheelson
 
 local mainFrame = nil
 local currentView = nil -- "lobby" | "wheel" | "results"
+
 local function GetMainFrame()
     if not mainFrame then
         mainFrame = _G["WHLSNMainFrame"]
