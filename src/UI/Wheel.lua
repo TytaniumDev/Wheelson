@@ -732,6 +732,8 @@ local function UpdateReelScroll(i, state, dt)
             -- Only reposition slots near the visible area (viewport is 0 to -REEL_HEIGHT)
             if rawY > -REEL_HEIGHT - ROW_HEIGHT and rawY < ROW_HEIGHT * 2 then
                 local slot = slots[j]
+                -- SetPoint with the same anchor name replaces the existing point;
+                -- ClearAllPoints() is unnecessary when only one anchor is used.
                 slot:SetPoint("TOPLEFT", inner, "TOPLEFT", 2, rawY)
                 if alphaChanged then
                     slot:SetTextColor(1, 1, 1, slotAlpha)
@@ -958,6 +960,7 @@ function WHLSN:HideWheelView()
         ws.frame:SetScript("OnUpdate", nil)
         if ws.frame.collapseAG then
             ws.frame.collapseAG:Stop()
+            ws.frame.collapseAG:SetScript("OnFinished", nil)
         end
         ws.frame:Hide()
     end
@@ -1010,6 +1013,7 @@ function WHLSN:SkipWheelAnimation()
         ws.frame:SetScript("OnUpdate", nil)
         if ws.frame.collapseAG then
             ws.frame.collapseAG:Stop()
+            ws.frame.collapseAG:SetScript("OnFinished", nil)
         end
     end
     ws.isAnimating = false
