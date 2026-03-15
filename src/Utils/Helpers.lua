@@ -52,37 +52,6 @@ function WHLSN:FormatGroupSummary(groups)
     return table.concat(lines, "\n")
 end
 
---- Post group results to guild chat.
----@param groups WHLSNGroup[]
-function WHLSN:PostToGuildChat(groups)
-    if self.session.isTest then
-        self:Print("[Test] Would post group results to guild chat:")
-        self:Print(self:FormatGroupSummary(groups))
-        return
-    end
-
-    if not IsInGuild() then
-        self:Print("Not in a guild.")
-        return
-    end
-
-    C_ChatInfo.SendChatMessage("=== Mythic+ Groups ===", "GUILD")
-    for i, group in ipairs(groups) do
-        local tankName = group.tank and group.tank.name or "(none)"
-        local healerName = group.healer and group.healer.name or "(none)"
-        local dpsNames = {}
-        for _, dps in ipairs(group.dps) do
-            dpsNames[#dpsNames + 1] = dps.name
-        end
-
-        local msg = string.format(
-            "Group %d: T=%s H=%s D=%s",
-            i, tankName, healerName, table.concat(dpsNames, ",")
-        )
-        C_ChatInfo.SendChatMessage(msg, "GUILD")
-    end
-end
-
 --- Get a role-colored name string for display.
 ---@param player WHLSNPlayer
 ---@return string

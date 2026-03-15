@@ -40,28 +40,21 @@ local function CreateGroupDisplayFrame(parent)
     frame.scrollChild:SetHeight(1)
     frame.scrollFrame:SetScrollChild(frame.scrollChild)
 
-    -- Bottom button bar: chain left-to-right to avoid overlap
-    -- Row 1 (left-aligned): Invite, Post, Report
+    -- Bottom button bar
+    -- Center: Invite My Group
     frame.inviteButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     frame.inviteButton:SetSize(130, 30)
-    frame.inviteButton:SetPoint("BOTTOMLEFT", 8, 5)
+    frame.inviteButton:SetPoint("BOTTOM", 0, 5)
     frame.inviteButton:SetText("Invite My Group")
     frame.inviteButton:GetFontString():SetFontObject("GameFontNormalLarge")
     frame.inviteButton:SetScript("OnClick", function()
         WHLSN:InviteMyGroup()
     end)
 
-    frame.postButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.postButton:SetSize(90, 24)
-    frame.postButton:SetPoint("LEFT", frame.inviteButton, "RIGHT", 4, 0)
-    frame.postButton:SetText("Post to Guild")
-    frame.postButton:SetScript("OnClick", function()
-        WHLSN:PostToGuildChat(WHLSN.session.groups)
-    end)
-
+    -- Left: Report
     frame.reportButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     frame.reportButton:SetSize(60, 24)
-    frame.reportButton:SetPoint("LEFT", frame.postButton, "RIGHT", 4, 0)
+    frame.reportButton:SetPoint("BOTTOMLEFT", 8, 8)
     frame.reportButton:SetText("Report")
     frame.reportButton:SetScript("OnClick", function()
         if WHLSN.session.algorithmSnapshot then
@@ -71,7 +64,7 @@ local function CreateGroupDisplayFrame(parent)
         end
     end)
 
-    -- Row 1 (right-aligned): Finish
+    -- Right: Finish
     frame.endButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     frame.endButton:SetSize(70, 24)
     frame.endButton:SetPoint("BOTTOMRIGHT", -8, 8)
@@ -263,7 +256,6 @@ function WHLSN:UpdateGroupDisplayView()
     local isViewing = self.session.viewingHistory or false
     displayFrame.endButton:SetShown(isHost or isViewing)
     displayFrame.inviteButton:SetShown(not isViewing)
-    displayFrame.postButton:SetShown(not isViewing)
     displayFrame.reportButton:SetShown(not isViewing and WHLSN.session.algorithmSnapshot ~= nil)
 
     -- Update title for historical views

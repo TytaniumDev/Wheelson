@@ -9,11 +9,6 @@ local mainFrame = nil
 local currentView = nil -- "lobby" | "wheel" | "results"
 local isMinimized = false
 
-local MIN_WIDTH = 400
-local MIN_HEIGHT = 350
-local MAX_WIDTH = 900
-local MAX_HEIGHT = 700
-
 local function GetMainFrame()
     if not mainFrame then
         mainFrame = _G["WHLSNMainFrame"]
@@ -27,25 +22,6 @@ local function GetMainFrame()
                 mainFrame:ClearAllPoints()
                 mainFrame:SetPoint(pos.point, UIParent, pos.relPoint, pos.x, pos.y)
             end
-
-            -- Make frame resizable
-            mainFrame:SetResizable(true)
-            mainFrame:SetResizeBounds(MIN_WIDTH, MIN_HEIGHT, MAX_WIDTH, MAX_HEIGHT)
-
-            -- Resize handle
-            local resizer = CreateFrame("Button", nil, mainFrame)
-            resizer:SetSize(16, 16)
-            resizer:SetPoint("BOTTOMRIGHT")
-            resizer:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-            resizer:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
-            resizer:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-            resizer:SetScript("OnMouseDown", function()
-                mainFrame:StartSizing("BOTTOMRIGHT")
-            end)
-            resizer:SetScript("OnMouseUp", function()
-                mainFrame:StopMovingOrSizing()
-                WHLSN:SaveFramePosition()
-            end)
 
             -- Save position on drag stop
             mainFrame:SetScript("OnDragStop", function(self)

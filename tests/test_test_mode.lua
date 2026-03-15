@@ -198,19 +198,6 @@ describe("Test Mode", function()
         end)
     end)
 
-    describe("guild chat suppression", function()
-        it("should not send guild chat messages in test mode", function()
-            local chatSent = false
-            _G.C_ChatInfo.SendChatMessage = function() chatSent = true end
-
-            WHLSN:StartTestSession()
-            WHLSN.session.groups = WHLSN:CreateMythicPlusGroups(WHLSN.session.players)
-            WHLSN:PostToGuildChat(WHLSN.session.groups)
-
-            assert.is_false(chatSent)
-        end)
-    end)
-
     describe("GetTestPlayers", function()
         it("should return exactly 15 players", function()
             local players = WHLSN:GetTestPlayers()
