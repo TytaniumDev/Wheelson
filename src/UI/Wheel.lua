@@ -56,6 +56,9 @@ local P2_END = 0.45     -- end of full speed
 local P1_OUT_END = 0.01
 local P2_OUT_END = 0.60
 
+-- Expose easing constants for testing
+WHLSN._EASING = { P1_END = P1_END, P2_END = P2_END, P1_OUT_END = P1_OUT_END, P2_OUT_END = P2_OUT_END }
+
 ---------------------------------------------------------------------------
 -- Animation State Variables
 ---------------------------------------------------------------------------
@@ -250,7 +253,7 @@ function WHLSN.SlotEasing(t)
         local a = v - 2
         local b = 3 - 2 * v
         local c = v
-        local eased = a * p * p * p + b * p * p + c * p
+        local eased = p * (c + p * (b + a * p))
         return P2_OUT_END + eased * P3_RANGE
     end
 end
