@@ -28,6 +28,7 @@ dofile("src/Models.lua")
 dofile("src/GroupCreator.lua")
 
 local Player = Wheelson.Player
+local Group = Wheelson.Group
 local WHLSN = Wheelson
 
 ---------------------------------------------------------------------------
@@ -562,6 +563,65 @@ describe("CreateMythicPlusGroups", function()
             if g.healer then healerCount = healerCount + 1 end
         end
         assert.is_true(healerCount >= 1)
+    end)
+
+    it("should form 3 full groups from 15 players with healer-offtank (issue #40)", function()
+        local players = {
+            Player:New("Temma", "tank", {"melee"}, {"brez"}),
+            Player:New("Gazzi", "tank", {}, {"brez"}),
+            Player:New("Quill", "healer", {"tank", "ranged", "melee"}, {"brez"}),
+            Player:New("Sorovar", "healer", {}, {}),
+            Player:New("Vanyali", "ranged", {}, {}),
+            Player:New("Tytaniormu", "ranged", {}, {"lust"}),
+            Player:New("Heretofore", "ranged", {}, {"lust"}),
+            Player:New("Poppybrosjr", "ranged", {}, {"lust"}),
+            Player:New("Volkareth", "ranged", {"healer"}, {"lust"}),
+            Player:New("Johng", "melee", {}, {"brez"}),
+            Player:New("jim", "melee", {"tank"}, {}),
+            Player:New("Raxef", "melee", {}, {}),
+            Player:New("Mickey", "melee", {}, {}),
+            Player:New("Khurri", "melee", {}, {"brez"}),
+            Player:New("Blueshift", "ranged", {}, {"lust"}),
+        }
+        local lastGroups = {
+            Group:New(
+                Player:New("Gazzi", "tank", {}, {"brez"}),
+                Player:New("Sorovar", "healer", {}, {}),
+                {
+                    Player:New("Poppybrosjr", "ranged", {}, {"lust"}),
+                    Player:New("Johng", "melee", {}, {"brez"}),
+                    Player:New("Heretofore", "ranged", {}, {"lust"}),
+                }
+            ),
+            Group:New(
+                Player:New("Temma", "tank", {"melee"}, {"brez"}),
+                Player:New("Volkareth", "ranged", {"healer"}, {"lust"}),
+                {
+                    Player:New("Tytaniormu", "ranged", {}, {"lust"}),
+                    Player:New("Mickey", "melee", {}, {}),
+                    Player:New("Raxef", "melee", {}, {}),
+                }
+            ),
+            Group:New(
+                Player:New("jim", "melee", {"tank"}, {}),
+                Player:New("Quill", "healer", {"tank", "ranged", "melee"}, {"brez"}),
+                {
+                    Player:New("Blueshift", "ranged", {}, {"lust"}),
+                    Player:New("Khurri", "melee", {}, {"brez"}),
+                    Player:New("Vanyali", "ranged", {}, {}),
+                }
+            ),
+        }
+        WHLSN:SetLastGroups(lastGroups)
+        for _ = 1, 20 do
+            local groups = WHLSN:CreateMythicPlusGroups(players)
+            assert.equal(3, #groups, "Expected 3 groups from 15 players, got " .. #groups)
+            local totalPlayers = 0
+            for _, g in ipairs(groups) do
+                totalPlayers = totalPlayers + g:GetSize()
+            end
+            assert.equal(15, totalPlayers, "All 15 players should be assigned")
+        end
     end)
 
     it("should try to get ranged DPS in each group", function()
