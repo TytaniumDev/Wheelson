@@ -321,3 +321,48 @@ describe("DampedSpring", function()
         assert.near(1, WHLSN.DampedSpring(1), 0.01)
     end)
 end)
+
+-- ---------------------------------------------------------------------------
+-- PrepareReelNames tests
+-- ---------------------------------------------------------------------------
+
+describe("PrepareReelNames", function()
+    it("should preserve all names from the base list", function()
+        local baseNames = {"Alice", "Bob", "Carol", "Alice", "Bob", "Carol", "Alice", "Bob"}
+        local winner = Player:New("Alice", "tank", {}, {})
+        local result = WHLSN._PrepareReelNames(baseNames, winner)
+        assert.equal(#baseNames, #result)
+    end)
+
+    it("should place winner at index 1", function()
+        local baseNames = {"Alice", "Bob", "Carol", "Alice", "Bob", "Carol", "Alice", "Bob"}
+        local winner = Player:New("Carol", "tank", {}, {})
+        local result = WHLSN._PrepareReelNames(baseNames, winner)
+        assert.equal("Carol", result[1])
+    end)
+
+    it("should keep all duplicate copies of winner", function()
+        local baseNames = {"Alice", "Bob", "Alice", "Bob", "Alice", "Bob", "Alice", "Bob"}
+        local winner = Player:New("Alice", "tank", {}, {})
+        local result = WHLSN._PrepareReelNames(baseNames, winner)
+        local count = 0
+        for _, n in ipairs(result) do
+            if n == "Alice" then count = count + 1 end
+        end
+        assert.equal(4, count)
+    end)
+
+    it("should force-insert winner if not in list", function()
+        local baseNames = {"Alice", "Bob", "Carol"}
+        local winner = Player:New("Dave", "tank", {}, {})
+        local result = WHLSN._PrepareReelNames(baseNames, winner)
+        assert.equal("Dave", result[1])
+        assert.equal(#baseNames + 1, #result)
+    end)
+
+    it("should return baseNames unchanged when winner is nil", function()
+        local baseNames = {"Alice", "Bob", "Carol"}
+        local result = WHLSN._PrepareReelNames(baseNames, nil)
+        assert.same(baseNames, result)
+    end)
+end)

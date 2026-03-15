@@ -481,39 +481,42 @@ local function BuildReelNameLists()
 end
 
 --- Prepare the reel name list for a specific group spin.
---- Uses the pre-built name list but places the winner at index 1.
----@param reelIndex number 1-5
+--- Rotates the names so the winner lands at index 1, preserving all entries.
+--- If the winner is not in the list, prepends them.
+---@param baseNames string[]
 ---@param winner WHLSNPlayer|nil
 ---@return string[] names with winner at index 1
-local function PrepareReelNames(reelIndex, winner)
-    local baseNames = reelNameLists[reelIndex]
+function WHLSN._PrepareReelNames(baseNames, winner)
     if not winner or not baseNames or #baseNames == 0 then return baseNames end
 
     local winnerName = winner.name
 
-    -- Ensure winner is in the list (force-insert if not)
-    local found = false
-    for _, n in ipairs(baseNames) do
-        if n == winnerName then found = true; break end
+    -- Find first occurrence of winner in the list
+    local winnerPos = nil
+    for idx, n in ipairs(baseNames) do
+        if n == winnerName then
+            winnerPos = idx
+            break
+        end
     end
 
-    local names
-    if found then
-        -- Copy with winner removed, then prepend winner at index 1
-        names = { winnerName }
-        for _, n in ipairs(baseNames) do
-            if n ~= winnerName then
-                names[#names + 1] = n
-            end
-        end
-    else
-        -- Winner not in pool — prepend and keep existing names
-        names = { winnerName }
+    -- Winner not in pool — prepend and keep all existing names
+    if not winnerPos then
+        local names = { winnerName }
         for _, n in ipairs(baseNames) do
             names[#names + 1] = n
         end
+        return names
     end
 
+    -- Rotate list so winner is at index 1
+    local names = {}
+    for i = winnerPos, #baseNames do
+        names[#names + 1] = baseNames[i]
+    end
+    for i = 1, winnerPos - 1 do
+        names[#names + 1] = baseNames[i]
+    end
     return names
 end
 
@@ -548,7 +551,7 @@ local function SpinForGroup(groupIndex)
         local winner = winners[i]
 
         if winner then
-            local finalNames = PrepareReelNames(i, winner)
+            local finalNames = WHLSN._PrepareReelNames(reelNameLists[i], winner)
 
             reelState[i] = {
                 active     = true,
