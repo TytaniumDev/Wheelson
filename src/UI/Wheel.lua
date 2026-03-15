@@ -34,19 +34,18 @@ local GOLD_R = 0.961
 local GOLD_G = 0.620
 local GOLD_B = 0.043
 
-local BASE_REEL_DURATIONS = { 8000, 8600, 9200, 9800, 10400 }
+local BASE_REEL_DURATIONS = { 5000, 5300, 5600, 5900, 6200 }
 
 local GLOW_DURATION     = 1.5
 local COLLAPSE_DURATION = 0.5
 local FINAL_PAUSE       = 2.0
 local MIN_POOL_SIZE     = 8
-local TARGET_SPEED      = 500   -- px/s during linear phase (uniform across all reels)
-local MIN_SPIN_CYCLES   = 3     -- minimum full list cycles for visual spin effect
+local TARGET_SPEED      = 250   -- px/s during linear phase (uniform across all reels)
+local MIN_SPIN_CYCLES   = 2     -- minimum full list cycles for visual spin effect
 
 -- Easing phase boundaries (as fractions of total reel duration)
-local P1_END = 0.0375   -- end of snap start (300ms / 8000ms)
-local P2_END = 0.55     -- end of full speed (4400ms / 8000ms)
-local P3_END = 0.95     -- end of deceleration (7600ms / 8000ms)
+local P1_END = 0.0375   -- end of snap start (187ms / 5000ms)
+local P2_END = 0.55     -- end of full speed (2750ms / 5000ms)
 
 ---------------------------------------------------------------------------
 -- Animation State Variables
@@ -209,27 +208,11 @@ end
 -- Easing Functions
 ---------------------------------------------------------------------------
 
---- Damped spring oscillation function used for Phase 4 (landing bounce).
---- Returns a value that starts at 1 and oscillates around 1 with decaying
---- amplitude, simulating a physical spring settling.
---- f(t) = 1 + e^(-k*t) * sin(w*t) * 0.04,  k=12, w=8
---- Clamped to return exactly 1 for t<=0 or t>=1.
----@param t number  normalised time [0, 1]
----@return number
-function WHLSN.DampedSpring(t)
-    if t <= 0 or t >= 1 then return 1 end
-    local k = 12
-    local w = 8
-    local amplitude = 0.04
-    return 1 + math.exp(-k * t) * math.sin(w * t) * amplitude
-end
-
---- Four-phase slot-machine easing curve.
+--- Three-phase slot-machine easing curve.
 ---
 ---  Phase 1 (0   → P1_END=0.0375): quartic ease-in,      maps scroll to  0% –  3%
 ---  Phase 2 (P1_END → P2_END=0.55):  linear,              maps scroll to  3% – 75%
----  Phase 3 (P2_END → P3_END=0.95):  easeOutCubic,        maps scroll to 75% – 100%
----  Phase 4 (P3_END → 1.0):          DampedSpring bounce  (oscillates around 1)
+---  Phase 3 (P2_END → 1.0):          easeOutCubic,        maps scroll to 75% – 100%
 ---
 --- Returns 0 for t<=0, 1 for t>=1.
 ---@param t number  normalised time [0, 1]
@@ -255,16 +238,11 @@ function WHLSN.SlotEasing(t)
         local p = (t - P1_END) / (P2_END - P1_END)
         return P1_OUT_END + p * (P2_OUT_END - P1_OUT_END)
 
-    elseif t < P3_END then
+    else
         -- Phase 3: easeOutCubic  1 - (1-p)^3
-        local p = (t - P2_END) / (P3_END - P2_END)
+        local p = (t - P2_END) / (1 - P2_END)
         local eased = 1 - (1 - p) * (1 - p) * (1 - p)
         return P2_OUT_END + eased * (P3_OUT_END - P2_OUT_END)
-
-    else
-        -- Phase 4: damped spring bounce around 1
-        local p = (t - P3_END) / (1 - P3_END)
-        return WHLSN.DampedSpring(p)
     end
 end
 
@@ -609,7 +587,7 @@ end
 local OnUpdateHandler
 
 --- Calculate scroll metrics for a reel, targeting a uniform linear-phase speed.
---- Linear phase covers 72% of totalScroll in 51.25% of duration.
+--- Linear phase covers 72% of totalScroll in 51.25% of duration (P1_END to P2_END).
 --- numCycles is chosen so all reels scroll at ~TARGET_SPEED px/s.
 ---@param state table  reelState entry (needs .names and .duration)
 ---@return number numCycles, number listHeight, number winnerOffset, number totalScroll
@@ -682,8 +660,8 @@ OnUpdateHandler = function(_, dt)
                     speed = 1.0
                 elseif t < P1_END then
                     speed = t / P1_END
-                elseif t < P3_END then
-                    speed = 1.0 - (t - P2_END) / (P3_END - P2_END)
+                else
+                    speed = 1.0 - (t - P2_END) / (1 - P2_END)
                 end
             end
             local slotAlpha = 1.0 - speed * 0.5  -- 0.5 at full speed, 1.0 at rest
@@ -708,21 +686,16 @@ OnUpdateHandler = function(_, dt)
                 end
             end
 
-            -- When t >= 1: snap to final position and highlight winner
+            -- When t >= 1: highlight winner (positions already correct from animation loop)
             if t >= 1 then
                 state.landed = true
 
                 if reel and reel.slots then
-                    -- Snap: winner (names[1]) must land at slot j=3 (centre row, under pointer).
-                    -- At t=1, baseSlot = numNames-1, so: nameIdx = ((numNames-1+j-2) % numNames)+1
-                    -- j=3 → ((numNames-1+1) % numNames)+1 = 1 = winner ✓
+                    -- At t=1: SlotEasing(1)=1, so scrollOffset=totalScroll and baseSlot=numNames-1.
+                    -- For j=3: nameIdx = ((numNames-1 + 1) % numNames)+1 = 1 = winner ✓
+                    -- No repositioning needed — animation loop already placed slots correctly.
                     for j = 1, 15 do
-                        local nameIdx = ((numNames - 1 + j - 2) % numNames) + 1
-                        reel.slots[j]:ClearAllPoints()
-                        reel.slots[j]:SetPoint("TOPLEFT", reel.inner, "TOPLEFT", 2, -(j - 2) * ROW_HEIGHT)
-                        reel.slots[j]:SetText(state.names[nameIdx])
                         if j == 3 then
-                            -- Centre row: winner slot — gold highlight
                             reel.slots[j]:SetTextColor(GOLD_R, GOLD_G, GOLD_B, 1)
                         else
                             reel.slots[j]:SetTextColor(0.7, 0.7, 0.7, 0.8)

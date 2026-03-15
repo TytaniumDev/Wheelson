@@ -263,11 +263,11 @@ describe("SlotEasing", function()
         assert.is_true(val > 0)
     end)
 
-    it("should be monotonically increasing before bounce phase (check up to t=0.92)", function()
+    it("should be monotonically increasing (no bounce phase)", function()
         local prev = WHLSN.SlotEasing(0)
         local step = 0.01
         local t = step
-        while t <= 0.92 do
+        while t <= 0.99 do
             local curr = WHLSN.SlotEasing(t)
             assert.is_true(curr >= prev, "not monotonically increasing at t=" .. t)
             prev = curr
@@ -286,40 +286,6 @@ describe("SlotEasing", function()
         local before2 = WHLSN.SlotEasing(0.55 - eps)
         local after2  = WHLSN.SlotEasing(0.55 + eps)
         assert.near(before2, after2, 0.01)
-
-        -- Phase 3 → Phase 4 boundary (t ≈ 0.95)
-        local before3 = WHLSN.SlotEasing(0.95 - eps)
-        local after3  = WHLSN.SlotEasing(0.95 + eps)
-        assert.near(before3, after3, 0.01)
-    end)
-end)
-
--- ---------------------------------------------------------------------------
--- DampedSpring tests
--- ---------------------------------------------------------------------------
-
-describe("DampedSpring", function()
-    it("should return 1 at t=0", function()
-        -- DampedSpring(0): envelope = e^0 = 1, sin(0)=0 → 1 + 0 = 1
-        assert.near(1, WHLSN.DampedSpring(0), 1e-9)
-    end)
-
-    it("should overshoot past 1 briefly", function()
-        -- With 1 + e^(-k*t)*sin(w*t)*0.04, the first half-lobe of sin is positive → overshoots above 1
-        local found_overshoot = false
-        local t = 0.01
-        while t <= 0.5 do
-            if WHLSN.DampedSpring(t) > 1.0 then
-                found_overshoot = true
-                break
-            end
-            t = t + 0.01
-        end
-        assert.is_true(found_overshoot)
-    end)
-
-    it("should settle near 1 at t=1", function()
-        assert.near(1, WHLSN.DampedSpring(1), 0.01)
     end)
 end)
 
@@ -375,11 +341,11 @@ end)
 describe("CalcScrollMetrics", function()
     it("should produce similar linear-phase speed for small and large pools", function()
         -- Small pool (8 names, like padded tank pool); duration mirrors BASE_REEL_DURATIONS[1]
-        local smallState = { names = {}, duration = 8.0 }
+        local smallState = { names = {}, duration = 5.0 }
         for i = 1, 8 do smallState.names[i] = "P" .. i end
 
         -- Large pool (20 names, like DPS pool); duration mirrors BASE_REEL_DURATIONS[3]
-        local largeState = { names = {}, duration = 9.2 }
+        local largeState = { names = {}, duration = 5.6 }
         for i = 1, 20 do largeState.names[i] = "P" .. i end
 
         local _, _, _, smallTotal = WHLSN._CalcScrollMetrics(smallState)
@@ -397,10 +363,10 @@ describe("CalcScrollMetrics", function()
 
     it("should use at least MIN_SPIN_CYCLES cycles", function()
         -- Very large pool where target speed would yield < 3 cycles
-        local state = { names = {}, duration = 8.0 }
+        local state = { names = {}, duration = 5.0 }
         for i = 1, 50 do state.names[i] = "P" .. i end
 
         local numCycles = WHLSN._CalcScrollMetrics(state)
-        assert.is_true(numCycles >= 3)
+        assert.is_true(numCycles >= 2)
     end)
 end)
