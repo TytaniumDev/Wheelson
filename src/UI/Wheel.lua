@@ -721,15 +721,16 @@ function WHLSN._OnAllReelsLanded()
     local groups = WHLSN.session.groups
     local totalGroups = #groups
 
+    local glowDelay = GLOW_DURATION / GetAnimationSpeed()
     if currentGroupIndex < totalGroups then
         -- More groups to show: wait GLOW_DURATION then collapse and advance
-        animTimer = C_Timer.NewTimer(GLOW_DURATION, function()
+        animTimer = C_Timer.NewTimer(glowDelay, function()
             animTimer = nil
             CollapseAndAdvance()
         end)
     else
         -- Last group
-        animTimer = C_Timer.NewTimer(GLOW_DURATION, function()
+        animTimer = C_Timer.NewTimer(glowDelay, function()
             animTimer = nil
             OnFinalGroupComplete()
         end)
@@ -793,7 +794,7 @@ CollapseAndAdvance = function()
         local fade = ag:CreateAnimation("Alpha")
         fade:SetFromAlpha(1)
         fade:SetToAlpha(0)
-        fade:SetDuration(COLLAPSE_DURATION)
+        fade:SetDuration(COLLAPSE_DURATION / GetAnimationSpeed())
         fade:SetSmoothing("OUT")
         ag:SetToFinalAlpha(true)
         ag:SetScript("OnFinished", function()
@@ -830,7 +831,7 @@ end
 
 --- Called after the last group's glow period expires.
 OnFinalGroupComplete = function()
-    animTimer = C_Timer.NewTimer(FINAL_PAUSE, function()
+    animTimer = C_Timer.NewTimer(FINAL_PAUSE / GetAnimationSpeed(), function()
         animTimer = nil
         WHLSN:OnWheelComplete()
     end)
