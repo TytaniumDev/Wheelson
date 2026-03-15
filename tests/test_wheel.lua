@@ -221,23 +221,36 @@ describe("PadReelPool", function()
         assert.equal(5, #result)
     end)
 
-    it("should cycle names to reach min size", function()
+    it("should duplicate full list to reach min size", function()
         local names = {"Alice", "Bob"}
         local result = WHLSN.PadReelPool(names, 5)
-        assert.equal(5, #result)
-        -- First two should be original
+        -- 3 full copies of [Alice, Bob] = 6 entries (never partial)
+        assert.equal(6, #result)
         assert.equal("Alice", result[1])
         assert.equal("Bob", result[2])
-        -- Should cycle: Alice, Bob, Alice
         assert.equal("Alice", result[3])
         assert.equal("Bob", result[4])
         assert.equal("Alice", result[5])
+        assert.equal("Bob", result[6])
+    end)
+
+    it("should duplicate full list for 3-name pool", function()
+        local names = {"Alice", "Bob", "Carol"}
+        local result = WHLSN.PadReelPool(names, 5)
+        -- 2 full copies = 6 entries
+        assert.equal(6, #result)
+        assert.equal("Alice", result[1])
+        assert.equal("Bob", result[2])
+        assert.equal("Carol", result[3])
+        assert.equal("Alice", result[4])
+        assert.equal("Bob", result[5])
+        assert.equal("Carol", result[6])
     end)
 
     it("should handle single name", function()
         local names = {"Solo"}
-        local result = WHLSN.PadReelPool(names, 4)
-        assert.equal(4, #result)
+        local result = WHLSN.PadReelPool(names, 5)
+        assert.equal(5, #result)
         for _, n in ipairs(result) do
             assert.equal("Solo", n)
         end
@@ -264,16 +277,30 @@ describe("SlotEasing", function()
         assert.is_true(val > 0)
     end)
 
-    it("should be monotonically increasing (no bounce phase)", function()
+    it("should be monotonically increasing through phases 1-2", function()
+        local E = WHLSN._EASING
         local prev = WHLSN.SlotEasing(0)
         local step = 0.01
         local t = step
-        while t <= 0.99 do
+        while t <= E.P2_END do
             local curr = WHLSN.SlotEasing(t)
             assert.is_true(curr >= prev, "not monotonically increasing at t=" .. t)
             prev = curr
             t = t + step
         end
+    end)
+
+    it("should overshoot past 1.0 in phase 3 (spring bounce)", function()
+        local E = WHLSN._EASING
+        local maxVal = 0
+        local step = 0.005
+        local t = E.P2_END
+        while t <= 1.0 do
+            local val = WHLSN.SlotEasing(t)
+            if val > maxVal then maxVal = val end
+            t = t + step
+        end
+        assert.is_true(maxVal > 1.0, "expected overshoot past 1.0, max was " .. maxVal)
     end)
 
     it("should be continuous at phase boundaries", function()
@@ -341,37 +368,47 @@ end)
 -- ---------------------------------------------------------------------------
 
 describe("CalcScrollMetrics", function()
-    it("should produce similar linear-phase speed for small and large pools", function()
-        -- Small pool (8 names, like padded tank pool); duration mirrors BASE_REEL_DURATIONS[1]
+    it("should produce identical linear-phase speed for different pool sizes", function()
+        -- Small pool (8 names); duration mirrors BASE_REEL_DURATIONS[1]
         local smallState = { names = {}, duration = 3.0 }
         for i = 1, 8 do smallState.names[i] = "P" .. i end
 
-        -- Larger pool (10 names, like DPS pool); duration mirrors BASE_REEL_DURATIONS[3]
+        -- Larger pool (10 names); duration mirrors BASE_REEL_DURATIONS[3]
         local largeState = { names = {}, duration = 3.6 }
         for i = 1, 10 do largeState.names[i] = "P" .. i end
 
-        local _, _, _, smallTotal = WHLSN._CalcScrollMetrics(smallState)
-        local _, _, _, largeTotal = WHLSN._CalcScrollMetrics(largeState)
+        local _, _, smallDist = WHLSN._CalcScrollMetrics(smallState)
+        local _, _, largeDist = WHLSN._CalcScrollMetrics(largeState)
 
-        -- Linear phase speed = linearScrollFrac * totalScroll / (linearTimeFrac * duration)
+        -- scrollDistance yields exactly TARGET_SPEED; speed is pool-independent
         local E = WHLSN._EASING
         local linearScrollFrac = E.P2_OUT_END - E.P1_OUT_END
         local linearTimeFrac   = E.P2_END - E.P1_END
-        local smallSpeed = linearScrollFrac * smallTotal / (linearTimeFrac * smallState.duration)
-        local largeSpeed = linearScrollFrac * largeTotal / (linearTimeFrac * largeState.duration)
+        local smallSpeed = linearScrollFrac * smallDist / (linearTimeFrac * smallState.duration)
+        local largeSpeed = linearScrollFrac * largeDist / (linearTimeFrac * largeState.duration)
 
-        -- Speeds should be within 20% of each other
-        local ratio = smallSpeed / largeSpeed
-        assert.is_true(ratio > 0.8 and ratio < 1.2,
-            "speed ratio " .. ratio .. " outside 0.8-1.2 range")
+        -- Both should be exactly TARGET_SPEED (within float tolerance)
+        assert.near(smallSpeed, largeSpeed, 1e-6)
     end)
 
-    it("should use at least MIN_SPIN_CYCLES cycles", function()
-        -- Very large pool where target speed would yield < 3 cycles
+    it("should ensure at least MIN_SPIN_CYCLES full rotations", function()
+        -- Very large pool where target speed would yield < 1 cycle
         local state = { names = {}, duration = 3.0 }
         for i = 1, 50 do state.names[i] = "P" .. i end
 
-        local numCycles = WHLSN._CalcScrollMetrics(state)
+        local listHeight, scrollBase, scrollDistance = WHLSN._CalcScrollMetrics(state)
+        local totalScroll = scrollBase + scrollDistance
+        local numCycles = totalScroll / listHeight
         assert.is_true(numCycles >= 1)
+    end)
+
+    it("should land winner at centre (totalScroll is multiple of listHeight)", function()
+        local state = { names = {}, duration = 3.0 }
+        for i = 1, 7 do state.names[i] = "P" .. i end
+
+        local listHeight, scrollBase, scrollDistance = WHLSN._CalcScrollMetrics(state)
+        local totalScroll = scrollBase + scrollDistance
+        local remainder = totalScroll % listHeight
+        assert.near(0, remainder, 1e-6)
     end)
 end)
