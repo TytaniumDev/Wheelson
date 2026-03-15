@@ -876,10 +876,6 @@ local function AddSummaryRow(groupIndex)
                 slot:Show()
             end
         end
-
-        -- Write current group text to its slot
-        local curSlotIdx = ((ws.summaryCount - 1) % MAX_SUMMARY_ROWS) + 1
-        ws.frame.summarySlots[curSlotIdx]:SetText("Group " .. groupIndex .. ": " .. summaryText)
     end
 end
 
