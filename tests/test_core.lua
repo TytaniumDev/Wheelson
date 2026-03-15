@@ -244,7 +244,7 @@ describe("SpinGroups", function()
         WHLSN:ClearLastGroups()
     end)
 
-    it("should capture algorithmSnapshot with seed, players, and groups", function()
+    it("should capture algorithmSnapshot with players and groups", function()
         local Player = WHLSN.Player
         WHLSN.session.players = {
             Player:New("Tank1", "tank", {}, {"brez"}),
@@ -258,7 +258,6 @@ describe("SpinGroups", function()
 
         local snap = WHLSN.session.algorithmSnapshot
         assert.is_not_nil(snap)
-        assert.is_number(snap.seed)
         assert.is_not_nil(snap.players)
         assert.equals(5, #snap.players)
         assert.is_not_nil(snap.groups)
