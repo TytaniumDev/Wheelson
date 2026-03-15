@@ -268,40 +268,78 @@ function WHLSN:FormatBugReport(snapshot)
     return table.concat(lines, "\n")
 end
 
---- Get or create the shared clipboard EditBox (WoW has no direct clipboard API).
----@return table editBox
-local function getClipboardEditBox(self)
-    if not self.clipboardEditBox then
-        local editBox = CreateFrame("EditBox", "WHLSNClipboardEditBox", UIParent)
+--- Get or create the shared clipboard popup (WoW has no direct clipboard API).
+--- Shows a dialog with a selectable EditBox so the user can Ctrl+C.
+local function getClipboardFrame(self)
+    if not self.clipboardFrame then
+        local frame = CreateFrame("Frame", "WHLSNClipboardFrame", UIParent, "BackdropTemplate")
+        frame:SetSize(450, 300)
+        frame:SetPoint("CENTER")
+        frame:SetBackdrop({
+            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+            tile = true, tileSize = 32, edgeSize = 32,
+            insets = { left = 8, right = 8, top = 8, bottom = 8 },
+        })
+        frame:SetBackdropColor(0, 0, 0, 1)
+        frame:SetFrameStrata("DIALOG")
+        frame:EnableMouse(true)
+        frame:Hide()
+
+        local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        title:SetPoint("TOP", 0, -12)
+        title:SetText("|cFFFFD100Copy to Clipboard|r")
+
+        local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        hint:SetPoint("BOTTOM", 0, 36)
+        hint:SetText("Press Ctrl+C to copy, then close this window")
+
+        local scrollFrame = CreateFrame("ScrollFrame", "WHLSNClipboardScrollFrame", frame,
+            "UIPanelScrollFrameTemplate")
+        scrollFrame:SetPoint("TOPLEFT", 12, -32)
+        scrollFrame:SetPoint("BOTTOMRIGHT", -32, 52)
+
+        local editBox = CreateFrame("EditBox", "WHLSNClipboardEditBox", scrollFrame)
         editBox:SetMultiLine(true)
         editBox:SetMaxLetters(0)
         editBox:SetAutoFocus(false)
         editBox:SetFontObject("ChatFontNormal")
-        editBox:SetWidth(0)
-        editBox:SetHeight(0)
-        editBox:SetPoint("CENTER")
-        editBox:Hide()
+        editBox:SetWidth(scrollFrame:GetWidth())
+        editBox:SetScript("OnEscapePressed", function()
+            frame:Hide()
+        end)
+        scrollFrame:SetScrollChild(editBox)
+
+        local closeButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+        closeButton:SetSize(80, 22)
+        closeButton:SetPoint("BOTTOM", 0, 10)
+        closeButton:SetText("Close")
+        closeButton:SetScript("OnClick", function()
+            frame:Hide()
+        end)
+
+        self.clipboardFrame = frame
         self.clipboardEditBox = editBox
     end
-    return self.clipboardEditBox
+    return self.clipboardFrame
 end
 
 --- Copy group results to clipboard.
 ---@param groups WHLSNGroup[]
 function WHLSN:CopyGroupsToClipboard(groups)
-    local editBox = getClipboardEditBox(self)
-    editBox:SetText(self:FormatGroupSummary(groups))
-    editBox:HighlightText()
-    editBox:SetFocus()
-    self:Print("Group results copied. Press Ctrl+C to copy, then Escape.")
+    local frame = getClipboardFrame(self)
+    frame:Show()
+    self.clipboardEditBox:SetText(self:FormatGroupSummary(groups))
+    self.clipboardEditBox:HighlightText()
+    self.clipboardEditBox:SetFocus()
 end
 
 --- Copy a bug report to the clipboard and show instructions.
 ---@param snapshot table  algorithmSnapshot from session
 function WHLSN:CopyReportToClipboard(snapshot)
-    local editBox = getClipboardEditBox(self)
-    editBox:SetText(self:FormatBugReport(snapshot))
-    editBox:HighlightText()
-    editBox:SetFocus()
-    self:Print("Report copied! Press Ctrl+C, then paste into a new issue at github.com/TytaniumDev/Wheelson/issues")
+    local frame = getClipboardFrame(self)
+    frame:Show()
+    self.clipboardEditBox:SetText(self:FormatBugReport(snapshot))
+    self.clipboardEditBox:HighlightText()
+    self.clipboardEditBox:SetFocus()
 end
