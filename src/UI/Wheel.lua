@@ -10,6 +10,14 @@ local WHLSN = _G.Wheelson
 -- Constants
 ---------------------------------------------------------------------------
 
+-- Cache math functions as upvalues for hot-path performance
+local math_sin   = math.sin
+local math_floor = math.floor
+local math_ceil  = math.ceil
+local math_min   = math.min
+local math_max   = math.max
+local PI         = math.pi
+
 local ROW_HEIGHT        = 20
 local VISIBLE_ROWS      = 3
 local REEL_HEIGHT       = ROW_HEIGHT * VISIBLE_ROWS
@@ -99,12 +107,12 @@ local SOUND_START   = 271526  -- Foley_Goblin_Casino_Slot_Machine_Arm_Crank_Star
 
 local TICK_THROTTLE = 0.15    -- seconds; at most one tick sound per 150ms across all reels
 local lastTickTime  = 0
+local frameTime     = 0       -- cached GetTime() value, set once per OnUpdate frame
 
 local function PlayTick()
     if not ws.soundEnabled then return end
-    local now = GetTime()
-    if now - lastTickTime < TICK_THROTTLE then return end
-    lastTickTime = now
+    if frameTime - lastTickTime < TICK_THROTTLE then return end
+    lastTickTime = frameTime
     PlaySoundFile(SOUND_TICK, "SFX")
 end
 
@@ -221,7 +229,7 @@ function WHLSN.SlotEasing(t)
 
     else
         local p = (t - P2_END) / (1 - P2_END)
-        local eased = 1.0 + (2 ^ (-10 * p)) * math.sin((10 * p - 0.75) * 2 * math.pi / 3)
+        local eased = 1.0 + (2 ^ (-10 * p)) * math_sin((10 * p - 0.75) * 2 * PI / 3)
         return P2_OUT_END + eased * P3_RANGE
     end
 end
@@ -270,11 +278,25 @@ local function CreateReelBorders(reel, roleDef)
     return borders
 end
 
+local GLOW_FADE_DURATION = 0.3  -- seconds for glow to fade in when a reel lands
+
 local function CreateReelGlow(parent, reel, reelWidth)
     local glow = parent:CreateTexture(nil, "BACKGROUND")
     glow:SetSize(reelWidth + 8, REEL_HEIGHT + 8)
     glow:SetPoint("CENTER", reel, "CENTER", 0, 0)
     glow:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 0)
+    glow:SetAlpha(0)
+
+    -- Reusable AnimationGroup for smooth glow fade-in
+    local glowAG = glow:CreateAnimationGroup()
+    local glowFade = glowAG:CreateAnimation("Alpha")
+    glowFade:SetFromAlpha(0)
+    glowFade:SetToAlpha(1)
+    glowFade:SetDuration(GLOW_FADE_DURATION)
+    glowFade:SetSmoothing("OUT")
+    glowAG:SetToFinalAlpha(true)
+    glow.fadeAG = glowAG
+
     return glow
 end
 
@@ -345,7 +367,7 @@ end
 ---@return table  the reel frame
 local function CreateReelFrame(parent, index, roleDef)
     local parentWidth = parent:GetWidth()
-    local reelWidth = math.floor((parentWidth - REEL_PADDING * (5 + 1)) / 5)
+    local reelWidth = math_floor((parentWidth - REEL_PADDING * (5 + 1)) / 5)
     local xOffset = REEL_PADDING + (index - 1) * (reelWidth + REEL_PADDING)
 
     local reel = CreateFrame("Frame", nil, parent)
@@ -451,6 +473,8 @@ local function ResetReelVisuals()
         local reel = ws.reelFrames[i]
         if reel then
             if reel.glow then
+                if reel.glow.fadeAG then reel.glow.fadeAG:Stop() end
+                reel.glow:SetAlpha(0)
                 reel.glow:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 0)
             end
             for _, border in ipairs(reel.borders or {}) do
@@ -567,7 +591,7 @@ local function SpinForGroup(groupIndex)
 
         if winner then
             local finalNames = WHLSN._PrepareReelNames(ws.reelNames[i], winner)
-            local numNames = math.min(#finalNames, MAX_SLOTS)
+            local numNames = math_min(#finalNames, MAX_SLOTS)
 
             ws.reelState[i] = {
                 active     = true,
@@ -578,6 +602,7 @@ local function SpinForGroup(groupIndex)
                 duration   = BASE_REEL_DURATIONS[i] / 1000.0 / GetAnimationSpeed(),
                 landed     = false,
                 lastRow    = -1,
+                lastAlpha  = -1,
             }
 
             if ws.reelFrames[i] then
@@ -622,16 +647,16 @@ local OnUpdateHandler
 ---@param state table  reelState entry (needs .names and .duration)
 ---@return number listHeight, number scrollBase, number scrollDistance
 function WHLSN._CalcScrollMetrics(state)
-    local numNames = state.numNames or math.min(#state.names, MAX_SLOTS)
+    local numNames = state.numNames or math_min(#state.names, MAX_SLOTS)
     local listHeight = numNames * ROW_HEIGHT
 
     local linearTimeFrac   = P2_END - P1_END
     local linearScrollFrac = P2_OUT_END - P1_OUT_END
     local scrollDistance = TARGET_SPEED * linearTimeFrac * state.duration / linearScrollFrac
 
-    local totalScroll = math.max(
+    local totalScroll = math_max(
         MIN_SPIN_CYCLES * listHeight,
-        math.ceil(scrollDistance / listHeight) * listHeight
+        math_ceil(scrollDistance / listHeight) * listHeight
     )
 
     local scrollBase = totalScroll - scrollDistance
@@ -696,6 +721,9 @@ local function UpdateReelScroll(i, state, dt)
     -- Only update slots whose positions are within or near the visible viewport
     local reel = ws.reelFrames[i]
     if reel and reel.slots then
+        local alphaChanged = slotAlpha ~= state.lastAlpha
+        local inner = reel.inner
+        local slots = reel.slots
         for j = 1, numNames do
             local rawY = (-scrollOffset - (j - 1) * ROW_HEIGHT) % listHeight - ROW_HEIGHT
             if rawY > ROW_HEIGHT then
@@ -703,14 +731,17 @@ local function UpdateReelScroll(i, state, dt)
             end
             -- Only reposition slots near the visible area (viewport is 0 to -REEL_HEIGHT)
             if rawY > -REEL_HEIGHT - ROW_HEIGHT and rawY < ROW_HEIGHT * 2 then
-                reel.slots[j]:ClearAllPoints()
-                reel.slots[j]:SetPoint("TOPLEFT", reel.inner, "TOPLEFT", 2, rawY)
-                reel.slots[j]:SetTextColor(1, 1, 1, slotAlpha)
+                local slot = slots[j]
+                slot:SetPoint("TOPLEFT", inner, "TOPLEFT", 2, rawY)
+                if alphaChanged then
+                    slot:SetTextColor(1, 1, 1, slotAlpha)
+                end
             end
         end
+        state.lastAlpha = slotAlpha
 
         -- Tick sound: detect when a new name scrolls past the centre row
-        local currentRow = math.floor(scrollOffset / ROW_HEIGHT)
+        local currentRow = math_floor(scrollOffset / ROW_HEIGHT)
         if currentRow ~= state.lastRow and speed > 0.1 then
             PlayTick()
             state.lastRow = currentRow
@@ -737,6 +768,10 @@ local function HighlightReelWinner(i, state)
 
     if reel.glow then
         reel.glow:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 0.35)
+        if reel.glow.fadeAG then
+            reel.glow.fadeAG:Stop()
+            reel.glow.fadeAG:Play()
+        end
     end
     for _, border in ipairs(reel.borders or {}) do
         border:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 1)
@@ -753,22 +788,21 @@ end
 
 --- Check if all reels have completed and handle completion.
 local function CheckAllReelsComplete()
-    local anyActive = false
+    if ws.frame then
+        ws.frame:SetScript("OnUpdate", nil)
+    end
+
+    local anyWereActive = false
     for i = 1, 5 do
         if ws.reelState[i] and ws.reelState[i].active then
-            anyActive = true
+            anyWereActive = true
             break
         end
     end
-    if anyActive then
-        if ws.frame then
-            ws.frame:SetScript("OnUpdate", nil)
-        end
+
+    if anyWereActive then
         WHLSN._OnAllReelsLanded()
     else
-        if ws.frame then
-            ws.frame:SetScript("OnUpdate", nil)
-        end
         ws.isAnimating = false
     end
 end
@@ -778,6 +812,7 @@ end
 ---@param dt number  seconds since last frame
 OnUpdateHandler = function(_, dt)
     if not ws.isAnimating then return end
+    frameTime = GetTime()
     local allLanded = true
 
     for i = 1, 5 do
@@ -838,9 +873,9 @@ local function AddSummaryRow(groupIndex)
         if player then
             parts[#parts + 1] = "|cff"
                 .. string.format("%02x%02x%02x",
-                    math.floor(colorR * 255),
-                    math.floor(colorG * 255),
-                    math.floor(colorB * 255))
+                    math_floor(colorR * 255),
+                    math_floor(colorG * 255),
+                    math_floor(colorB * 255))
                 .. player.name .. "|r"
         end
     end
@@ -859,7 +894,7 @@ local function AddSummaryRow(groupIndex)
         local sc = ws.frame.summaryContainer
 
         -- Position visible summary rows; hide oldest if > MAX_SUMMARY_ROWS
-        local visibleStart = math.max(1, ws.summaryCount - MAX_SUMMARY_ROWS + 1)
+        local visibleStart = math_max(1, ws.summaryCount - MAX_SUMMARY_ROWS + 1)
         for idx = 1, ws.summaryCount do
             -- Map to slot index (circular use of pre-created slots)
             local slotIdx = ((idx - 1) % MAX_SUMMARY_ROWS) + 1
@@ -921,6 +956,9 @@ function WHLSN:HideWheelView()
     end
     if ws.frame then
         ws.frame:SetScript("OnUpdate", nil)
+        if ws.frame.collapseAG then
+            ws.frame.collapseAG:Stop()
+        end
         ws.frame:Hide()
     end
     ws.isAnimating = false
@@ -970,6 +1008,9 @@ function WHLSN:SkipWheelAnimation()
     end
     if ws.frame then
         ws.frame:SetScript("OnUpdate", nil)
+        if ws.frame.collapseAG then
+            ws.frame.collapseAG:Stop()
+        end
     end
     ws.isAnimating = false
     self:OnWheelComplete()
