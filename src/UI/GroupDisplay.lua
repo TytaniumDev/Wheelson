@@ -14,6 +14,13 @@ local ROLE_COLORS = {
     melee = "FFD187",
 }
 
+local DEFAULT_ROLE_COLOR = "CCCCCC"
+local UTILITY_MISSING_ALPHA = 0.3
+local UTILITY_MISSING_COLOR = "888888"
+local UTILITY_NAME_OFFSET_X = -6
+local BREZ_ICON_PATH = "Interface\\Icons\\Spell_Nature_Reincarnation"
+local LUST_ICON_PATH = "Interface\\Icons\\Spell_Nature_Bloodlust"
+
 local function CreateGroupDisplayFrame(parent)
     local frame = CreateFrame("Frame", "WHLSNGroupDisplayFrame", parent)
     frame:SetAllPoints()
@@ -150,20 +157,20 @@ local function CreateUtilityRow(parent, yOffset, rowHeight, texturePath, players
     -- Player names to the left of the icon
     local nameStr
     if #players == 0 then
-        nameStr = "|cFF888888—|r"
-        row:SetAlpha(0.3)
+        nameStr = "|cFF" .. UTILITY_MISSING_COLOR .. "—|r"
+        row:SetAlpha(UTILITY_MISSING_ALPHA)
         icon:SetDesaturated(true)
     else
         local parts = {}
         for _, p in ipairs(players) do
-            local c = ROLE_COLORS[p.mainRole] or "CCCCCC"
+            local c = ROLE_COLORS[p.mainRole] or DEFAULT_ROLE_COLOR
             parts[#parts + 1] = "|cFF" .. c .. p.name .. "|r"
         end
         nameStr = table.concat(parts, "\n")
     end
 
     local names = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    names:SetPoint("RIGHT", icon, "LEFT", -6, 0)
+    names:SetPoint("RIGHT", icon, "LEFT", UTILITY_NAME_OFFSET_X, 0)
     names:SetJustifyH("RIGHT")
     names:SetJustifyV("MIDDLE")
     names:SetText(nameStr)
@@ -237,10 +244,8 @@ local function RenderGroupCard(parent, index, group, yOffset)
         if p:HasLust() then lustPlayers[#lustPlayers + 1] = p end
     end
 
-    CreateUtilityRow(utilPanel, 0, rowHeight,
-        "Interface\\Icons\\Spell_Nature_Reincarnation", brezPlayers)
-    CreateUtilityRow(utilPanel, rowHeight + panelGap, rowHeight,
-        "Interface\\Icons\\Spell_Nature_Bloodlust", lustPlayers)
+    CreateUtilityRow(utilPanel, 0, rowHeight, BREZ_ICON_PATH, brezPlayers)
+    CreateUtilityRow(utilPanel, rowHeight + panelGap, rowHeight, LUST_ICON_PATH, lustPlayers)
 
     return cardHeight + 8
 end
