@@ -4,44 +4,44 @@
 ## Author: MythicPlusDiscordBot Contributors
 ## Version: @project-version@
 ## SavedVariables: WheelsonDB
-## IconTexture: Interface\AddOns\Wheelson\textures\minimap-icon
+## IconTexture: Interface/AddOns/Wheelson/textures/minimap-icon
 ## X-Curse-Project-ID: 1484744
 ## X-Wago-ID: kGryLYKy
 
 # Embedded Libraries
-libs\LibStub\LibStub.lua
-libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
-libs\AceAddon-3.0\AceAddon-3.0.lua
-libs\AceConsole-3.0\AceConsole-3.0.lua
-libs\AceEvent-3.0\AceEvent-3.0.lua
-libs\AceComm-3.0\AceComm-3.0.lua
-libs\AceSerializer-3.0\AceSerializer-3.0.lua
-libs\AceDB-3.0\AceDB-3.0.lua
-libs\AceConfig-3.0\AceConfig-3.0.xml
-libs\AceGUI-3.0\AceGUI-3.0.lua
-libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
-libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+libs/LibStub/LibStub.lua
+libs/CallbackHandler-1.0/CallbackHandler-1.0.lua
+libs/AceAddon-3.0/AceAddon-3.0.lua
+libs/AceConsole-3.0/AceConsole-3.0.lua
+libs/AceEvent-3.0/AceEvent-3.0.lua
+libs/AceComm-3.0/AceComm-3.0.lua
+libs/AceSerializer-3.0/AceSerializer-3.0.lua
+libs/AceDB-3.0/AceDB-3.0.lua
+libs/AceConfig-3.0/AceConfig-3.0.xml
+libs/AceGUI-3.0/AceGUI-3.0.lua
+libs/LibDataBroker-1.1/LibDataBroker-1.1.lua
+libs/LibDBIcon-1.0/LibDBIcon-1.0.lua
 
 # Core
-src\Config.lua
-src\Models.lua
-src\TestData.lua
-src\GroupCreator.lua
-src\Core.lua
+src/Config.lua
+src/Models.lua
+src/TestData.lua
+src/GroupCreator.lua
+src/Core.lua
 
 # Services
-src\Services\SpecService.lua
-src\Services\GuildService.lua
-src\Services\PartyService.lua
+src/Services/SpecService.lua
+src/Services/GuildService.lua
+src/Services/PartyService.lua
 
 # Utilities
-src\Utils\Helpers.lua
+src/Utils/Helpers.lua
 
 # UI
-src\UI\MainFrame.xml
-src\UI\MainFrame.lua
-src\UI\Lobby.lua
-src\UI\Wheel.lua
-src\UI\GroupDisplay.lua
-src\UI\DebugPanel.lua
-src\UI\OptionsPanel.lua
+src/UI/MainFrame.xml
+src/UI/MainFrame.lua
+src/UI/Lobby.lua
+src/UI/Wheel.lua
+src/UI/GroupDisplay.lua
+src/UI/DebugPanel.lua
+src/UI/OptionsPanel.lua
