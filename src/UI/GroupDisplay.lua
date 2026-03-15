@@ -216,6 +216,32 @@ local function RenderGroupCard(parent, index, group, yOffset)
         lineY = lineY - 14
     end
 
+    -- Utility panel (right side of card)
+    local panelPadTop = 12
+    local panelPadBottom = 12
+    local panelPadRight = 4
+    local panelGap = 12
+    local panelHeight = cardHeight - panelPadTop - panelPadBottom
+    local rowHeight = math.floor((panelHeight - panelGap) / 2)
+
+    local utilPanel = CreateFrame("Frame", nil, card)
+    utilPanel:SetPoint("TOPRIGHT", card, "TOPRIGHT", -panelPadRight, -panelPadTop)
+    utilPanel:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -panelPadRight, panelPadBottom)
+    utilPanel:SetWidth(120)
+
+    -- Collect players with each utility
+    local brezPlayers = {}
+    local lustPlayers = {}
+    for _, p in ipairs(group:GetPlayers()) do
+        if p:HasBrez() then brezPlayers[#brezPlayers + 1] = p end
+        if p:HasLust() then lustPlayers[#lustPlayers + 1] = p end
+    end
+
+    CreateUtilityRow(utilPanel, 0, rowHeight,
+        "Interface\\Icons\\Spell_Nature_Reincarnation", brezPlayers)
+    CreateUtilityRow(utilPanel, rowHeight + panelGap, rowHeight,
+        "Interface\\Icons\\Spell_Nature_Bloodlust", lustPlayers)
+
     return cardHeight + 8
 end
 
