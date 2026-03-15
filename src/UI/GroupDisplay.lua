@@ -44,7 +44,7 @@ local function CreateGroupDisplayFrame(parent)
     -- Center: Invite My Group
     frame.inviteButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     frame.inviteButton:SetSize(130, 30)
-    frame.inviteButton:SetPoint("BOTTOM", 0, 5)
+    frame.inviteButton:SetPoint("BOTTOM", 0, 8)
     frame.inviteButton:SetText("Invite My Group")
     frame.inviteButton:GetFontString():SetFontObject("GameFontNormalLarge")
     frame.inviteButton:SetScript("OnClick", function()
