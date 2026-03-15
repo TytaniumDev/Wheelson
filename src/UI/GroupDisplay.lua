@@ -249,18 +249,16 @@ function WHLSN:UpdateGroupDisplayView()
         displayFrame.endButton:SetText("Finish")
     end
 
-    -- Render each group, reusing or creating cards
+    -- Hide all previously pooled cards (keep parented to avoid orphan leaks)
+    for ci = 1, #cardPool do
+        cardPool[ci]:Hide()
+    end
+
+    -- Render each group; old hidden cards stay parented and inert
     local yOffset = 0
     for i, group in ipairs(self.session.groups) do
-        local card, height
-        if cardPool[i] then
-            -- Reuse existing card's parent but recreate content
-            -- Cards have child frames that can't easily be updated, so hide old and create new
-            cardPool[i]:Hide()
-            cardPool[i]:SetParent(nil)
-        end
-        card, height = RenderGroupCard(displayFrame.scrollChild, i, group, yOffset)
-        cardPool[i] = card
+        local card, height = RenderGroupCard(displayFrame.scrollChild, i, group, yOffset)
+        cardPool[#cardPool + 1] = card
         card:Show()
         yOffset = yOffset + height
     end
