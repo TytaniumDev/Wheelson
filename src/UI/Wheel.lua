@@ -56,6 +56,7 @@ local summaryRows       = {}
 local currentGroupIndex = 0
 local isAnimating       = false
 local animTimer         = nil
+local reelNameLists     = {}   -- reelNameLists[1..5] = consistent name list per reel (built once)
 
 ---------------------------------------------------------------------------
 -- Helper Functions
@@ -415,12 +416,12 @@ local function CreateWheelFrame(parent)
     header:SetText("Group 1 of 1")
     frame.header = header
 
-    -- Reel container (holds the 5 reels side by side)
+    -- Reel container (holds the 5 reels side by side, vertically centred)
     local reelContainer = CreateFrame("Frame", nil, frame)
     local containerWidth = parent:GetWidth() - 20
     if containerWidth < 200 then containerWidth = 200 end
     reelContainer:SetSize(containerWidth, REEL_HEIGHT)
-    reelContainer:SetPoint("TOP", header, "BOTTOM", 0, -24)
+    reelContainer:SetPoint("CENTER", frame, "CENTER", 0, 10)
     frame.reelContainer = reelContainer
 
     -- Create 5 reels
@@ -455,6 +456,67 @@ end
 
 --- Called internally to kick off the spin animation for a given group index.
 ---@param groupIndex number  1-based index into self.session.groups
+--- Build the consistent name lists for all 5 reels (called once per session spin).
+--- Uses ALL session players — no exclusions between groups. The same names appear
+--- in every group's reels; only the winner target changes ("movie magic").
+local function BuildReelNameLists()
+    local players = WHLSN.session.players or {}
+    reelNameLists = {}
+
+    for i = 1, 5 do
+        local roleDef = REEL_ROLES[i]
+        -- Build pool with no winner and no exclusions — just all eligible players
+        local pool = WHLSN.BuildReelPool(players, roleDef.role, nil, {})
+
+        -- Extract names
+        local names = {}
+        for _, p in ipairs(pool) do
+            names[#names + 1] = p.name
+        end
+
+        -- Pad to MIN_POOL_SIZE
+        names = WHLSN.PadReelPool(names, MIN_POOL_SIZE)
+        reelNameLists[i] = names
+    end
+end
+
+--- Prepare the reel name list for a specific group spin.
+--- Uses the pre-built name list but places the winner at index 1.
+---@param reelIndex number 1-5
+---@param winner WHLSNPlayer|nil
+---@return string[] names with winner at index 1
+local function PrepareReelNames(reelIndex, winner)
+    local baseNames = reelNameLists[reelIndex]
+    if not winner or not baseNames or #baseNames == 0 then return baseNames end
+
+    local winnerName = winner.name
+
+    -- Ensure winner is in the list (force-insert if not)
+    local found = false
+    for _, n in ipairs(baseNames) do
+        if n == winnerName then found = true; break end
+    end
+
+    local names
+    if found then
+        -- Copy with winner removed, then prepend winner at index 1
+        names = { winnerName }
+        for _, n in ipairs(baseNames) do
+            if n ~= winnerName then
+                names[#names + 1] = n
+            end
+        end
+    else
+        -- Winner not in pool — prepend and keep existing names
+        names = { winnerName }
+        for _, n in ipairs(baseNames) do
+            names[#names + 1] = n
+        end
+    end
+
+    return names
+end
+
 local function SpinForGroup(groupIndex)
     currentGroupIndex = groupIndex
     local groups = WHLSN.session.groups
@@ -463,17 +525,10 @@ local function SpinForGroup(groupIndex)
 
     -- Update header text
     if wheelFrame and wheelFrame.header then
-        wheelFrame.header:SetText("Group " .. groupIndex .. " of " .. totalGroups)
-    end
-
-    -- Build exclude list: all winners from previously displayed groups
-    local excludeNames = {}
-    for gi = 1, groupIndex - 1 do
-        local prevGroup = groups[gi]
-        if prevGroup.tank then excludeNames[prevGroup.tank.name] = true end
-        if prevGroup.healer then excludeNames[prevGroup.healer.name] = true end
-        for _, dp in ipairs(prevGroup.dps) do
-            excludeNames[dp.name] = true
+        if totalGroups == 1 then
+            wheelFrame.header:SetText("Group 1")
+        else
+            wheelFrame.header:SetText("Group " .. groupIndex .. " of " .. totalGroups)
         end
     end
 
@@ -489,45 +544,11 @@ local function SpinForGroup(groupIndex)
     -- Initialise reelState
     reelState = {}
 
-    local players = WHLSN.session.players or {}
-
     for i = 1, 5 do
-        local roleDef = REEL_ROLES[i]
         local winner = winners[i]
 
         if winner then
-            -- Build pool of candidates (BuildReelPool takes winner as a string name)
-            local pool = WHLSN.BuildReelPool(players, roleDef.role, winner.name, excludeNames)
-
-            -- Extract names from pool
-            local names = {}
-            for _, p in ipairs(pool) do
-                names[#names + 1] = p.name
-            end
-
-            -- Pad to MIN_POOL_SIZE
-            names = WHLSN.PadReelPool(names, MIN_POOL_SIZE)
-
-            -- Place winner at index 1 so it lands at the centre slot (j=2)
-            -- Remove any existing occurrence of winner.name, then prepend
-            local winnerName = winner.name
-            local cleanedNames = {}
-            for _, n in ipairs(names) do
-                if n ~= winnerName then
-                    cleanedNames[#cleanedNames + 1] = n
-                end
-            end
-            -- Insert winner at front
-            local finalNames = { winnerName }
-            for _, n in ipairs(cleanedNames) do
-                finalNames[#finalNames + 1] = n
-            end
-            -- Re-pad in case we ended up short after removing duplicates
-            if #finalNames < MIN_POOL_SIZE then
-                finalNames = WHLSN.PadReelPool(finalNames, MIN_POOL_SIZE)
-                -- Winner must stay at index 1
-                finalNames[1] = winnerName
-            end
+            local finalNames = PrepareReelNames(i, winner)
 
             reelState[i] = {
                 active     = true,
@@ -539,10 +560,9 @@ local function SpinForGroup(groupIndex)
                 lastCenter = -1,           -- for tick sound tracking
             }
 
-            -- Show reel
+            -- Show reel and populate slots
             if reelFrames[i] then
                 reelFrames[i]:Show()
-                -- Populate slots with initial names
                 for j = 1, 15 do
                     local nameIdx = ((j - 1) % #finalNames) + 1
                     reelFrames[i].slots[j]:SetText(finalNames[nameIdx])
@@ -631,9 +651,10 @@ OnUpdateHandler = function(_, dt)
             local numNames     = #state.names
 
             -- yOffset within one list cycle; baseSlot = which name is at top
+            -- Names scroll downward (like a real slot machine pull — new names appear from top)
             local yOffset  = scrollOffset % listHeight
             local baseSlot = math.floor(yOffset / ROW_HEIGHT) -- 0-indexed name index
-            local subPixel = -(yOffset % ROW_HEIGHT)          -- fractional pixel offset
+            local subPixel = yOffset % ROW_HEIGHT             -- positive = shift slots downward
 
             -- Motion-blur alpha based on speed (fast = dim, slow = clear)
             -- speed ∈ [0,1] where 1 is max speed (linear phase)
@@ -654,7 +675,7 @@ OnUpdateHandler = function(_, dt)
             if reel and reel.slots then
                 for j = 1, 15 do
                     local nameIdx = ((baseSlot + j - 1) % numNames) + 1
-                    local yPos    = -(j - 1) * ROW_HEIGHT + subPixel
+                    local yPos    = -(j - 1) * ROW_HEIGHT - subPixel
                     reel.slots[j]:ClearAllPoints()
                     reel.slots[j]:SetPoint("TOPLEFT", reel.inner, "TOPLEFT", 2, yPos)
                     reel.slots[j]:SetText(state.names[nameIdx])
@@ -913,6 +934,9 @@ function WHLSN:ShowWheelView(parent)
     end
     wheelFrame = CreateWheelFrame(parent)
     wheelFrame:Show()
+
+    -- Build consistent reel name lists once for all groups
+    BuildReelNameLists()
 
     -- Start with group 1
     SpinForGroup(1)
