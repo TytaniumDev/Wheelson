@@ -7,6 +7,20 @@ local WHLSN = _G.Wheelson
 
 local displayFrame = nil
 
+local ROLE_COLORS = {
+    tank = "87BCDE",
+    healer = "87FF87",
+    ranged = "FF8787",
+    melee = "FFD187",
+}
+
+local DEFAULT_ROLE_COLOR = "CCCCCC"
+local UTILITY_MISSING_ALPHA = 0.3
+local UTILITY_MISSING_COLOR = "888888"
+local UTILITY_NAME_OFFSET_X = -6
+local BREZ_ICON_PATH = "Interface\\Icons\\Spell_Nature_Reincarnation"
+local LUST_ICON_PATH = "Interface\\Icons\\Spell_Nature_Bloodlust"
+
 local function CreateGroupDisplayFrame(parent)
     local frame = CreateFrame("Frame", "WHLSNGroupDisplayFrame", parent)
     frame:SetAllPoints()
@@ -88,17 +102,14 @@ end
 local function CreatePlayerLine(card, prefix, color, player, lineY)
     local lineFrame = CreateFrame("Frame", nil, card)
     lineFrame:SetPoint("TOPLEFT", 12, lineY)
-    lineFrame:SetPoint("TOPRIGHT", -12, lineY)
+    lineFrame:SetPoint("TOPRIGHT", -132, lineY)
     lineFrame:SetHeight(14)
     lineFrame:EnableMouse(true)
 
     local text = lineFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     text:SetPoint("LEFT")
     if player then
-        local utilStr = ""
-        if player:HasBrez() then utilStr = utilStr .. " |TInterface\\Icons\\Spell_Nature_Reincarnation:0|t" end
-        if player:HasLust() then utilStr = utilStr .. " |TInterface\\Icons\\Spell_Nature_Bloodlust:0|t" end
-        text:SetText(color .. prefix .. "|r  " .. player.name .. utilStr)
+        text:SetText(color .. prefix .. "|r  " .. player.name)
     else
         text:SetText("|cFF666666" .. prefix .. " (empty)|r")
     end
@@ -128,6 +139,43 @@ local function CreatePlayerLine(card, prefix, color, player, lineY)
     end
 
     return lineFrame
+end
+
+local function CreateUtilityRow(parent, yOffset, rowHeight, texturePath, players)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -yOffset)
+    row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, -yOffset)
+    row:SetHeight(rowHeight)
+
+    -- Icon (square, anchored to right side, fills row height)
+    local icon = row:CreateTexture(nil, "ARTWORK")
+    icon:SetPoint("TOPRIGHT", 0, 0)
+    icon:SetPoint("BOTTOMRIGHT", 0, 0)
+    icon:SetWidth(rowHeight)
+    icon:SetTexture(texturePath)
+
+    -- Player names to the left of the icon
+    local nameStr
+    if #players == 0 then
+        nameStr = "|cFF" .. UTILITY_MISSING_COLOR .. "—|r"
+        row:SetAlpha(UTILITY_MISSING_ALPHA)
+        icon:SetDesaturated(true)
+    else
+        local parts = {}
+        for _, p in ipairs(players) do
+            local c = ROLE_COLORS[p.mainRole] or DEFAULT_ROLE_COLOR
+            parts[#parts + 1] = "|cFF" .. c .. p.name .. "|r"
+        end
+        nameStr = table.concat(parts, "\n")
+    end
+
+    local names = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    names:SetPoint("RIGHT", icon, "LEFT", UTILITY_NAME_OFFSET_X, 0)
+    names:SetJustifyH("RIGHT")
+    names:SetJustifyV("MIDDLE")
+    names:SetText(nameStr)
+
+    return row
 end
 
 local function RenderGroupCard(parent, index, group, yOffset)
@@ -174,6 +222,30 @@ local function RenderGroupCard(parent, index, group, yOffset)
         CreatePlayerLine(card, tag, color, dps, lineY)
         lineY = lineY - 14
     end
+
+    -- Utility panel (right side of card)
+    local panelPadTop = 12
+    local panelPadBottom = 12
+    local panelPadRight = 4
+    local panelGap = 12
+    local panelHeight = cardHeight - panelPadTop - panelPadBottom
+    local rowHeight = math.floor((panelHeight - panelGap) / 2)
+
+    local utilPanel = CreateFrame("Frame", nil, card)
+    utilPanel:SetPoint("TOPRIGHT", card, "TOPRIGHT", -panelPadRight, -panelPadTop)
+    utilPanel:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -panelPadRight, panelPadBottom)
+    utilPanel:SetWidth(120)
+
+    -- Collect players with each utility
+    local brezPlayers = {}
+    local lustPlayers = {}
+    for _, p in ipairs(group:GetPlayers()) do
+        if p:HasBrez() then brezPlayers[#brezPlayers + 1] = p end
+        if p:HasLust() then lustPlayers[#lustPlayers + 1] = p end
+    end
+
+    CreateUtilityRow(utilPanel, 0, rowHeight, BREZ_ICON_PATH, brezPlayers)
+    CreateUtilityRow(utilPanel, rowHeight + panelGap, rowHeight, LUST_ICON_PATH, lustPlayers)
 
     return cardHeight + 8
 end
