@@ -23,11 +23,11 @@ local MAX_SUMMARY_ROWS   = 4
 
 -- 5 reel definitions: tank, healer, dps x3
 local REEL_ROLES = {
-    { role = "tank",   label = "Tank",   color = { r = 0.53, g = 0.76, b = 1.0 } },
-    { role = "healer", label = "Healer", color = { r = 0.53, g = 1.0,  b = 0.53 } },
-    { role = "dps",    label = "DPS",    color = { r = 1.0,  g = 0.4,  b = 0.4 } },
-    { role = "dps",    label = "DPS",    color = { r = 1.0,  g = 0.4,  b = 0.4 } },
-    { role = "dps",    label = "DPS",    color = { r = 1.0,  g = 0.4,  b = 0.4 } },
+    { role = "tank",   label = "TANK",   color = { r = 0.231, g = 0.510, b = 0.961 } },
+    { role = "healer", label = "HEALER", color = { r = 0.133, g = 0.773, b = 0.369 } },
+    { role = "dps",    label = "DPS 1",  color = { r = 0.937, g = 0.267, b = 0.267 } },
+    { role = "dps",    label = "DPS 2",  color = { r = 0.937, g = 0.267, b = 0.267 } },
+    { role = "dps",    label = "DPS 3",  color = { r = 0.937, g = 0.267, b = 0.267 } },
 }
 
 local GOLD_R = 0.961
@@ -40,6 +40,11 @@ local GLOW_DURATION     = 1.5
 local COLLAPSE_DURATION = 0.5
 local FINAL_PAUSE       = 2.0
 local MIN_POOL_SIZE     = 8
+
+-- Easing phase boundaries (as fractions of total reel duration)
+local P1_END = 0.0375   -- end of snap start (150ms / 4000ms)
+local P2_END = 0.625    -- end of full speed (2500ms / 4000ms)
+local P3_END = 0.925    -- end of deceleration (3700ms / 4000ms)
 
 ---------------------------------------------------------------------------
 -- Animation State Variables
@@ -171,6 +176,7 @@ end
 ---@param minSize number
 ---@return string[]
 function WHLSN.PadReelPool(names, minSize)
+    if #names == 0 then return {} end
     if #names >= minSize then
         -- Return a copy up to minSize so callers get a fresh table
         local result = {}
@@ -221,10 +227,6 @@ end
 function WHLSN.SlotEasing(t)
     if t <= 0 then return 0 end
     if t >= 1 then return 1 end
-
-    local P1_END = 0.0375
-    local P2_END = 0.625
-    local P3_END = 0.925
 
     -- Output range for each phase (scroll progress)
     local P1_OUT_START = 0.00
@@ -338,6 +340,9 @@ local function CreateReelFrame(parent, index, roleDef)
     reel.slots = slots
 
     -- Gradient fade overlays — top and bottom
+    -- Use role-tinted background color so fades blend seamlessly with the reel bg
+    local bgR, bgG, bgB = roleDef.color.r * 0.12, roleDef.color.g * 0.12, roleDef.color.b * 0.12
+
     local fadeTop = reel:CreateTexture(nil, "OVERLAY")
     fadeTop:SetPoint("TOPLEFT", reel, "TOPLEFT", 1, -1)
     fadeTop:SetPoint("TOPRIGHT", reel, "TOPRIGHT", -1, -1)
@@ -346,8 +351,8 @@ local function CreateReelFrame(parent, index, roleDef)
     -- VERTICAL gradient: minColor = bottom, maxColor = top.
     -- fadeTop sits at the reel top edge; top should be opaque, bottom transparent.
     fadeTop:SetGradient("VERTICAL",
-        CreateColor(0, 0, 0, 0),
-        CreateColor(0, 0, 0, 0.85))
+        CreateColor(bgR, bgG, bgB, 0),
+        CreateColor(bgR, bgG, bgB, 0.85))
     reel.fadeTop = fadeTop
 
     local fadeBottom = reel:CreateTexture(nil, "OVERLAY")
@@ -357,8 +362,8 @@ local function CreateReelFrame(parent, index, roleDef)
     fadeBottom:SetColorTexture(1, 1, 1, 1)
     -- fadeBottom sits at the reel bottom edge; bottom should be opaque, top transparent.
     fadeBottom:SetGradient("VERTICAL",
-        CreateColor(0, 0, 0, 0.85),
-        CreateColor(0, 0, 0, 0))
+        CreateColor(bgR, bgG, bgB, 0.85),
+        CreateColor(bgR, bgG, bgB, 0))
     reel.fadeBottom = fadeBottom
 
     -- Gold centre pointer line (1px, positioned at centre slot)
@@ -632,12 +637,10 @@ OnUpdateHandler = function(_, dt)
             -- speed ∈ [0,1] where 1 is max speed (linear phase)
             local speed = 0
             if t > 0 and t < 1 then
-                local P2_END = 0.625
-                local P3_END = 0.925
-                if t >= 0.0375 and t < P2_END then
+                if t >= P1_END and t < P2_END then
                     speed = 1.0
-                elseif t < 0.0375 then
-                    speed = t / 0.0375
+                elseif t < P1_END then
+                    speed = t / P1_END
                 elseif t < P3_END then
                     speed = 1.0 - (t - P2_END) / (P3_END - P2_END)
                 end
