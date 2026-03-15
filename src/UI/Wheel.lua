@@ -45,16 +45,16 @@ local GLOW_DURATION     = 1.5
 local COLLAPSE_DURATION = 0.5
 local FINAL_PAUSE       = 2.0
 local MIN_POOL_SIZE     = 8
-local TARGET_SPEED      = 100   -- px/s during linear phase (uniform across all reels)
+local TARGET_SPEED      = 50    -- px/s during linear phase (uniform across all reels)
 local MIN_SPIN_CYCLES   = 2     -- minimum full list cycles for visual spin effect
 
 -- Easing phase boundaries (as fractions of total reel duration)
-local P1_END = 0.05     -- end of snap start
-local P2_END = 0.50     -- end of full speed
+local P1_END = 0.03     -- end of ease-in
+local P2_END = 0.45     -- end of full speed
 
 -- Easing output ranges (fraction of total scroll at each phase boundary)
-local P1_OUT_END = 0.03
-local P2_OUT_END = 0.70
+local P1_OUT_END = 0.01
+local P2_OUT_END = 0.60
 
 ---------------------------------------------------------------------------
 -- Animation State Variables
@@ -596,7 +596,7 @@ end
 local OnUpdateHandler
 
 --- Calculate scroll metrics for a reel, targeting a uniform linear-phase speed.
---- Linear phase covers 67% of totalScroll in 45% of duration (P1_END to P2_END).
+--- Linear phase covers 59% of totalScroll in 42% of duration (P1_END to P2_END).
 --- numCycles is chosen so all reels scroll at ~TARGET_SPEED px/s.
 ---@param state table  reelState entry (needs .names and .duration)
 ---@return number numCycles, number listHeight, number winnerOffset, number totalScroll

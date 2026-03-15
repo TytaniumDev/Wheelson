@@ -259,7 +259,7 @@ describe("SlotEasing", function()
 
     it("should accelerate quickly in phase 1", function()
         -- At 50% through phase 1, progress should be > 0 (quartic: grows fast)
-        local midP1 = 0.05 * 0.5
+        local midP1 = 0.03 * 0.5
         local val = WHLSN.SlotEasing(midP1)
         assert.is_true(val > 0)
     end)
@@ -277,15 +277,15 @@ describe("SlotEasing", function()
     end)
 
     it("should be continuous at phase boundaries", function()
-        -- Phase 1 → Phase 2 boundary (t ≈ 0.05)
+        -- Phase 1 → Phase 2 boundary (t ≈ 0.03)
         local eps = 1e-5
-        local before1 = WHLSN.SlotEasing(0.05 - eps)
-        local after1  = WHLSN.SlotEasing(0.05 + eps)
+        local before1 = WHLSN.SlotEasing(0.03 - eps)
+        local after1  = WHLSN.SlotEasing(0.03 + eps)
         assert.near(before1, after1, 0.01)
 
-        -- Phase 2 → Phase 3 boundary (t ≈ 0.50)
-        local before2 = WHLSN.SlotEasing(0.50 - eps)
-        local after2  = WHLSN.SlotEasing(0.50 + eps)
+        -- Phase 2 → Phase 3 boundary (t ≈ 0.45)
+        local before2 = WHLSN.SlotEasing(0.45 - eps)
+        local after2  = WHLSN.SlotEasing(0.45 + eps)
         assert.near(before2, after2, 0.01)
     end)
 end)
@@ -353,8 +353,8 @@ describe("CalcScrollMetrics", function()
         local _, _, _, largeTotal = WHLSN._CalcScrollMetrics(largeState)
 
         -- Linear phase speed = linearScrollFrac * totalScroll / (linearTimeFrac * duration)
-        local linearScrollFrac = 0.67  -- P2_OUT_END - P1_OUT_END
-        local linearTimeFrac   = 0.45  -- P2_END - P1_END
+        local linearScrollFrac = 0.59  -- P2_OUT_END - P1_OUT_END
+        local linearTimeFrac   = 0.42  -- P2_END - P1_END
         local smallSpeed = linearScrollFrac * smallTotal / (linearTimeFrac * smallState.duration)
         local largeSpeed = linearScrollFrac * largeTotal / (linearTimeFrac * largeState.duration)
 
