@@ -128,11 +128,23 @@ function WHLSN:CreateMythicPlusGroups(players, guildId)
 
     local availableTanks = {}
     for _, p in ipairs(mainTanks) do availableTanks[#availableTanks + 1] = p end
-    for _, p in ipairs(offTanks) do availableTanks[#availableTanks + 1] = p end
+    -- Prefer offTanks who are NOT main healers to avoid depleting the healer pool
+    for _, p in ipairs(offTanks) do
+        if not p:IsHealerMain() then availableTanks[#availableTanks + 1] = p end
+    end
+    for _, p in ipairs(offTanks) do
+        if p:IsHealerMain() then availableTanks[#availableTanks + 1] = p end
+    end
 
     local availableHealers = {}
     for _, p in ipairs(mainHealers) do availableHealers[#availableHealers + 1] = p end
-    for _, p in ipairs(offHealers) do availableHealers[#availableHealers + 1] = p end
+    -- Prefer offHealers who are NOT main tanks to avoid depleting the tank pool
+    for _, p in ipairs(offHealers) do
+        if not p:IsTankMain() then availableHealers[#availableHealers + 1] = p end
+    end
+    for _, p in ipairs(offHealers) do
+        if p:IsTankMain() then availableHealers[#availableHealers + 1] = p end
+    end
 
     local availableDps = {}
     for _, p in ipairs(mainDps) do availableDps[#availableDps + 1] = p end
