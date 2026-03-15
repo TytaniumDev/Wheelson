@@ -259,7 +259,7 @@ describe("SlotEasing", function()
 
     it("should accelerate quickly in phase 1", function()
         -- At 50% through phase 1, progress should be > 0 (quartic: grows fast)
-        local midP1 = 0.0375 * 0.5
+        local midP1 = 0.05 * 0.5
         local val = WHLSN.SlotEasing(midP1)
         assert.is_true(val > 0)
     end)
@@ -277,15 +277,15 @@ describe("SlotEasing", function()
     end)
 
     it("should be continuous at phase boundaries", function()
-        -- Phase 1 → Phase 2 boundary (t ≈ 0.0375)
+        -- Phase 1 → Phase 2 boundary (t ≈ 0.05)
         local eps = 1e-5
-        local before1 = WHLSN.SlotEasing(0.0375 - eps)
-        local after1  = WHLSN.SlotEasing(0.0375 + eps)
+        local before1 = WHLSN.SlotEasing(0.05 - eps)
+        local after1  = WHLSN.SlotEasing(0.05 + eps)
         assert.near(before1, after1, 0.01)
 
-        -- Phase 2 → Phase 3 boundary (t ≈ 0.55)
-        local before2 = WHLSN.SlotEasing(0.55 - eps)
-        local after2  = WHLSN.SlotEasing(0.55 + eps)
+        -- Phase 2 → Phase 3 boundary (t ≈ 0.50)
+        local before2 = WHLSN.SlotEasing(0.50 - eps)
+        local after2  = WHLSN.SlotEasing(0.50 + eps)
         assert.near(before2, after2, 0.01)
     end)
 end)
@@ -342,19 +342,21 @@ end)
 describe("CalcScrollMetrics", function()
     it("should produce similar linear-phase speed for small and large pools", function()
         -- Small pool (8 names, like padded tank pool); duration mirrors BASE_REEL_DURATIONS[1]
-        local smallState = { names = {}, duration = 5.0 }
+        local smallState = { names = {}, duration = 3.0 }
         for i = 1, 8 do smallState.names[i] = "P" .. i end
 
-        -- Large pool (20 names, like DPS pool); duration mirrors BASE_REEL_DURATIONS[3]
-        local largeState = { names = {}, duration = 5.6 }
-        for i = 1, 20 do largeState.names[i] = "P" .. i end
+        -- Larger pool (10 names, like DPS pool); duration mirrors BASE_REEL_DURATIONS[3]
+        local largeState = { names = {}, duration = 3.6 }
+        for i = 1, 10 do largeState.names[i] = "P" .. i end
 
         local _, _, _, smallTotal = WHLSN._CalcScrollMetrics(smallState)
         local _, _, _, largeTotal = WHLSN._CalcScrollMetrics(largeState)
 
-        -- Linear phase speed = 0.72 * totalScroll / (0.5125 * duration)
-        local smallSpeed = 0.72 * smallTotal / (0.5125 * smallState.duration)
-        local largeSpeed = 0.72 * largeTotal / (0.5125 * largeState.duration)
+        -- Linear phase speed = linearScrollFrac * totalScroll / (linearTimeFrac * duration)
+        local linearScrollFrac = 0.67  -- P2_OUT_END - P1_OUT_END
+        local linearTimeFrac   = 0.45  -- P2_END - P1_END
+        local smallSpeed = linearScrollFrac * smallTotal / (linearTimeFrac * smallState.duration)
+        local largeSpeed = linearScrollFrac * largeTotal / (linearTimeFrac * largeState.duration)
 
         -- Speeds should be within 20% of each other
         local ratio = smallSpeed / largeSpeed
@@ -364,7 +366,7 @@ describe("CalcScrollMetrics", function()
 
     it("should use at least MIN_SPIN_CYCLES cycles", function()
         -- Very large pool where target speed would yield < 3 cycles
-        local state = { names = {}, duration = 5.0 }
+        local state = { names = {}, duration = 3.0 }
         for i = 1, 50 do state.names[i] = "P" .. i end
 
         local numCycles = WHLSN._CalcScrollMetrics(state)
