@@ -798,10 +798,10 @@ function WHLSN._OnAllReelsLanded()
     end
 end
 
---- Collapse the current reels into a summary row and spin for the next group.
-CollapseAndAdvance = function()
+--- Add a summary row for the given group index to the summary container.
+local function AddSummaryRow(groupIndex)
     local groups = WHLSN.session.groups
-    local group  = groups[currentGroupIndex]
+    local group  = groups[groupIndex]
 
     -- Build summary text with role-coloured names joined by " · "
     local parts = {}
@@ -830,7 +830,7 @@ CollapseAndAdvance = function()
         local row = sc:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         row:SetJustifyH("CENTER")
         row:SetSize(sc:GetWidth(), SUMMARY_ROW_HEIGHT)
-        row:SetText("Group " .. currentGroupIndex .. ": " .. summaryText)
+        row:SetText("Group " .. groupIndex .. ": " .. summaryText)
 
         summaryRows[#summaryRows + 1] = row
 
@@ -847,6 +847,11 @@ CollapseAndAdvance = function()
             end
         end
     end
+end
+
+--- Collapse the current reels into a summary row and spin for the next group.
+CollapseAndAdvance = function()
+    AddSummaryRow(currentGroupIndex)
 
     -- Fade out the reel container using AnimationGroup
     local container = wheelFrame and wheelFrame.reelContainer
@@ -892,6 +897,7 @@ end
 
 --- Called after the last group's glow period expires.
 OnFinalGroupComplete = function()
+    AddSummaryRow(currentGroupIndex)
     animTimer = C_Timer.NewTimer(FINAL_PAUSE / GetAnimationSpeed(), function()
         animTimer = nil
         WHLSN:OnWheelComplete()
