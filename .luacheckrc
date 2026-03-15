@@ -51,10 +51,12 @@ read_globals = {
 
     -- WoW UI globals
     "ChatFontNormal",
+    "CreateColor",
     "GameFontNormal",
     "GameFontNormalLarge",
     "GameFontHighlightSmall",
     "GameFontNormalSmall",
+    "GameMenuButtonTemplate",
     Settings = { other_fields = true },
     "SOUNDKIT",
     "UIParent",
