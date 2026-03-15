@@ -345,12 +345,6 @@ local function showClipboardPopup(self, title, text)
     self.clipboardEditBox:SetFocus()
 end
 
---- Copy group results to clipboard.
----@param groups WHLSNGroup[]
-function WHLSN:CopyGroupsToClipboard(groups)
-    showClipboardPopup(self, "Copy Group Results", self:FormatGroupSummary(groups))
-end
-
 --- Copy a bug report to the clipboard and show instructions.
 ---@param snapshot table  algorithmSnapshot from session
 function WHLSN:CopyReportToClipboard(snapshot)

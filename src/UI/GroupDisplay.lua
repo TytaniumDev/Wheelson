@@ -41,7 +41,7 @@ local function CreateGroupDisplayFrame(parent)
     frame.scrollFrame:SetScrollChild(frame.scrollChild)
 
     -- Bottom button bar: chain left-to-right to avoid overlap
-    -- Row 1 (left-aligned): Invite, Post, Copy, Report
+    -- Row 1 (left-aligned): Invite, Post, Report
     frame.inviteButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     frame.inviteButton:SetSize(110, 24)
     frame.inviteButton:SetPoint("BOTTOMLEFT", 8, 8)
@@ -58,17 +58,9 @@ local function CreateGroupDisplayFrame(parent)
         WHLSN:PostToGuildChat(WHLSN.session.groups)
     end)
 
-    frame.copyButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.copyButton:SetSize(60, 24)
-    frame.copyButton:SetPoint("LEFT", frame.postButton, "RIGHT", 4, 0)
-    frame.copyButton:SetText("Copy")
-    frame.copyButton:SetScript("OnClick", function()
-        WHLSN:CopyGroupsToClipboard(WHLSN.session.groups)
-    end)
-
     frame.reportButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     frame.reportButton:SetSize(60, 24)
-    frame.reportButton:SetPoint("LEFT", frame.copyButton, "RIGHT", 4, 0)
+    frame.reportButton:SetPoint("LEFT", frame.postButton, "RIGHT", 4, 0)
     frame.reportButton:SetText("Report")
     frame.reportButton:SetScript("OnClick", function()
         if WHLSN.session.algorithmSnapshot then
@@ -280,7 +272,6 @@ function WHLSN:UpdateGroupDisplayView()
     displayFrame.newButton:SetShown(isHost and not isViewing)
     displayFrame.inviteButton:SetShown(not isViewing)
     displayFrame.postButton:SetShown(not isViewing)
-    displayFrame.copyButton:SetShown(not isViewing)
     displayFrame.reportButton:SetShown(not isViewing and WHLSN.session.algorithmSnapshot ~= nil)
 
     -- Update title for historical views
