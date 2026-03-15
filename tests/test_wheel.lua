@@ -290,35 +290,6 @@ describe("SlotEasing", function()
 end)
 
 -- ---------------------------------------------------------------------------
--- DampedSpring tests
--- ---------------------------------------------------------------------------
-
-describe("DampedSpring", function()
-    it("should return 1 at t=0", function()
-        -- DampedSpring(0): envelope = e^0 = 1, sin(0)=0 → 1 + 0 = 1
-        assert.near(1, WHLSN.DampedSpring(0), 1e-9)
-    end)
-
-    it("should overshoot past 1 briefly", function()
-        -- With 1 + e^(-k*t)*sin(w*t)*0.04, the first half-lobe of sin is positive → overshoots above 1
-        local found_overshoot = false
-        local t = 0.01
-        while t <= 0.5 do
-            if WHLSN.DampedSpring(t) > 1.0 then
-                found_overshoot = true
-                break
-            end
-            t = t + 0.01
-        end
-        assert.is_true(found_overshoot)
-    end)
-
-    it("should settle near 1 at t=1", function()
-        assert.near(1, WHLSN.DampedSpring(1), 0.01)
-    end)
-end)
-
--- ---------------------------------------------------------------------------
 -- PrepareReelNames tests
 -- ---------------------------------------------------------------------------
 

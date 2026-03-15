@@ -208,21 +208,6 @@ end
 -- Easing Functions
 ---------------------------------------------------------------------------
 
---- Damped spring oscillation function used for Phase 4 (landing bounce).
---- Returns a value that starts at 1 and oscillates around 1 with decaying
---- amplitude, simulating a physical spring settling.
---- f(t) = 1 + e^(-k*t) * sin(w*t) * 0.04,  k=12, w=8
---- Clamped to return exactly 1 for t<=0 or t>=1.
----@param t number  normalised time [0, 1]
----@return number
-function WHLSN.DampedSpring(t)
-    if t <= 0 or t >= 1 then return 1 end
-    local k = 12
-    local w = 8
-    local amplitude = 0.04
-    return 1 + math.exp(-k * t) * math.sin(w * t) * amplitude
-end
-
 --- Three-phase slot-machine easing curve.
 ---
 ---  Phase 1 (0   → P1_END=0.0375): quartic ease-in,      maps scroll to  0% –  3%
@@ -706,7 +691,9 @@ OnUpdateHandler = function(_, dt)
                 state.landed = true
 
                 if reel and reel.slots then
-                    -- Winner is at slot j=3 (centre row, under pointer).
+                    -- At t=1: SlotEasing(1)=1, so scrollOffset=totalScroll and baseSlot=numNames-1.
+                    -- For j=3: nameIdx = ((numNames-1 + 1) % numNames)+1 = 1 = winner ✓
+                    -- No repositioning needed — animation loop already placed slots correctly.
                     for j = 1, 15 do
                         if j == 3 then
                             reel.slots[j]:SetTextColor(GOLD_R, GOLD_G, GOLD_B, 1)
