@@ -96,8 +96,8 @@ local function CreatePlayerLine(card, prefix, color, player, lineY)
     text:SetPoint("LEFT")
     if player then
         local utilStr = ""
-        if player:HasBrez() then utilStr = utilStr .. " |cFF00FF00[BR]|r" end
-        if player:HasLust() then utilStr = utilStr .. " |cFFFF4400[BL]|r" end
+        if player:HasBrez() then utilStr = utilStr .. " |TInterface\\Icons\\Spell_Nature_Reincarnation:0|t" end
+        if player:HasLust() then utilStr = utilStr .. " |TInterface\\Icons\\Spell_Nature_Bloodlust:0|t" end
         text:SetText(color .. prefix .. "|r  " .. player.name .. utilStr)
     else
         text:SetText("|cFF666666" .. prefix .. " (empty)|r")
