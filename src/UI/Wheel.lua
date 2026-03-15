@@ -16,6 +16,7 @@ local ROW_HEIGHT        = 20
 local VISIBLE_ROWS      = 3
 local REEL_HEIGHT       = ROW_HEIGHT * VISIBLE_ROWS
 local FADE_HEIGHT       = 16
+local MAX_SLOTS         = 15
 local REEL_PADDING      = 6
 
 local SUMMARY_ROW_HEIGHT = 18
@@ -44,8 +45,8 @@ end
 local GLOW_DURATION     = 1.5
 local COLLAPSE_DURATION = 0.5
 local FINAL_PAUSE       = 2.0
-local MIN_POOL_SIZE     = 8
-local TARGET_SPEED      = 50    -- px/s during linear phase (uniform across all reels)
+local MIN_POOL_SIZE     = 5
+local TARGET_SPEED      = 500   -- px/s during linear phase (uniform across all reels)
 local MIN_SPIN_CYCLES   = 1     -- minimum full list cycles for visual spin effect
 
 -- Easing phase boundaries (as fractions of total reel duration)
@@ -167,9 +168,8 @@ function WHLSN.BuildReelPool(players, role, winner, excludeNames)
     end
 
     -- Force-insert the winner if they weren't found in the eligible pool.
-    -- Search the full players list first; if the winner isn't there at all,
-    -- synthesise a minimal Player entry so the reel can still show the name.
-    if not winnerInPool then
+    -- When winner is nil (e.g. BuildReelNameLists), skip force-insert entirely.
+    if winner and not winnerInPool then
         local found = false
         for _, p in ipairs(players) do
             if p.name == winner then
@@ -187,14 +187,13 @@ function WHLSN.BuildReelPool(players, role, winner, excludeNames)
 end
 
 --- Pad (or return as-is) a names array so it has at least minSize entries,
---- cycling through the existing names as needed.
+--- duplicating the FULL list each time so identical names are never adjacent.
 ---@param names string[]
 ---@param minSize number
 ---@return string[]
 function WHLSN.PadReelPool(names, minSize)
     if #names == 0 then return {} end
     if #names >= minSize then
-        -- Return a copy up to minSize so callers get a fresh table
         local result = {}
         for i = 1, #names do
             result[#result + 1] = names[i]
@@ -202,12 +201,12 @@ function WHLSN.PadReelPool(names, minSize)
         return result
     end
 
+    -- Repeat the entire list until we reach minSize
     local result = {}
-    local i = 1
     while #result < minSize do
-        result[#result + 1] = names[i]
-        i = i + 1
-        if i > #names then i = 1 end
+        for i = 1, #names do
+            result[#result + 1] = names[i]
+        end
     end
     return result
 end
@@ -218,9 +217,10 @@ end
 
 --- Three-phase slot-machine easing curve.
 ---
----  Phase 1 (0   → P1_END=0.0375): quartic ease-in,      maps scroll to  0% –  3%
----  Phase 2 (P1_END → P2_END=0.55):  linear,              maps scroll to  3% – 75%
----  Phase 3 (P2_END → 1.0):          easeOutCubic,        maps scroll to 75% – 100%
+---  Phase 1 (0   → P1_END=0.03):  quartic ease-in,       maps scroll to  0% –  1%
+---  Phase 2 (P1_END → P2_END=0.45): linear,              maps scroll to  1% – 60%
+---  Phase 3 (P2_END → 1.0):         elastic ease-out,    maps scroll to 60% – 100%
+---                                   (overshoots past 1.0 and snaps back)
 ---
 --- Returns 0 for t<=0, 1 for t>=1.
 ---@param t number  normalised time [0, 1]
@@ -229,8 +229,6 @@ function WHLSN.SlotEasing(t)
     if t <= 0 then return 0 end
     if t >= 1 then return 1 end
 
-    -- Phase 2 velocity (normalised): used to match phase 3 entry speed
-    local V_LINEAR = (P2_OUT_END - P1_OUT_END) / (P2_END - P1_END)
     local P3_RANGE = 1.0 - P2_OUT_END
 
     if t < P1_END then
@@ -245,15 +243,11 @@ function WHLSN.SlotEasing(t)
         return P1_OUT_END + p * (P2_OUT_END - P1_OUT_END)
 
     else
-        -- Phase 3: velocity-matched deceleration (Hermite blend)
-        -- Starts at linear-phase speed and smoothly decelerates to zero.
-        -- Uses cubic Hermite: f(p) = a*p^3 + b*p^2 + c*p  with f(0)=0, f(1)=1, f'(0)=v, f'(1)=0
+        -- Phase 3: elastic ease-out with strong overshoot.
+        -- Rushes toward the target, overshoots hard, and snaps back —
+        -- like a physical reel slamming against its stop and bouncing.
         local p = (t - P2_END) / (1 - P2_END)
-        local v = V_LINEAR * (1 - P2_END) / P3_RANGE  -- normalised entry velocity
-        local a = v - 2
-        local b = 3 - 2 * v
-        local c = v
-        local eased = p * (c + p * (b + a * p))
+        local eased = 1.0 + (2 ^ (-10 * p)) * math.sin((10 * p - 0.75) * 2 * math.pi / 3)
         return P2_OUT_END + eased * P3_RANGE
     end
 end
@@ -330,7 +324,7 @@ local function CreateReelFrame(parent, index, roleDef)
     reel.inner = inner
 
     local slots = {}
-    for j = 1, 15 do
+    for j = 1, MAX_SLOTS do
         local fs = inner:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         fs:SetPoint("TOPLEFT", inner, "TOPLEFT", 2, -(j - 1) * ROW_HEIGHT)
         fs:SetSize(reelWidth - 4, ROW_HEIGHT)
@@ -446,8 +440,6 @@ end
 -- Task 3 (continued): SpinForGroup
 ---------------------------------------------------------------------------
 
---- Called internally to kick off the spin animation for a given group index.
----@param groupIndex number  1-based index into self.session.groups
 --- Build the consistent name lists for all 5 reels (called once per session spin).
 --- Uses ALL session players — no exclusions between groups. The same names appear
 --- in every group's reels; only the winner target changes ("movie magic").
@@ -552,17 +544,23 @@ local function SpinForGroup(groupIndex)
                 elapsed    = 0,
                 duration   = BASE_REEL_DURATIONS[i] / 1000.0 / GetAnimationSpeed(),
                 landed     = false,
-                lastCenter = -1,           -- for tick sound tracking
+                lastRow    = -1,           -- for tick sound tracking
             }
 
-            -- Show reel and populate slots
+            -- Show reel and assign fixed text per slot (one name per slot).
+            -- During animation only positions change — text is never reassigned.
             if reelFrames[i] then
                 reelFrames[i]:Show()
-                for j = 1, 15 do
-                    local nameIdx = ((j - 1) % #finalNames) + 1
-                    reelFrames[i].slots[j]:SetText(finalNames[nameIdx])
-                    reelFrames[i].slots[j]:SetTextColor(1, 1, 1, 1)
-                    reelFrames[i].slots[j]:SetAlpha(1)
+                local numNames = math.min(#finalNames, MAX_SLOTS)
+                for j = 1, MAX_SLOTS do
+                    if j <= numNames then
+                        reelFrames[i].slots[j]:SetText(finalNames[j])
+                        reelFrames[i].slots[j]:SetTextColor(1, 1, 1, 0.5)
+                        reelFrames[i].slots[j]:SetAlpha(1)
+                    else
+                        reelFrames[i].slots[j]:SetText("")
+                        reelFrames[i].slots[j]:SetTextColor(1, 1, 1, 0)
+                    end
                 end
             end
         else
@@ -570,7 +568,7 @@ local function SpinForGroup(groupIndex)
             reelState[i] = { active = false, landed = true }
             if reelFrames[i] then
                 reelFrames[i]:Show()
-                for j = 1, 15 do
+                for j = 1, MAX_SLOTS do
                     local text = (j == 2) and "(none)" or ""
                     reelFrames[i].slots[j]:SetText(text)
                     reelFrames[i].slots[j]:SetTextColor(0.5, 0.5, 0.5, 0.7)
@@ -592,22 +590,30 @@ end
 local OnUpdateHandler
 
 --- Calculate scroll metrics for a reel, targeting a uniform linear-phase speed.
---- Linear phase covers 59% of totalScroll in 42% of duration (P1_END to P2_END).
---- numCycles is chosen so all reels scroll at ~TARGET_SPEED px/s.
+--- Returns an exact scrollDistance (for consistent speed across reels) and a
+--- scrollBase offset so the total is a multiple of listHeight (winner lands).
 ---@param state table  reelState entry (needs .names and .duration)
----@return number numCycles, number listHeight, number winnerOffset, number totalScroll
+---@return number listHeight, number scrollBase, number scrollDistance
 function WHLSN._CalcScrollMetrics(state)
-    local listHeight   = #state.names * ROW_HEIGHT
-    local winnerOffset = (#state.names - 1) * ROW_HEIGHT
+    local listHeight = math.min(#state.names, MAX_SLOTS) * ROW_HEIGHT
 
-    -- Solve for totalScroll that yields TARGET_SPEED during linear phase
+    -- Exact scroll distance that yields TARGET_SPEED during the linear phase.
+    -- speed = linearScrollFrac * scrollDistance / (linearTimeFrac * duration)
+    -- => scrollDistance = TARGET_SPEED * linearTimeFrac * duration / linearScrollFrac
     local linearTimeFrac   = P2_END - P1_END
     local linearScrollFrac = P2_OUT_END - P1_OUT_END
-    local idealTotal = TARGET_SPEED * linearTimeFrac * state.duration / linearScrollFrac
-    local numCycles  = math.max(MIN_SPIN_CYCLES, math.ceil((idealTotal - winnerOffset) / listHeight))
+    local scrollDistance = TARGET_SPEED * linearTimeFrac * state.duration / linearScrollFrac
 
-    local totalScroll = numCycles * listHeight + winnerOffset
-    return numCycles, listHeight, winnerOffset, totalScroll
+    -- Round up to the next multiple of listHeight so winner lands at centre.
+    local totalScroll = math.max(
+        MIN_SPIN_CYCLES * listHeight,
+        math.ceil(scrollDistance / listHeight) * listHeight
+    )
+
+    -- scrollBase shifts the start position so that scrollBase + scrollDistance
+    -- overshoots into an exact multiple of listHeight.
+    local scrollBase = totalScroll - scrollDistance
+    return listHeight, scrollBase, scrollDistance
 end
 
 --- Start the scroll animation for all active reels.
@@ -618,10 +624,11 @@ function WHLSN._StartReelAnimations()
     for i = 1, 5 do
         local state = reelState[i]
         if state and state.active then
-            local _, listHeight, _, totalScroll = WHLSN._CalcScrollMetrics(state)
-            state.listHeight  = listHeight
-            state.totalScroll = totalScroll
-            state.elapsed     = 0
+            local listHeight, scrollBase, scrollDistance = WHLSN._CalcScrollMetrics(state)
+            state.listHeight     = listHeight
+            state.scrollBase     = scrollBase
+            state.scrollDistance = scrollDistance
+            state.elapsed        = 0
         end
     end
 
@@ -648,15 +655,9 @@ OnUpdateHandler = function(_, dt)
             if t > 1 then t = 1 end
 
             local progress     = WHLSN.SlotEasing(t)
-            local scrollOffset = progress * state.totalScroll
+            local scrollOffset = state.scrollBase + progress * state.scrollDistance
             local listHeight   = state.listHeight
-            local numNames     = #state.names
-
-            -- yOffset within one list cycle; baseSlot = which name is at top
-            -- Names scroll downward (like a real slot machine pull — new names appear from top)
-            local yOffset  = scrollOffset % listHeight
-            local baseSlot = math.floor(yOffset / ROW_HEIGHT) -- 0-indexed name index
-            local subPixel = yOffset % ROW_HEIGHT             -- positive = shift slots downward
+            local numNames     = math.min(#state.names, MAX_SLOTS)
 
             -- Motion-blur alpha based on speed (fast = dim, slow = clear)
             -- speed ∈ [0,1] where 1 is max speed (linear phase)
@@ -672,36 +673,40 @@ OnUpdateHandler = function(_, dt)
             end
             local slotAlpha = 1.0 - speed * 0.5  -- 0.5 at full speed, 1.0 at rest
 
-            -- Reposition each FontString slot
+            -- Virtual-scroll: reposition each slot using modulo wrapping.
+            -- Text is fixed per slot (assigned once in SpinForGroup); only
+            -- position changes, like names painted on a physical drum.
+            -- Names scroll top-to-bottom (new names appear from the top).
             local reel = reelFrames[i]
             if reel and reel.slots then
-                for j = 1, 15 do
-                    local nameIdx = ((baseSlot + j - 2) % numNames) + 1
-                    local yPos    = -(j - 2) * ROW_HEIGHT - subPixel
+                for j = 1, numNames do
+                    local rawY = (-scrollOffset - (j - 1) * ROW_HEIGHT) % listHeight - ROW_HEIGHT
+                    -- Wrap slots that overflowed above the viewport back to the bottom
+                    if rawY > ROW_HEIGHT then
+                        rawY = rawY - listHeight
+                    end
                     reel.slots[j]:ClearAllPoints()
-                    reel.slots[j]:SetPoint("TOPLEFT", reel.inner, "TOPLEFT", 2, yPos)
-                    reel.slots[j]:SetText(state.names[nameIdx])
+                    reel.slots[j]:SetPoint("TOPLEFT", reel.inner, "TOPLEFT", 2, rawY)
                     reel.slots[j]:SetTextColor(1, 1, 1, slotAlpha)
                 end
 
-                -- Tick sound: detect when a new name crosses the centre line
-                local centerName = ((baseSlot + 1) % numNames) + 1  -- slot j=3 nameIdx
-                if centerName ~= state.lastCenter and speed > 0.1 then
+                -- Tick sound: detect when a new name scrolls past the centre row
+                local currentRow = math.floor(scrollOffset / ROW_HEIGHT)
+                if currentRow ~= state.lastRow and speed > 0.1 then
                     PlayTick()
-                    state.lastCenter = centerName
+                    state.lastRow = currentRow
                 end
             end
 
-            -- When t >= 1: highlight winner (positions already correct from animation loop)
+            -- When t >= 1: highlight winner (slot 1 = winner, at centre)
             if t >= 1 then
                 state.landed = true
 
                 if reel and reel.slots then
-                    -- At t=1: SlotEasing(1)=1, so scrollOffset=totalScroll and baseSlot=numNames-1.
-                    -- For j=3: nameIdx = ((numNames-1 + 1) % numNames)+1 = 1 = winner ✓
-                    -- No repositioning needed — animation loop already placed slots correctly.
-                    for j = 1, 15 do
-                        if j == 3 then
+                    -- At t=1, scrollBase + scrollDistance is an exact multiple of listHeight.
+                    -- Slot 1 (winner) wraps to y = -ROW_HEIGHT = centre of viewport.
+                    for j = 1, numNames do
+                        if j == 1 then
                             reel.slots[j]:SetTextColor(GOLD_R, GOLD_G, GOLD_B, 1)
                         else
                             reel.slots[j]:SetTextColor(0.7, 0.7, 0.7, 0.8)
@@ -868,7 +873,7 @@ CollapseAndAdvance = function()
                     end
                     if reel.brezIcon then reel.brezIcon:Hide() end
                     if reel.lustIcon then reel.lustIcon:Hide() end
-                    for j = 1, 15 do
+                    for j = 1, MAX_SLOTS do
                         reel.slots[j]:SetText("")
                         reel.slots[j]:SetTextColor(1, 1, 1, 1)
                     end
