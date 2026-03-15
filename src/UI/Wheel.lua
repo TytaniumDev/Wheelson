@@ -341,14 +341,14 @@ local function CreateReelFrame(parent, index, roleDef)
     local brezIcon = parent:CreateTexture(nil, "OVERLAY")
     brezIcon:SetSize(12, 12)
     brezIcon:SetPoint("TOPRIGHT", reel, "TOPRIGHT", -2, -2)
-    brezIcon:SetTexture("Interface\\Icons\\Spell_Shaman_SpiritWalk")
+    brezIcon:SetTexture("Interface\\Icons\\Spell_Nature_Reincarnation")
     brezIcon:Hide()
     reel.brezIcon = brezIcon
 
     local lustIcon = parent:CreateTexture(nil, "OVERLAY")
     lustIcon:SetSize(12, 12)
     lustIcon:SetPoint("TOPLEFT", reel, "TOPLEFT", 2, -2)
-    lustIcon:SetTexture("Interface\\Icons\\Spell_Nature_TimeStop")
+    lustIcon:SetTexture("Interface\\Icons\\Spell_Nature_Bloodlust")
     lustIcon:Hide()
     reel.lustIcon = lustIcon
 
@@ -632,14 +632,16 @@ OnUpdateHandler = function(_, dt)
                 state.landed = true
 
                 if reel and reel.slots then
-                    -- Snap: winner (names[1]) should be at slot j=2 (centre row)
+                    -- Snap: winner (names[1]) must land at slot j=2 (centre row, under pointer).
+                    -- At t=1, baseSlot = numNames-1, so: nameIdx = ((numNames-1+j-1) % numNames)+1
+                    -- j=2 → ((numNames-1+1) % numNames)+1 = 1 = winner ✓
                     for j = 1, 15 do
-                        local nameIdx = ((j - 1) % numNames) + 1  -- j=1 → names[1]=winner
+                        local nameIdx = ((numNames - 1 + j - 1) % numNames) + 1
                         reel.slots[j]:ClearAllPoints()
                         reel.slots[j]:SetPoint("TOPLEFT", reel.inner, "TOPLEFT", 2, -(j - 1) * ROW_HEIGHT)
                         reel.slots[j]:SetText(state.names[nameIdx])
-                        if j == 1 then
-                            -- Winner slot: gold highlight
+                        if j == 2 then
+                            -- Centre row: winner slot — gold highlight
                             reel.slots[j]:SetTextColor(GOLD_R, GOLD_G, GOLD_B, 1)
                         else
                             reel.slots[j]:SetTextColor(0.7, 0.7, 0.7, 0.8)
@@ -690,6 +692,12 @@ OnUpdateHandler = function(_, dt)
                 wheelFrame:SetScript("OnUpdate", nil)
             end
             WHLSN._OnAllReelsLanded()
+        else
+            -- No active reels at all — clear handler so it doesn't fire every frame
+            if wheelFrame then
+                wheelFrame:SetScript("OnUpdate", nil)
+            end
+            isAnimating = false
         end
     end
 end
