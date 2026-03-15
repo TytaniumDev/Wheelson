@@ -221,10 +221,6 @@ function WHLSN:SpinGroups()
         lastGroupDicts[#lastGroupDicts + 1] = g:ToDict()
     end
 
-    -- Generate and set a deterministic seed
-    local seed = math.random(2147483647)
-    math.randomseed(seed)
-
     self.session.groups = self:CreateMythicPlusGroups(self.session.players)
     self.session.status = self.Status.SPINNING
 
@@ -235,7 +231,6 @@ function WHLSN:SpinGroups()
     end
 
     self.session.algorithmSnapshot = {
-        seed = seed,
         players = playerDicts,
         lastGroups = lastGroupDicts,
         groups = groupDicts,
