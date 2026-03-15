@@ -40,6 +40,7 @@ read_globals = {
     "IsInGroup",
     "IsInRaid",
     "PlaySound",
+    "PlaySoundFile",
     C_ChatInfo = { other_fields = true },
     C_PartyInfo = { other_fields = true },
     C_SpecializationInfo = { other_fields = true },

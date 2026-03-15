@@ -49,6 +49,7 @@ _G.CreateColor = function(r, g, b, a) return { r = r, g = g, b = b, a = a } end
 
 _G.SOUNDKIT = {}
 _G.PlaySound = function() end
+_G.PlaySoundFile = function() end
 _G.GetTime = function() return 0 end
 _G.C_Timer = {
     NewTimer = function(_, cb) return { Cancel = function() end } end,
