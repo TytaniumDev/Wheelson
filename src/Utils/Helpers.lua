@@ -183,8 +183,6 @@ function WHLSN:FormatBugReport(snapshot)
     lines[#lines + 1] = "- **Groups created:** " .. groupCountDesc
     lines[#lines + 1] = "- **Timestamp:** "
         .. (snapshot.timestamp and date("%Y-%m-%d %H:%M:%S", snapshot.timestamp) or "Unknown")
-    lines[#lines + 1] = "- **Seed:** " .. (snapshot.seed or "Unknown")
-    lines[#lines + 1] = ""
 
     -- Player table
     lines[#lines + 1] = "### Players"
@@ -220,9 +218,7 @@ function WHLSN:FormatBugReport(snapshot)
     lines[#lines + 1] = "--- LUA TEST CASE ---"
     lines[#lines + 1] = "```lua"
     lines[#lines + 1] = "-- Paste into tests/test_group_creator.lua"
-    lines[#lines + 1] = 'it("should handle reported bad grouping (seed '
-        .. (snapshot.seed or "?") .. ')", function()'
-    lines[#lines + 1] = "    math.randomseed(" .. (snapshot.seed or 0) .. ")"
+    lines[#lines + 1] = 'it("should handle reported bad grouping", function()'
 
     local function formatPlayerNew(pd)
         if not pd then return "nil" end
@@ -260,9 +256,12 @@ function WHLSN:FormatBugReport(snapshot)
         lines[#lines + 1] = '    WHLSN:SetLastGroups(lastGroups)'
     end
 
-    lines[#lines + 1] = "    local groups = WHLSN:CreateMythicPlusGroups(players)"
-    lines[#lines + 1] = "    -- TODO: Add assertions for expected behavior"
-    lines[#lines + 1] = "    -- Got " .. #groups .. " groups from " .. #snapshot.players .. " players"
+    lines[#lines + 1] = "    for trial = 1, 20 do"
+    lines[#lines + 1] = "        local groups = WHLSN:CreateMythicPlusGroups(players)"
+    lines[#lines + 1] = "        -- TODO: Add assertions for the invariant that was violated"
+    lines[#lines + 1] = "        -- Bad output had " .. #groups .. " groups from "
+        .. #snapshot.players .. " players"
+    lines[#lines + 1] = "    end"
     lines[#lines + 1] = "end)"
     lines[#lines + 1] = "```"
 
