@@ -20,16 +20,18 @@ Names display as plain white text during the spin — no role tags or utility in
 
 Groups are pre-computed by `GroupCreator` before the wheel view is shown. The winner for each slot is already known; the reel animation is purely visual.
 
-**Candidate pool per reel**: Derived from `self.session.players` filtered by role eligibility (checking both `mainRole` and `offspecs`):
+**Candidate pool per reel**: Derived from `self.session.players` by checking both `mainRole` and `offspecs`. A player appears in every reel for which they are eligible — the same player can show up in multiple reels (e.g., a Druid who can tank and DPS appears in the Tank reel and all DPS reels):
 - Tank reel: players whose `mainRole` is `"tank"` OR who have `"tank"` in `offspecs`
 - Healer reel: players whose `mainRole` is `"healer"` OR who have `"healer"` in `offspecs`
 - DPS reels: players whose `mainRole` is `"ranged"` or `"melee"` OR who have DPS roles in `offspecs`
 
-**Winner force-insert**: The actual winner for each reel is always included in that reel's candidate list, even if role filtering would otherwise exclude them (safety net for edge cases in GroupCreator's assignment logic).
+The UI is independent of the algorithm. The reels show all *possible* players for a role, not just those the algorithm considered. The algorithm determines the groups when spin is pressed; the UI then animates to reach that predetermined outcome.
+
+**Winner force-insert**: The actual winner for each reel is always included in that reel's candidate list, even if role filtering would otherwise exclude them (safety net for edge cases).
 
 **Small pool padding**: If a role pool has fewer than 5 candidates, the list is repeated/cycled to create at least 8 entries. This ensures enough names scroll through for a convincing animation even with a small candidate pool (e.g., 2 tanks → cycle to 8 entries).
 
-**Cross-group pools**: For group N+1's reels, winners already assigned to previous groups are excluded from the candidate pool. This mirrors reality — those players are already placed.
+**Cross-group pools**: For group N+1's reels, winners already assigned to previous groups are excluded from the candidate pool (they're placed). Players who were *not* selected remain in the pool and can appear in subsequent reels.
 
 **Empty role slots**: If a group has no tank or no healer (`group.tank == nil`), that reel is shown in an inactive state: dark background, no spin animation, displays "(none)" in dim text. Same for unused DPS slots if a group has fewer than 3 DPS.
 
@@ -100,7 +102,7 @@ Summary rows stack upward from the bottom, remaining visible during subsequent s
 Header shows "Group 1" (no "of 1"). After the gold glow moment, skip the collapse step — go directly to the 2s pause, then auto-navigate to GroupDisplay.
 
 ### Final Group Completion
-After the final group's gold glow moment, a ~2s pause, then `CompleteSession()` is called and the view auto-navigates to the GroupDisplay results view. No Continue button exists. The Re-spin button is not shown during the wheel animation — it is available on the GroupDisplay results view (see Modified Files below for the small addition to GroupDisplay.lua).
+After the final group's gold glow moment, a ~2s pause, then `CompleteSession()` is called and the view auto-navigates to the GroupDisplay results view. No Continue button exists.
 
 ### Skip Behavior
 The Skip button is visible during the spin animation. Pressing it:
@@ -150,21 +152,21 @@ The animation is entirely client-side. Each player (host and non-host) runs the 
 
 ## Scope & Public API
 
-### Public API (unchanged)
+### Public API (changed)
 - `WHLSN:ShowWheelView(parent)` — Creates reel UI and starts spin for group 1
 - `WHLSN:HideWheelView()` — Cancels animations, hides the wheel frame
 - `WHLSN:UpdateWheelView()` — Remains a no-op (animation is self-driven via OnUpdate)
 - `WHLSN:SkipWheelAnimation()` — Cancels animations, calls CompleteSession, auto-navigates to GroupDisplay
-- `WHLSN:ReSpin()` — Unchanged, transitions back to lobby and re-spins
 - `WHLSN:OnWheelComplete()` — Calls CompleteSession, triggers auto-navigate to GroupDisplay
+- `WHLSN:ReSpin()` — **Removed**. Re-spin functionality is removed from the addon entirely.
 
 ### Modified files
-- `src/UI/Wheel.lua` — Complete rewrite with same public API
-- `src/UI/GroupDisplay.lua` — Add a Re-spin button (host-only, hidden during history views). Placed next to the existing "New Session" button. Calls `WHLSN:ReSpin()`. The `ReSpin()` method itself remains on Wheel.lua (public API unchanged).
+- `src/UI/Wheel.lua` — Complete rewrite. `ReSpin()` method removed.
 
 ### Unchanged files
 - `src/UI/MainFrame.lua` — Same `ShowWheelView`/`HideWheelView`/`UpdateWheelView` interface
 - `src/UI/MainFrame.xml` — No changes
+- `src/UI/GroupDisplay.lua` — No changes
 - `src/Core.lua` — Session state machine untouched
 - `src/GroupCreator.lua` — Groups pre-computed before wheel view
 
