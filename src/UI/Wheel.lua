@@ -307,9 +307,11 @@ local function CreateReelFrame(parent, index, roleDef)
     fadeTop:SetPoint("TOPRIGHT", reel, "TOPRIGHT", -1, -1)
     fadeTop:SetHeight(FADE_HEIGHT)
     fadeTop:SetColorTexture(1, 1, 1, 1)
+    -- VERTICAL gradient: minColor = bottom, maxColor = top.
+    -- fadeTop sits at the reel top edge; top should be opaque, bottom transparent.
     fadeTop:SetGradient("VERTICAL",
-        CreateColor(0, 0, 0, 0.85),
-        CreateColor(0, 0, 0, 0))
+        CreateColor(0, 0, 0, 0),
+        CreateColor(0, 0, 0, 0.85))
     reel.fadeTop = fadeTop
 
     local fadeBottom = reel:CreateTexture(nil, "OVERLAY")
@@ -317,9 +319,10 @@ local function CreateReelFrame(parent, index, roleDef)
     fadeBottom:SetPoint("BOTTOMRIGHT", reel, "BOTTOMRIGHT", -1, 1)
     fadeBottom:SetHeight(FADE_HEIGHT)
     fadeBottom:SetColorTexture(1, 1, 1, 1)
+    -- fadeBottom sits at the reel bottom edge; bottom should be opaque, top transparent.
     fadeBottom:SetGradient("VERTICAL",
-        CreateColor(0, 0, 0, 0),
-        CreateColor(0, 0, 0, 0.85))
+        CreateColor(0, 0, 0, 0.85),
+        CreateColor(0, 0, 0, 0))
     reel.fadeBottom = fadeBottom
 
     -- Gold centre pointer line (1px, positioned at centre slot)
