@@ -77,8 +77,8 @@ local function CreateGroupDisplayFrame(parent)
     frame.endButton:SetPoint("BOTTOMRIGHT", -8, 8)
     frame.endButton:SetText("Finish")
     frame.endButton:SetScript("OnClick", function()
-        WHLSN:EndSession()
         WHLSN:ToggleMainFrame()
+        WHLSN:EndSession()
     end)
 
     return frame
