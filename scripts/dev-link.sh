@@ -23,6 +23,11 @@ if [ -L "$ADDON_DIR" ]; then
   exit 0
 fi
 
+if [ ! -e "$ADDON_DIR" ] && [ -d "$BACKUP_DIR" ]; then
+  echo "Addon directory missing but backup exists — restoring from backup..."
+  mv "$BACKUP_DIR" "$ADDON_DIR"
+fi
+
 if [ ! -d "$ADDON_DIR" ]; then
   echo "ERROR: No existing Wheelson addon found at: $ADDON_DIR" >&2
   echo "Install Wheelson via Wago first so we can copy its libs." >&2
@@ -43,11 +48,10 @@ fi
 
 echo "Backing up Wago install to Wheelson.wago-backup..."
 if [ -d "$BACKUP_DIR" ]; then
-  echo "  Backup already exists, removing stale Wago dir."
-  rm -rf "$ADDON_DIR"
-else
-  mv "$ADDON_DIR" "$BACKUP_DIR"
+  echo "  Replacing stale backup with current Wago install."
+  rm -rf "$BACKUP_DIR"
 fi
+mv "$ADDON_DIR" "$BACKUP_DIR"
 
 echo "Creating symlink: $ADDON_DIR -> $REPO_ROOT"
 ln -s "$REPO_ROOT" "$ADDON_DIR"
