@@ -89,13 +89,19 @@ end
 -- SOUND_VICTORY : WoW 12.0 UI Alert – Slot Machine Coins (jackpot payout)
 ---------------------------------------------------------------------------
 
-local SOUND_TICK    = 271528  -- GamblingSlotMachine03_Tri_Face_Vertical_Spin
-local SOUND_LAND    = 272764  -- GamblingSlotMachine06_Wheel_Face_Spin_End
-local SOUND_VICTORY = 316718  -- 12.0_UI_Alert_Devices_Slot_Machine_Coins
-local SOUND_START   = 271526  -- Foley_Goblin_Casino_Slot_Machine_Arm_Crank_Start
+local SOUND_TICK    = 856     -- igMainMenuOptionCheckboxOn (ultra-short click)
+local SOUND_LAND    = 316717  -- 12.0_UI_Alert_Devices_Slot_Machine_Bell (short slot bell)
+local SOUND_VICTORY = 316769  -- 12.0_UI_Alert_War3_Fanfare (big fanfare)
+local SOUND_START   = 271526  -- Foley_Goblin_Casino_Slot_Machine_Arm_Crank_Start (keep)
+
+local TICK_THROTTLE = 0.15    -- seconds; at most one tick sound per 150ms across all reels
+local lastTickTime  = 0
 
 local function PlayTick()
     if not ShouldPlaySounds() then return end
+    local now = GetTime()
+    if now - lastTickTime < TICK_THROTTLE then return end
+    lastTickTime = now
     PlaySound(SOUND_TICK, "SFX")
 end
 

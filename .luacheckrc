@@ -34,6 +34,7 @@ read_globals = {
     "GetNumGroupMembers",
     "GetNumGuildMembers",
     "GetNumSpecializations",
+    "GetTime",
     "hooksecurefunc",
     "IsInGuild",
     "IsInGroup",
