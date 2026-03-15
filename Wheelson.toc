@@ -9,19 +9,24 @@
 ## X-Wago-ID: kGryLYKy
 
 # Embedded Libraries
+# Lua files listed explicitly to avoid upstream Ace3 XML backslash path issues on macOS.
+# If upgrading Ace3, re-enumerate from the corresponding .xml files.
 libs/LibStub/LibStub.lua
 libs/CallbackHandler-1.0/CallbackHandler-1.0.lua
 libs/AceAddon-3.0/AceAddon-3.0.lua
 libs/AceConsole-3.0/AceConsole-3.0.lua
 libs/AceEvent-3.0/AceEvent-3.0.lua
+# AceComm-3.0
 libs/AceComm-3.0/ChatThrottleLib.lua
 libs/AceComm-3.0/AceComm-3.0.lua
 libs/AceSerializer-3.0/AceSerializer-3.0.lua
 libs/AceDB-3.0/AceDB-3.0.lua
+# AceConfig-3.0 (sub-modules loaded directly instead of via AceConfig-3.0.xml)
 libs/AceConfig-3.0/AceConfigRegistry-3.0/AceConfigRegistry-3.0.lua
 libs/AceConfig-3.0/AceConfigCmd-3.0/AceConfigCmd-3.0.lua
 libs/AceConfig-3.0/AceConfigDialog-3.0/AceConfigDialog-3.0.lua
 libs/AceConfig-3.0/AceConfig-3.0.lua
+# AceGUI-3.0 (widgets loaded directly instead of via AceGUI-3.0.xml)
 libs/AceGUI-3.0/AceGUI-3.0.lua
 libs/AceGUI-3.0/widgets/AceGUIContainer-BlizOptionsGroup.lua
 libs/AceGUI-3.0/widgets/AceGUIContainer-DropDownGroup.lua
