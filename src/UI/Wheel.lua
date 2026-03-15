@@ -34,18 +34,30 @@ local GOLD_R = 0.961
 local GOLD_G = 0.620
 local GOLD_B = 0.043
 
-local BASE_REEL_DURATIONS = { 5000, 5300, 5600, 5900, 6200 }
+local BASE_REEL_DURATION = 3000  -- ms, first reel spin time
+local REEL_DURATION_OFFSET = 300 -- ms, stagger between successive reels
+local BASE_REEL_DURATIONS = {}
+for i = 1, 5 do
+    BASE_REEL_DURATIONS[i] = BASE_REEL_DURATION + (i - 1) * REEL_DURATION_OFFSET
+end
 
 local GLOW_DURATION     = 1.5
 local COLLAPSE_DURATION = 0.5
 local FINAL_PAUSE       = 2.0
 local MIN_POOL_SIZE     = 8
-local TARGET_SPEED      = 250   -- px/s during linear phase (uniform across all reels)
-local MIN_SPIN_CYCLES   = 2     -- minimum full list cycles for visual spin effect
+local TARGET_SPEED      = 50    -- px/s during linear phase (uniform across all reels)
+local MIN_SPIN_CYCLES   = 1     -- minimum full list cycles for visual spin effect
 
 -- Easing phase boundaries (as fractions of total reel duration)
-local P1_END = 0.0375   -- end of snap start (187ms / 5000ms)
-local P2_END = 0.55     -- end of full speed (2750ms / 5000ms)
+local P1_END = 0.03     -- end of ease-in
+local P2_END = 0.45     -- end of full speed
+
+-- Easing output ranges (fraction of total scroll at each phase boundary)
+local P1_OUT_END = 0.01
+local P2_OUT_END = 0.60
+
+-- Expose easing constants for testing
+WHLSN._EASING = { P1_END = P1_END, P2_END = P2_END, P1_OUT_END = P1_OUT_END, P2_OUT_END = P2_OUT_END }
 
 ---------------------------------------------------------------------------
 -- Animation State Variables
@@ -217,17 +229,15 @@ function WHLSN.SlotEasing(t)
     if t <= 0 then return 0 end
     if t >= 1 then return 1 end
 
-    -- Output range for each phase (scroll progress)
-    local P1_OUT_START = 0.00
-    local P1_OUT_END   = 0.03
-    local P2_OUT_END   = 0.75
-    local P3_OUT_END   = 1.00
+    -- Phase 2 velocity (normalised): used to match phase 3 entry speed
+    local V_LINEAR = (P2_OUT_END - P1_OUT_END) / (P2_END - P1_END)
+    local P3_RANGE = 1.0 - P2_OUT_END
 
     if t < P1_END then
         -- Phase 1: quartic ease-in
         local p = t / P1_END
         local eased = p * p * p * p
-        return P1_OUT_START + eased * (P1_OUT_END - P1_OUT_START)
+        return eased * P1_OUT_END
 
     elseif t < P2_END then
         -- Phase 2: linear
@@ -235,10 +245,16 @@ function WHLSN.SlotEasing(t)
         return P1_OUT_END + p * (P2_OUT_END - P1_OUT_END)
 
     else
-        -- Phase 3: easeOutCubic  1 - (1-p)^3
+        -- Phase 3: velocity-matched deceleration (Hermite blend)
+        -- Starts at linear-phase speed and smoothly decelerates to zero.
+        -- Uses cubic Hermite: f(p) = a*p^3 + b*p^2 + c*p  with f(0)=0, f(1)=1, f'(0)=v, f'(1)=0
         local p = (t - P2_END) / (1 - P2_END)
-        local eased = 1 - (1 - p) * (1 - p) * (1 - p)
-        return P2_OUT_END + eased * (P3_OUT_END - P2_OUT_END)
+        local v = V_LINEAR * (1 - P2_END) / P3_RANGE  -- normalised entry velocity
+        local a = v - 2
+        local b = 3 - 2 * v
+        local c = v
+        local eased = p * (c + p * (b + a * p))
+        return P2_OUT_END + eased * P3_RANGE
     end
 end
 
@@ -352,13 +368,6 @@ local function CreateReelFrame(parent, index, roleDef)
         CreateColor(bgR, bgG, bgB, 0))
     reel.fadeBottom = fadeBottom
 
-    -- Gold centre pointer line (1px, positioned at centre slot)
-    local pointer = reel:CreateTexture(nil, "OVERLAY")
-    pointer:SetHeight(1)
-    pointer:SetPoint("LEFT", reel, "LEFT", 1, 0)
-    pointer:SetPoint("RIGHT", reel, "RIGHT", -1, 0)
-    pointer:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 0.8)
-    reel.pointer = pointer
 
     -- Role label FontString above reel
     local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -583,7 +592,7 @@ end
 local OnUpdateHandler
 
 --- Calculate scroll metrics for a reel, targeting a uniform linear-phase speed.
---- Linear phase covers 72% of totalScroll in 51.25% of duration (P1_END to P2_END).
+--- Linear phase covers 59% of totalScroll in 42% of duration (P1_END to P2_END).
 --- numCycles is chosen so all reels scroll at ~TARGET_SPEED px/s.
 ---@param state table  reelState entry (needs .names and .duration)
 ---@return number numCycles, number listHeight, number winnerOffset, number totalScroll
@@ -591,9 +600,10 @@ function WHLSN._CalcScrollMetrics(state)
     local listHeight   = #state.names * ROW_HEIGHT
     local winnerOffset = (#state.names - 1) * ROW_HEIGHT
 
-    -- Solve for totalScroll that yields TARGET_SPEED during linear phase:
-    -- TARGET_SPEED = 0.72 * totalScroll / (0.5125 * duration)
-    local idealTotal = TARGET_SPEED * 0.5125 * state.duration / 0.72
+    -- Solve for totalScroll that yields TARGET_SPEED during linear phase
+    local linearTimeFrac   = P2_END - P1_END
+    local linearScrollFrac = P2_OUT_END - P1_OUT_END
+    local idealTotal = TARGET_SPEED * linearTimeFrac * state.duration / linearScrollFrac
     local numCycles  = math.max(MIN_SPIN_CYCLES, math.ceil((idealTotal - winnerOffset) / listHeight))
 
     local totalScroll = numCycles * listHeight + winnerOffset
