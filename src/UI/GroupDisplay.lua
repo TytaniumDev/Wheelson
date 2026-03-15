@@ -26,37 +26,35 @@ local function CreateGroupDisplayFrame(parent)
     frame.scrollChild:SetHeight(1)
     frame.scrollFrame:SetScrollChild(frame.scrollChild)
 
-    -- Invite My Group button
+    -- Bottom button bar: chain left-to-right to avoid overlap
+    -- Row 1 (left-aligned): Invite, Post, Copy, Report
     frame.inviteButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.inviteButton:SetSize(120, 28)
+    frame.inviteButton:SetSize(110, 24)
     frame.inviteButton:SetPoint("BOTTOMLEFT", 8, 8)
     frame.inviteButton:SetText("Invite My Group")
     frame.inviteButton:SetScript("OnClick", function()
         WHLSN:InviteMyGroup()
     end)
 
-    -- Post to Guild Chat button
     frame.postButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.postButton:SetSize(100, 28)
-    frame.postButton:SetPoint("BOTTOM", -40, 8)
+    frame.postButton:SetSize(90, 24)
+    frame.postButton:SetPoint("LEFT", frame.inviteButton, "RIGHT", 4, 0)
     frame.postButton:SetText("Post to Guild")
     frame.postButton:SetScript("OnClick", function()
         WHLSN:PostToGuildChat(WHLSN.session.groups)
     end)
 
-    -- Copy to Clipboard button
     frame.copyButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.copyButton:SetSize(80, 28)
-    frame.copyButton:SetPoint("BOTTOM", 40, 8)
+    frame.copyButton:SetSize(60, 24)
+    frame.copyButton:SetPoint("LEFT", frame.postButton, "RIGHT", 4, 0)
     frame.copyButton:SetText("Copy")
     frame.copyButton:SetScript("OnClick", function()
         WHLSN:CopyGroupsToClipboard(WHLSN.session.groups)
     end)
 
-    -- Report Bad Grouping button
     frame.reportButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.reportButton:SetSize(80, 28)
-    frame.reportButton:SetPoint("BOTTOM", 120, 8)
+    frame.reportButton:SetSize(60, 24)
+    frame.reportButton:SetPoint("LEFT", frame.copyButton, "RIGHT", 4, 0)
     frame.reportButton:SetText("Report")
     frame.reportButton:SetScript("OnClick", function()
         if WHLSN.session.algorithmSnapshot then
@@ -66,19 +64,18 @@ local function CreateGroupDisplayFrame(parent)
         end
     end)
 
-    -- End Session button (host only)
+    -- Row 1 (right-aligned): New Session, End Session
     frame.endButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.endButton:SetSize(100, 28)
+    frame.endButton:SetSize(90, 24)
     frame.endButton:SetPoint("BOTTOMRIGHT", -8, 8)
     frame.endButton:SetText("End Session")
     frame.endButton:SetScript("OnClick", function()
         WHLSN:EndSession()
     end)
 
-    -- New Session button (host only)
     frame.newButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.newButton:SetSize(100, 28)
-    frame.newButton:SetPoint("BOTTOMRIGHT", frame.endButton, "BOTTOMLEFT", -4, 0)
+    frame.newButton:SetSize(90, 24)
+    frame.newButton:SetPoint("RIGHT", frame.endButton, "LEFT", -4, 0)
     frame.newButton:SetText("New Session")
     frame.newButton:SetScript("OnClick", function()
         WHLSN:EndSession()
