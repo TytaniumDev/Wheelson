@@ -370,6 +370,6 @@ describe("CalcScrollMetrics", function()
         for i = 1, 50 do state.names[i] = "P" .. i end
 
         local numCycles = WHLSN._CalcScrollMetrics(state)
-        assert.is_true(numCycles >= 2)
+        assert.is_true(numCycles >= 1)
     end)
 end)

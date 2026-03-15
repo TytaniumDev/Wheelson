@@ -46,7 +46,7 @@ local COLLAPSE_DURATION = 0.5
 local FINAL_PAUSE       = 2.0
 local MIN_POOL_SIZE     = 8
 local TARGET_SPEED      = 50    -- px/s during linear phase (uniform across all reels)
-local MIN_SPIN_CYCLES   = 2     -- minimum full list cycles for visual spin effect
+local MIN_SPIN_CYCLES   = 1     -- minimum full list cycles for visual spin effect
 
 -- Easing phase boundaries (as fractions of total reel duration)
 local P1_END = 0.03     -- end of ease-in
@@ -365,13 +365,6 @@ local function CreateReelFrame(parent, index, roleDef)
         CreateColor(bgR, bgG, bgB, 0))
     reel.fadeBottom = fadeBottom
 
-    -- Gold centre pointer line (1px, positioned at centre slot)
-    local pointer = reel:CreateTexture(nil, "OVERLAY")
-    pointer:SetHeight(1)
-    pointer:SetPoint("LEFT", reel, "LEFT", 1, 0)
-    pointer:SetPoint("RIGHT", reel, "RIGHT", -1, 0)
-    pointer:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 0.8)
-    reel.pointer = pointer
 
     -- Role label FontString above reel
     local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
