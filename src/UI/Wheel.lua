@@ -40,6 +40,8 @@ local GLOW_DURATION     = 1.5
 local COLLAPSE_DURATION = 0.5
 local FINAL_PAUSE       = 2.0
 local MIN_POOL_SIZE     = 8
+local TARGET_SPEED      = 500   -- px/s during linear phase (uniform across all reels)
+local MIN_SPIN_CYCLES   = 3     -- minimum full list cycles for visual spin effect
 
 -- Easing phase boundaries (as fractions of total reel duration)
 local P1_END = 0.0375   -- end of snap start (150ms / 4000ms)
@@ -599,15 +601,21 @@ end
 --- Forward declaration for the OnUpdate handler; assigned below.
 local OnUpdateHandler
 
---- Calculate scroll metrics for a reel.
----@param state table  reelState entry
+--- Calculate scroll metrics for a reel, targeting a uniform linear-phase speed.
+--- Linear phase covers 82% of totalScroll in 58.75% of duration.
+--- numCycles is chosen so all reels scroll at ~TARGET_SPEED px/s.
+---@param state table  reelState entry (needs .names and .duration)
 ---@return number numCycles, number listHeight, number winnerOffset, number totalScroll
-local function CalcScrollMetrics(state)
-    local numCycles  = math.random(8, 11)
-    local listHeight = #state.names * ROW_HEIGHT
-    -- winner is at index 1; centre slot is visual row j=2 (0-indexed offset = 1*ROW_HEIGHT)
+function WHLSN._CalcScrollMetrics(state)
+    local listHeight   = #state.names * ROW_HEIGHT
     local winnerOffset = (#state.names - 1) * ROW_HEIGHT
-    local totalScroll  = numCycles * listHeight + winnerOffset
+
+    -- Solve for totalScroll that yields TARGET_SPEED during linear phase:
+    -- TARGET_SPEED = 0.82 * totalScroll / (0.5875 * duration)
+    local idealTotal = TARGET_SPEED * 0.5875 * state.duration / 0.82
+    local numCycles  = math.max(MIN_SPIN_CYCLES, math.ceil((idealTotal - winnerOffset) / listHeight))
+
+    local totalScroll = numCycles * listHeight + winnerOffset
     return numCycles, listHeight, winnerOffset, totalScroll
 end
 
@@ -619,7 +627,7 @@ function WHLSN._StartReelAnimations()
     for i = 1, 5 do
         local state = reelState[i]
         if state and state.active then
-            local _, listHeight, _, totalScroll = CalcScrollMetrics(state)
+            local _, listHeight, _, totalScroll = WHLSN._CalcScrollMetrics(state)
             state.listHeight  = listHeight
             state.totalScroll = totalScroll
             state.elapsed     = 0
