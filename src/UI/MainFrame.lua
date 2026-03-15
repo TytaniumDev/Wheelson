@@ -7,7 +7,6 @@ local WHLSN = _G.Wheelson
 
 local mainFrame = nil
 local currentView = nil -- "lobby" | "wheel" | "results"
-local isMinimized = false
 
 local function GetMainFrame()
     if not mainFrame then
@@ -32,21 +31,6 @@ local function GetMainFrame()
                 self:StopMovingOrSizing()
                 WHLSN:SaveFramePosition()
             end)
-
-            -- Minimize button
-            local minimizeBtn = CreateFrame("Button", nil, mainFrame)
-            minimizeBtn:SetSize(20, 20)
-            minimizeBtn:SetPoint("TOPRIGHT", mainFrame.CloseButton, "TOPLEFT", -2, 0)
-            minimizeBtn:SetNormalFontObject("GameFontNormal")
-
-            local minText = minimizeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            minText:SetPoint("CENTER")
-            minText:SetText("_")
-            minText:SetTextColor(1, 0.82, 0)
-            minimizeBtn:SetScript("OnClick", function()
-                WHLSN:ToggleMinimize()
-            end)
-            mainFrame.minimizeButton = minimizeBtn
         end
     end
     return mainFrame
@@ -66,22 +50,6 @@ function WHLSN:SaveFramePosition()
     }
 end
 
---- Toggle frame minimize state.
-function WHLSN:ToggleMinimize()
-    local frame = GetMainFrame()
-    if not frame then return end
-
-    isMinimized = not isMinimized
-    if isMinimized then
-        frame.Content:Hide()
-        frame:SetHeight(40)
-    else
-        frame.Content:Show()
-        frame:SetHeight(500)
-        self:UpdateUI()
-    end
-end
-
 --- Toggle main frame visibility.
 function WHLSN:ToggleMainFrame()
     local frame = GetMainFrame()
@@ -96,7 +64,6 @@ function WHLSN:ToggleMainFrame()
     else
         frame:Show()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
-        isMinimized = false
         frame.Content:Show()
         self:UpdateUI()
     end
@@ -111,7 +78,6 @@ function WHLSN:ShowMainFrame()
         frame:Show()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
     end
-    isMinimized = false
     frame.Content:Show()
     self:UpdateUI()
 end
@@ -127,7 +93,6 @@ end
 function WHLSN:UpdateUI()
     local frame = GetMainFrame()
     if not frame or not frame:IsShown() then return end
-    if isMinimized then return end
 
     local status = self.session.status
 
