@@ -71,6 +71,42 @@ local function ShouldPlaySounds()
 end
 
 ---------------------------------------------------------------------------
+-- Sound Helpers
+-- SoundKit IDs sourced from the One-Armed Bandit (Liberation of Undermine)
+-- and the WoW 12.0 UI alert sounds database.
+--
+-- SOUND_START   : Goblin Casino Slot Machine – Arm Crank Start (11.1)
+-- SOUND_TICK    : Goblin Casino Slot Machine – Tri-Face Vertical Spin (11.1)
+-- SOUND_LAND    : Goblin Casino Slot Machine – Wheel Face Spin End (11.1)
+-- SOUND_VICTORY : WoW 12.0 UI Alert – Slot Machine Coins (jackpot payout)
+---------------------------------------------------------------------------
+
+local SOUND_TICK    = 271528  -- GamblingSlotMachine03_Tri_Face_Vertical_Spin
+local SOUND_LAND    = 272764  -- GamblingSlotMachine06_Wheel_Face_Spin_End
+local SOUND_VICTORY = 316718  -- 12.0_UI_Alert_Devices_Slot_Machine_Coins
+local SOUND_START   = 271526  -- Foley_Goblin_Casino_Slot_Machine_Arm_Crank_Start
+
+local function PlayTick()
+    if not ShouldPlaySounds() then return end
+    PlaySound(SOUND_TICK, "SFX")
+end
+
+local function PlayLand()
+    if not ShouldPlaySounds() then return end
+    PlaySound(SOUND_LAND, "SFX")
+end
+
+local function PlayVictory()
+    if not ShouldPlaySounds() then return end
+    PlaySound(SOUND_VICTORY, "SFX")
+end
+
+local function PlayStart()
+    if not ShouldPlaySounds() then return end
+    PlaySound(SOUND_START, "SFX")
+end
+
+---------------------------------------------------------------------------
 -- Candidate Pool Helpers
 ---------------------------------------------------------------------------
 
@@ -547,9 +583,7 @@ end
 
 --- Start the scroll animation for all active reels.
 function WHLSN._StartReelAnimations()
-    if ShouldPlaySounds() then
-        PlaySound(SOUNDKIT.IG_ABILITY_OPEN or 841, "SFX")
-    end
+    PlayStart()
 
     -- Pre-calculate scroll metrics for each active reel
     for i = 1, 5 do
@@ -624,8 +658,8 @@ OnUpdateHandler = function(_, dt)
 
                 -- Tick sound: detect when a new name crosses the centre line
                 local centerName = ((baseSlot + 1) % numNames) + 1  -- slot j=2 nameIdx
-                if centerName ~= state.lastCenter and ShouldPlaySounds() and speed > 0.1 then
-                    PlaySound(1115, "SFX")  -- generic UI tick
+                if centerName ~= state.lastCenter and speed > 0.1 then
+                    PlayTick()
                     state.lastCenter = centerName
                 end
             end
@@ -672,9 +706,7 @@ OnUpdateHandler = function(_, dt)
                     end
 
                     -- Landing sound
-                    if ShouldPlaySounds() then
-                        PlaySound(SOUNDKIT.IG_QUEST_LIST_SELECT or 879, "SFX")
-                    end
+                    PlayLand()
                 end
             end
         end
@@ -717,9 +749,7 @@ local OnFinalGroupComplete
 function WHLSN._OnAllReelsLanded()
     isAnimating = false
 
-    if ShouldPlaySounds() then
-        PlaySound(SOUNDKIT.RAID_WARNING or 8959, "SFX")
-    end
+    PlayVictory()
 
     local groups = WHLSN.session.groups
     local totalGroups = #groups
