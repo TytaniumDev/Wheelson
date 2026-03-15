@@ -99,6 +99,7 @@ function WHLSN:CreateMythicPlusGroups(players, guildId)
     -- Build role pools
     local mainTanks = shuffle({})
     local offTanks = shuffle({})
+    local offTanksWithHeal = shuffle({})
     local mainHealers = shuffle({})
     local offHealers = shuffle({})
     local mainDps = shuffle({})
@@ -108,7 +109,14 @@ function WHLSN:CreateMythicPlusGroups(players, guildId)
 
     for _, p in ipairs(players) do
         if p:IsTankMain() then mainTanks[#mainTanks + 1] = p end
-        if p:IsOfftank() and not p:IsTankMain() then offTanks[#offTanks + 1] = p end
+        -- Partition offtanks: healer-capable players go into offTanksWithHeal (used last)
+        if p:IsOfftank() and not p:IsTankMain() then
+            if p:IsHealerMain() or p:IsOffhealer() then
+                offTanksWithHeal[#offTanksWithHeal + 1] = p
+            else
+                offTanks[#offTanks + 1] = p
+            end
+        end
         if p:IsHealerMain() then mainHealers[#mainHealers + 1] = p end
         if p:IsOffhealer() and not p:IsHealerMain() then offHealers[#offHealers + 1] = p end
         if p:IsDpsMain() then mainDps[#mainDps + 1] = p end
@@ -119,6 +127,7 @@ function WHLSN:CreateMythicPlusGroups(players, guildId)
 
     shuffle(mainTanks)
     shuffle(offTanks)
+    shuffle(offTanksWithHeal)
     shuffle(mainHealers)
     shuffle(offHealers)
     shuffle(mainDps)
@@ -126,25 +135,15 @@ function WHLSN:CreateMythicPlusGroups(players, guildId)
     shuffle(brezPlayers)
     shuffle(lustPlayers)
 
+    -- Tanks: mainTanks first, then non-healer offtanks, then healer-capable offtanks last
     local availableTanks = {}
     for _, p in ipairs(mainTanks) do availableTanks[#availableTanks + 1] = p end
-    -- Prefer offTanks who are NOT main healers to avoid depleting the healer pool
-    for _, p in ipairs(offTanks) do
-        if not p:IsHealerMain() then availableTanks[#availableTanks + 1] = p end
-    end
-    for _, p in ipairs(offTanks) do
-        if p:IsHealerMain() then availableTanks[#availableTanks + 1] = p end
-    end
+    for _, p in ipairs(offTanks) do availableTanks[#availableTanks + 1] = p end
+    for _, p in ipairs(offTanksWithHeal) do availableTanks[#availableTanks + 1] = p end
 
     local availableHealers = {}
     for _, p in ipairs(mainHealers) do availableHealers[#availableHealers + 1] = p end
-    -- Prefer offHealers who are NOT main tanks to avoid depleting the tank pool
-    for _, p in ipairs(offHealers) do
-        if not p:IsTankMain() then availableHealers[#availableHealers + 1] = p end
-    end
-    for _, p in ipairs(offHealers) do
-        if p:IsTankMain() then availableHealers[#availableHealers + 1] = p end
-    end
+    for _, p in ipairs(offHealers) do availableHealers[#availableHealers + 1] = p end
 
     local availableDps = {}
     for _, p in ipairs(mainDps) do availableDps[#availableDps + 1] = p end
@@ -161,6 +160,7 @@ function WHLSN:CreateMythicPlusGroups(players, guildId)
             removeFromList(availableTanks, player)
         elseif player:IsOfftank() then
             removeFromList(offTanks, player)
+            removeFromList(offTanksWithHeal, player)
             removeFromList(availableTanks, player)
         end
 
@@ -337,14 +337,31 @@ function WHLSN:CreateMythicPlusGroups(players, guildId)
             if player then
                 added = true
                 totalUsed = totalUsed + 1
-                if not remainderGroup.tank and (player:IsTankMain() or player:IsOfftank()) then
+                local placed = false
+
+                -- Priority 1: place by main role
+                if player:IsTankMain() and not remainderGroup.tank then
                     remainderGroup.tank = player
-                elseif not remainderGroup.healer and (player:IsHealerMain() or player:IsOffhealer()) then
+                    placed = true
+                elseif player:IsHealerMain() and not remainderGroup.healer then
                     remainderGroup.healer = player
-                elseif #remainderGroup.dps < 3 then
-                    -- Accept any player as DPS (including role-less players)
+                    placed = true
+                elseif player:IsDpsMain() and #remainderGroup.dps < 3 then
                     remainderGroup.dps[#remainderGroup.dps + 1] = player
-                else
+                    placed = true
+                -- Priority 2: place by offspec
+                elseif player:IsOfftank() and not remainderGroup.tank then
+                    remainderGroup.tank = player
+                    placed = true
+                elseif player:IsOffhealer() and not remainderGroup.healer then
+                    remainderGroup.healer = player
+                    placed = true
+                elseif player:IsOffdps() and #remainderGroup.dps < 3 then
+                    remainderGroup.dps[#remainderGroup.dps + 1] = player
+                    placed = true
+                end
+
+                if not placed then
                     -- Group full, break to create another
                     usedPlayers[player.name] = nil
                     totalUsed = totalUsed - 1

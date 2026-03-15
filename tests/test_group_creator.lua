@@ -624,6 +624,42 @@ describe("CreateMythicPlusGroups", function()
         end
     end)
 
+    it("remainder places healer main as healer not tank even with offtank (issue #40)", function()
+        -- 7 players = 1 full group + 2 remainder.
+        -- The remainder healer main with offtank should be placed as healer.
+        for _ = 1, 20 do
+            WHLSN:ClearLastGroups()
+            local players = {
+                TankWarrior("Tank1"),
+                HealerPriest("Healer1"),
+                Mage("Mage1"),
+                Rogue("Rogue1"),
+                Rogue("Rogue2"),
+                -- Remainder players:
+                HealerMonk("HealerOfftank", { offtank = true }),
+                Rogue("PureDPS"),
+            }
+            local groups = WHLSN:CreateMythicPlusGroups(players)
+
+            -- HealerOfftank should never be placed as tank
+            for _, g in ipairs(groups) do
+                if g.tank and g.tank.name == "HealerOfftank" then
+                    assert.fail("Healer main was placed as tank in remainder")
+                end
+            end
+
+            -- HealerOfftank should be placed as healer in one of the groups
+            local asHealer = false
+            for _, g in ipairs(groups) do
+                if g.healer and g.healer.name == "HealerOfftank" then
+                    asHealer = true
+                    break
+                end
+            end
+            assert.is_true(asHealer, "HealerOfftank should be placed as healer")
+        end
+    end)
+
     it("should try to get ranged DPS in each group", function()
         local players = {
             TankWarrior("Tank1"),
