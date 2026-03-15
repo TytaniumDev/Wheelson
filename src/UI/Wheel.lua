@@ -220,7 +220,8 @@ function WHLSN.DampedSpring(t)
     if t <= 0 or t >= 1 then return 1 end
     local k = 12
     local w = 8
-    return 1 + math.exp(-k * t) * math.sin(w * t) * 0.04
+    local amplitude = 0.04
+    return 1 + math.exp(-k * t) * math.sin(w * t) * amplitude
 end
 
 --- Four-phase slot-machine easing curve.
@@ -700,7 +701,7 @@ OnUpdateHandler = function(_, dt)
                 end
 
                 -- Tick sound: detect when a new name crosses the centre line
-                local centerName = ((baseSlot + 1) % numNames) + 1  -- slot j=2 nameIdx
+                local centerName = ((baseSlot + 1) % numNames) + 1  -- slot j=3 nameIdx
                 if centerName ~= state.lastCenter and speed > 0.1 then
                     PlayTick()
                     state.lastCenter = centerName
