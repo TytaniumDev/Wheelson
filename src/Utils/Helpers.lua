@@ -56,13 +56,8 @@ end
 ---@param player WHLSNPlayer
 ---@return string
 function WHLSN:ColoredPlayerName(player)
-    local colors = {
-        tank = "87BCDE",
-        healer = "87FF87",
-        ranged = "FF8787",
-        melee = "FFD187",
-    }
-    local color = colors[player.mainRole] or "FFFFFF"
+    local rc = self.RoleColors[player.mainRole]
+    local color = rc and rc.hex or "FFFFFF"
     return "|cFF" .. color .. player.name .. "|r"
 end
 
@@ -103,6 +98,33 @@ function WHLSN:GetGroupQuality(group)
     return table.concat(parts, ", ")
 end
 
+--- Show a player tooltip on a frame. Shared by Lobby and GroupDisplay.
+---@param owner table  frame to anchor tooltip to
+---@param player WHLSNPlayer  player data
+function WHLSN:ShowPlayerTooltip(owner, player)
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(player.name, 1, 1, 1)
+
+    local role = player.mainRole
+    if role then
+        local rc = self.RoleColors[role] or { r = 1, g = 1, b = 1 }
+        GameTooltip:AddLine("Role: " .. role, rc.r, rc.g, rc.b)
+    end
+
+    if #player.offspecs > 0 then
+        GameTooltip:AddLine("Offspecs: " .. table.concat(player.offspecs, ", "), 0.7, 0.7, 0.7)
+    end
+
+    if player:HasBrez() then
+        GameTooltip:AddLine("Battle Rez", 0, 1, 0)
+    end
+    if player:HasLust() then
+        GameTooltip:AddLine("Bloodlust/Heroism", 1, 0.27, 0)
+    end
+
+    GameTooltip:Show()
+end
+
 --- Format a Lua table literal for a string array (e.g., {"tank", "healer"}).
 ---@param arr table
 ---@return string
@@ -115,20 +137,8 @@ local function luaArrayStr(arr)
     return "{" .. table.concat(parts, ", ") .. "}"
 end
 
---- Format a bug report from an algorithm snapshot.
---- Returns a string with two sections: human-readable markdown and a Lua test case.
----@param snapshot table  algorithmSnapshot captured at spin time
----@return string
-function WHLSN:FormatBugReport(snapshot)
-    local Group = WHLSN.Group
-    local lines = {}
-
-    -- Reconstruct groups from serialized data for display
-    local groups = {}
-    for _, gd in ipairs(snapshot.groups) do
-        groups[#groups + 1] = Group.FromDict(gd)
-    end
-
+--- Format the human-readable markdown section of a bug report.
+local function FormatBugReportMarkdown(self, snapshot, groups, lines)
     local fullCount = 0
     local incompleteCount = 0
     for _, g in ipairs(groups) do
@@ -145,7 +155,6 @@ function WHLSN:FormatBugReport(snapshot)
     end
     groupCountDesc = groupCountDesc .. ")"
 
-    -- Section 1: Human-readable
     lines[#lines + 1] = "## Bad Grouping Report"
     lines[#lines + 1] = "- **Host:** " .. (snapshot.host or "Unknown")
     lines[#lines + 1] = "- **Players:** " .. (snapshot.playerCount or #snapshot.players)
@@ -153,7 +162,6 @@ function WHLSN:FormatBugReport(snapshot)
     lines[#lines + 1] = "- **Timestamp:** "
         .. (snapshot.timestamp and date("%Y-%m-%d %H:%M:%S", snapshot.timestamp) or "Unknown")
 
-    -- Player table
     lines[#lines + 1] = "### Players"
     lines[#lines + 1] = "| Name | Main Role | Offspecs | Utilities |"
     lines[#lines + 1] = "|------|-----------|----------|-----------|"
@@ -165,30 +173,25 @@ function WHLSN:FormatBugReport(snapshot)
     end
     lines[#lines + 1] = ""
 
-    -- Group summary
     lines[#lines + 1] = "### Groups"
     lines[#lines + 1] = self:FormatGroupSummary(groups)
     lines[#lines + 1] = ""
 
-    -- Last groups
     lines[#lines + 1] = "### Last Groups (duplicate-avoidance context)"
     if #snapshot.lastGroups > 0 then
-        local lastGroups = {}
+        local prevGroups = {}
         for _, gd in ipairs(snapshot.lastGroups) do
-            lastGroups[#lastGroups + 1] = Group.FromDict(gd)
+            prevGroups[#prevGroups + 1] = WHLSN.Group.FromDict(gd)
         end
-        lines[#lines + 1] = self:FormatGroupSummary(lastGroups)
+        lines[#lines + 1] = self:FormatGroupSummary(prevGroups)
     else
         lines[#lines + 1] = "None - first session"
     end
     lines[#lines + 1] = ""
+end
 
-    -- Section 2: Lua test case
-    lines[#lines + 1] = "--- LUA TEST CASE ---"
-    lines[#lines + 1] = "```lua"
-    lines[#lines + 1] = "-- Paste into tests/test_group_creator.lua"
-    lines[#lines + 1] = 'it("should handle reported bad grouping", function()'
-
+--- Format the Lua test case section of a bug report.
+local function FormatBugReportTestCase(snapshot, lines)
     local function formatPlayerNew(pd)
         if not pd then return "nil" end
         return "Player:New("
@@ -198,14 +201,17 @@ function WHLSN:FormatBugReport(snapshot)
             .. luaArrayStr(pd.utilities or {}) .. ")"
     end
 
-    -- Players
+    lines[#lines + 1] = "--- LUA TEST CASE ---"
+    lines[#lines + 1] = "```lua"
+    lines[#lines + 1] = "-- Paste into tests/test_group_creator.lua"
+    lines[#lines + 1] = 'it("should handle reported bad grouping", function()'
+
     lines[#lines + 1] = "    local players = {"
     for _, pd in ipairs(snapshot.players) do
         lines[#lines + 1] = "        " .. formatPlayerNew(pd) .. ","
     end
     lines[#lines + 1] = "    }"
 
-    -- Last groups
     if #snapshot.lastGroups > 0 then
         lines[#lines + 1] = "    local lastGroups = {"
         for _, gd in ipairs(snapshot.lastGroups) do
@@ -228,11 +234,28 @@ function WHLSN:FormatBugReport(snapshot)
     lines[#lines + 1] = "    for trial = 1, 20 do"
     lines[#lines + 1] = "        local groups = WHLSN:CreateMythicPlusGroups(players)"
     lines[#lines + 1] = "        -- TODO: Add assertions for the invariant that was violated"
-    lines[#lines + 1] = "        -- Bad output had " .. #groups .. " groups from "
+    lines[#lines + 1] = "        -- Bad output had " .. #snapshot.groups .. " groups from "
         .. #snapshot.players .. " players"
     lines[#lines + 1] = "    end"
     lines[#lines + 1] = "end)"
     lines[#lines + 1] = "```"
+end
+
+--- Format a bug report from an algorithm snapshot.
+--- Returns a string with two sections: human-readable markdown and a Lua test case.
+---@param snapshot table  algorithmSnapshot captured at spin time
+---@return string
+function WHLSN:FormatBugReport(snapshot)
+    local Group = WHLSN.Group
+    local lines = {}
+
+    local groups = {}
+    for _, gd in ipairs(snapshot.groups) do
+        groups[#groups + 1] = Group.FromDict(gd)
+    end
+
+    FormatBugReportMarkdown(self, snapshot, groups, lines)
+    FormatBugReportTestCase(snapshot, lines)
 
     return table.concat(lines, "\n")
 end

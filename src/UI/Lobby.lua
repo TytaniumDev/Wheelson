@@ -6,9 +6,7 @@ local WHLSN = _G.Wheelson
 -- Shows player list and "Spin" button (mirrors activity lobby UI)
 ---------------------------------------------------------------------------
 
-local lobbyFrame = nil
-local playerRows = {}
-local historyRows = {}
+local lobbyState = { frame = nil, playerRows = {}, historyRows = {} }
 
 local ROLE_ICONS = {
     tank = "Interface\\LFGFrame\\LFGRole_BW",
@@ -22,13 +20,6 @@ local ROLE_TEXCOORDS = {
     healer = { 0.75, 1, 0, 1 },
     ranged = { 0.25, 0.5, 0, 1 },
     melee = { 0, 0.25, 0, 1 },
-}
-
-local ROLE_COLORS = {
-    tank = { r = 0.53, g = 0.76, b = 1.0 },
-    healer = { r = 0.53, g = 1.0, b = 0.53 },
-    ranged = { r = 1.0, g = 0.53, b = 0.53 },
-    melee = { r = 1.0, g = 0.82, b = 0.53 },
 }
 
 
@@ -154,7 +145,7 @@ local function CreatePlayerRow(parent, index)
     row.lustIcon = row:CreateTexture(nil, "ARTWORK")
     row.lustIcon:SetSize(16, 16)
     row.lustIcon:SetPoint("RIGHT", -28, 0)
-    row.lustIcon:SetTexture("Interface\\Icons\\Spell_Nature_Bloodlust")
+    row.lustIcon:SetTexture(WHLSN.LUST_ICON)
 
     -- Kick button (host only, shown on hover)
     row.kickButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
@@ -163,30 +154,10 @@ local function CreatePlayerRow(parent, index)
     row.kickButton:SetText("X")
     row.kickButton:Hide()
 
-    -- Tooltip for utility details
+    -- Tooltip for utility details + kick button hover
     row:SetScript("OnEnter", function(self)
         if self.playerData then
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(self.playerData.name, 1, 1, 1)
-
-            local role = self.playerData.mainRole
-            if role then
-                local color = ROLE_COLORS[role] or { r = 1, g = 1, b = 1 }
-                GameTooltip:AddLine("Role: " .. role, color.r, color.g, color.b)
-            end
-
-            if #self.playerData.offspecs > 0 then
-                GameTooltip:AddLine("Offspecs: " .. table.concat(self.playerData.offspecs, ", "), 0.7, 0.7, 0.7)
-            end
-
-            if self.playerData:HasBrez() then
-                GameTooltip:AddLine("Battle Rez", 0, 1, 0)
-            end
-            if self.playerData:HasLust() then
-                GameTooltip:AddLine("Bloodlust/Heroism", 1, 0.27, 0)
-            end
-
-            GameTooltip:Show()
+            WHLSN:ShowPlayerTooltip(self, self.playerData)
         end
 
         -- Show kick button if host
@@ -231,45 +202,132 @@ end
 
 --- Hide the lobby view.
 function WHLSN:HideLobbyView()
-    if lobbyFrame then lobbyFrame:Hide() end
+    if lobbyState.frame then lobbyState.frame:Hide() end
 end
 
 --- Show the lobby view inside the given content frame.
 function WHLSN:ShowLobbyView(parent)
-    if lobbyFrame then lobbyFrame:Hide() end
+    if not lobbyState.frame then
+        lobbyState.frame = CreateLobbyFrame(parent)
+    end
+    lobbyState.frame:SetParent(parent)
+    lobbyState.frame:SetAllPoints()
+    lobbyState.frame:Show()
+end
 
-    lobbyFrame = CreateLobbyFrame(parent)
-    lobbyFrame:Show()
+---------------------------------------------------------------------------
+-- UpdateLobbyView sub-functions
+---------------------------------------------------------------------------
+
+local function UpdateLobbyStatus(frame, session, hasSession)
+    if hasSession then
+        frame.statusText:SetText("Lobby - Hosted by " .. (session.host or "Unknown"))
+    else
+        frame.statusText:SetText("No active session")
+    end
+end
+
+local function UpdateLobbyButtons(frame, isHost, hasSession, isInSession, playerCount)
+    frame.spinButton:SetShown(isHost and hasSession)
+    frame.spinButton:SetEnabled(playerCount >= 5)
+    frame.joinButton:SetShown(not isHost and hasSession and not isInSession)
+    frame.leaveButton:SetShown(not isHost and hasSession and isInSession)
+    frame.startButton:SetShown(not hasSession)
+    frame.testButton:SetShown(not hasSession)
+    frame.endButton:SetShown(isHost and hasSession)
+end
+
+local function PopulatePlayerRows(frame, players)
+    local rows = lobbyState.playerRows
+    for i, player in ipairs(players) do
+        if not rows[i] then
+            rows[i] = CreatePlayerRow(frame.scrollChild, i)
+        end
+
+        local row = rows[i]
+        row.playerData = player
+        row.nameText:SetText(player.name)
+
+        local role = player.mainRole
+        if role and ROLE_TEXCOORDS[role] then
+            row.roleIcon:SetTexture(ROLE_ICONS[role])
+            local tc = ROLE_TEXCOORDS[role]
+            row.roleIcon:SetTexCoord(tc[1], tc[2], tc[3], tc[4])
+            row.roleIcon:Show()
+
+            local rc = WHLSN.RoleColors[role]
+            row.nameText:SetTextColor(rc.r, rc.g, rc.b)
+        else
+            row.roleIcon:Hide()
+            row.nameText:SetTextColor(1, 1, 1)
+        end
+
+        row.classIcon:Hide()
+        row.brezIcon:SetShown(player:HasBrez())
+        row.lustIcon:SetShown(player:HasLust())
+
+        row.kickButton:SetScript("OnClick", function()
+            WHLSN:KickPlayer(player.name)
+        end)
+        row.kickButton:Hide()
+
+        row:Show()
+    end
+
+    frame.scrollChild:SetHeight(math.max(1, #players * 26))
+end
+
+local function PopulateHistoryRows(frame, history)
+    local rows = lobbyState.historyRows
+    frame.statusText:SetText("Recent Sessions")
+    frame.countText:SetText(#history .. " sessions")
+
+    for i, record in ipairs(history) do
+        if not rows[i] then
+            rows[i] = CreateHistoryRow(frame.scrollChild, i)
+        end
+
+        local row = rows[i]
+        local dateStr = record.timestamp and date("%m/%d %H:%M", record.timestamp) or "Unknown"
+        local groupCount = record.groups and #record.groups or 0
+        local playerCount = record.playerCount or 0
+
+        row.dateText:SetText(dateStr)
+        row.infoText:SetText(string.format("%s  |  %d players, %d groups",
+            record.host or "Unknown", playerCount, groupCount))
+
+        local idx = i
+        row:SetScript("OnClick", function()
+            PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+            WHLSN:ViewHistorySession(idx)
+        end)
+
+        row:Show()
+    end
+
+    frame.scrollChild:SetHeight(math.max(1, #history * 22))
 end
 
 --- Update the lobby view with current session data.
 function WHLSN:UpdateLobbyView()
-    if not lobbyFrame then return end
+    local frame = lobbyState.frame
+    if not frame then return end
 
     local players = self.session.players
     local isHost = self.session.host == UnitName("player")
     local hasSession = self.session.status ~= nil
     local myName = UnitName("player")
 
-    -- Update status text
-    if hasSession then
-        local statusStr = "Lobby - Hosted by " .. (self.session.host or "Unknown")
-        lobbyFrame.statusText:SetText(statusStr)
-    else
-        lobbyFrame.statusText:SetText("No active session")
-    end
+    UpdateLobbyStatus(frame, self.session, hasSession)
 
-    -- Update player count
-    lobbyFrame.countText:SetText(#players .. " players")
+    frame.countText:SetText(#players .. " players")
 
-    -- Update role summary
     if #players > 0 then
-        lobbyFrame.roleText:SetText(self:GetRoleCountSummary(players))
+        frame.roleText:SetText(self:GetRoleCountSummary(players))
     else
-        lobbyFrame.roleText:SetText("")
+        frame.roleText:SetText("")
     end
 
-    -- Check if local player is already in the session
     local isInSession = false
     for _, p in ipairs(players) do
         if p.name == myName then
@@ -278,95 +336,20 @@ function WHLSN:UpdateLobbyView()
         end
     end
 
-    -- Update button visibility
-    lobbyFrame.spinButton:SetShown(isHost and hasSession)
-    lobbyFrame.spinButton:SetEnabled(#players >= 5)
-    lobbyFrame.joinButton:SetShown(not isHost and hasSession and not isInSession)
-    lobbyFrame.leaveButton:SetShown(not isHost and hasSession and isInSession)
-    lobbyFrame.startButton:SetShown(not hasSession)
-    lobbyFrame.testButton:SetShown(not hasSession)
-    lobbyFrame.endButton:SetShown(isHost and hasSession)
+    UpdateLobbyButtons(frame, isHost, hasSession, isInSession, #players)
 
     -- Hide all dynamic rows before repopulating
-    for _, row in ipairs(playerRows) do row:Hide() end
-    for _, row in ipairs(historyRows) do row:Hide() end
+    for _, row in ipairs(lobbyState.playerRows) do row:Hide() end
+    for _, row in ipairs(lobbyState.historyRows) do row:Hide() end
 
     if hasSession then
-        -- Update player rows
-        for i, player in ipairs(players) do
-            if not playerRows[i] then
-                playerRows[i] = CreatePlayerRow(lobbyFrame.scrollChild, i)
-            end
-
-            local row = playerRows[i]
-            row.playerData = player
-            row.nameText:SetText(player.name)
-
-            -- Set role icon
-            local role = player.mainRole
-            if role and ROLE_TEXCOORDS[role] then
-                row.roleIcon:SetTexture(ROLE_ICONS[role])
-                local tc = ROLE_TEXCOORDS[role]
-                row.roleIcon:SetTexCoord(tc[1], tc[2], tc[3], tc[4])
-                row.roleIcon:Show()
-
-                local color = ROLE_COLORS[role]
-                row.nameText:SetTextColor(color.r, color.g, color.b)
-            else
-                row.roleIcon:Hide()
-                row.nameText:SetTextColor(1, 1, 1)
-            end
-
-            -- Set class icon (hidden if no class data)
-            row.classIcon:Hide()
-
-            -- Utility icons
-            row.brezIcon:SetShown(player:HasBrez())
-            row.lustIcon:SetShown(player:HasLust())
-
-            -- Set up kick button for this row
-            row.kickButton:SetScript("OnClick", function()
-                WHLSN:KickPlayer(player.name)
-            end)
-            row.kickButton:Hide()
-
-            row:Show()
-        end
-
-        lobbyFrame.scrollChild:SetHeight(math.max(1, #players * 26))
+        PopulatePlayerRows(frame, players)
     else
-        -- Show session history when idle
         local history = self.db and self.db.profile.sessionHistory
         if history and #history > 0 then
-            lobbyFrame.statusText:SetText("Recent Sessions")
-            lobbyFrame.countText:SetText(#history .. " sessions")
-
-            for i, record in ipairs(history) do
-                if not historyRows[i] then
-                    historyRows[i] = CreateHistoryRow(lobbyFrame.scrollChild, i)
-                end
-
-                local row = historyRows[i]
-                local dateStr = record.timestamp and date("%m/%d %H:%M", record.timestamp) or "Unknown"
-                local groupCount = record.groups and #record.groups or 0
-                local playerCount = record.playerCount or 0
-
-                row.dateText:SetText(dateStr)
-                row.infoText:SetText(string.format("%s  |  %d players, %d groups",
-                    record.host or "Unknown", playerCount, groupCount))
-
-                local idx = i
-                row:SetScript("OnClick", function()
-                    PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-                    WHLSN:ViewHistorySession(idx)
-                end)
-
-                row:Show()
-            end
-
-            lobbyFrame.scrollChild:SetHeight(math.max(1, #history * 22))
+            PopulateHistoryRows(frame, history)
         else
-            lobbyFrame.scrollChild:SetHeight(1)
+            frame.scrollChild:SetHeight(1)
         end
     end
 end

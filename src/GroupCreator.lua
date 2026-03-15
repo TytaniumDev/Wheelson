@@ -65,281 +65,267 @@ local function copyList(src)
     return dst
 end
 
---- Create balanced Mythic+ groups from a player list.
---- Port of createMythicPlusGroups() from parallelGroupCreator.ts.
----@param players WHLSNPlayer[]
----@param guildId? string
----@return WHLSNGroup[]
-function WHLSN:CreateMythicPlusGroups(players, guildId)
-    guildId = guildId or "default"
-    local previousGroups = lastGroups[guildId] or {}
+---------------------------------------------------------------------------
+-- Context-based pipeline helpers
+---------------------------------------------------------------------------
 
-    -- Pre-compute teammate lookups
-    local lastGroupsDict = {}
+--- Build the teammate lookup map from previous groups.
+local function BuildLastGroupsDict(previousGroups)
+    local dict = {}
     for _, group in ipairs(previousGroups) do
         local members = group:GetPlayers()
         for _, member in ipairs(members) do
-            if not lastGroupsDict[member.name] then
-                lastGroupsDict[member.name] = {}
+            if not dict[member.name] then
+                dict[member.name] = {}
             end
             for _, m in ipairs(members) do
                 if not m:Equals(member) then
-                    lastGroupsDict[member.name][m.name] = true
+                    dict[member.name][m.name] = true
                 end
             end
         end
     end
+    return dict
+end
 
-    local groups = {}
-    players = copyList(players)
-    local usedPlayers = {}
-
-    local maxGroups = math.floor(#players / 5)
-
-    -- Build role pools
-    local mainTanks = shuffle({})
-    local offTanks = shuffle({})
-    local offTanksWithHeal = shuffle({})
-    local mainHealers = shuffle({})
-    local offHealers = shuffle({})
-    local mainDps = shuffle({})
-    local offDps = shuffle({})
-    local brezPlayers = shuffle({})
-    local lustPlayers = shuffle({})
-
-    for _, p in ipairs(players) do
-        if p:IsTankMain() then mainTanks[#mainTanks + 1] = p end
-        -- Partition offtanks: healer-capable players go into offTanksWithHeal (used last)
+--- Categorize players into role pools and shuffle them.
+local function BuildRolePools(ctx)
+    for _, p in ipairs(ctx.players) do
+        if p:IsTankMain() then ctx.mainTanks[#ctx.mainTanks + 1] = p end
         if p:IsOfftank() and not p:IsTankMain() then
             if p:IsHealerMain() or p:IsOffhealer() then
-                offTanksWithHeal[#offTanksWithHeal + 1] = p
+                ctx.offTanksWithHeal[#ctx.offTanksWithHeal + 1] = p
             else
-                offTanks[#offTanks + 1] = p
+                ctx.offTanks[#ctx.offTanks + 1] = p
             end
         end
-        if p:IsHealerMain() then mainHealers[#mainHealers + 1] = p end
-        if p:IsOffhealer() and not p:IsHealerMain() then offHealers[#offHealers + 1] = p end
-        if p:IsDpsMain() then mainDps[#mainDps + 1] = p end
-        if p:IsOffdps() and not p:IsDpsMain() then offDps[#offDps + 1] = p end
-        if p:HasBrez() then brezPlayers[#brezPlayers + 1] = p end
-        if p:HasLust() then lustPlayers[#lustPlayers + 1] = p end
+        if p:IsHealerMain() then ctx.mainHealers[#ctx.mainHealers + 1] = p end
+        if p:IsOffhealer() and not p:IsHealerMain() then ctx.offHealers[#ctx.offHealers + 1] = p end
+        if p:IsDpsMain() then ctx.mainDps[#ctx.mainDps + 1] = p end
+        if p:IsOffdps() and not p:IsDpsMain() then ctx.offDps[#ctx.offDps + 1] = p end
+        if p:HasBrez() then ctx.brezPlayers[#ctx.brezPlayers + 1] = p end
+        if p:HasLust() then ctx.lustPlayers[#ctx.lustPlayers + 1] = p end
     end
 
-    shuffle(mainTanks)
-    shuffle(offTanks)
-    shuffle(offTanksWithHeal)
-    shuffle(mainHealers)
-    shuffle(offHealers)
-    shuffle(mainDps)
-    shuffle(offDps)
-    shuffle(brezPlayers)
-    shuffle(lustPlayers)
+    shuffle(ctx.mainTanks)
+    shuffle(ctx.offTanks)
+    shuffle(ctx.offTanksWithHeal)
+    shuffle(ctx.mainHealers)
+    shuffle(ctx.offHealers)
+    shuffle(ctx.mainDps)
+    shuffle(ctx.offDps)
+    shuffle(ctx.brezPlayers)
+    shuffle(ctx.lustPlayers)
+end
 
-    -- Tanks: mainTanks first, then non-healer offtanks, then healer-capable offtanks last
-    local availableTanks = {}
-    for _, p in ipairs(mainTanks) do availableTanks[#availableTanks + 1] = p end
-    for _, p in ipairs(offTanks) do availableTanks[#availableTanks + 1] = p end
-    for _, p in ipairs(offTanksWithHeal) do availableTanks[#availableTanks + 1] = p end
+--- Build merged available lists and compute maxGroups.
+local function BuildAvailableLists(ctx)
+    for _, p in ipairs(ctx.mainTanks) do ctx.availableTanks[#ctx.availableTanks + 1] = p end
+    for _, p in ipairs(ctx.offTanks) do ctx.availableTanks[#ctx.availableTanks + 1] = p end
+    for _, p in ipairs(ctx.offTanksWithHeal) do ctx.availableTanks[#ctx.availableTanks + 1] = p end
 
-    local availableHealers = {}
-    for _, p in ipairs(mainHealers) do availableHealers[#availableHealers + 1] = p end
-    for _, p in ipairs(offHealers) do availableHealers[#availableHealers + 1] = p end
+    for _, p in ipairs(ctx.mainHealers) do ctx.availableHealers[#ctx.availableHealers + 1] = p end
+    for _, p in ipairs(ctx.offHealers) do ctx.availableHealers[#ctx.availableHealers + 1] = p end
 
-    local availableDps = {}
-    for _, p in ipairs(mainDps) do availableDps[#availableDps + 1] = p end
-    for _, p in ipairs(offDps) do availableDps[#availableDps + 1] = p end
+    for _, p in ipairs(ctx.mainDps) do ctx.availableDps[#ctx.availableDps + 1] = p end
+    for _, p in ipairs(ctx.offDps) do ctx.availableDps[#ctx.availableDps + 1] = p end
 
-    local offhealersToGrab = math.max(0, maxGroups - #mainHealers)
+    ctx.maxGroups = math.floor(#ctx.players / 5)
+    ctx.offhealersToGrab = math.max(0, ctx.maxGroups - #ctx.mainHealers)
+end
 
-    local function removePlayer(player)
-        if player == nil then return end
-        usedPlayers[player.name] = true
+--- Remove a player from all applicable pools.
+local function removePlayer(ctx, player)
+    if player == nil then return end
+    ctx.usedPlayers[player.name] = true
 
-        if player:IsTankMain() then
-            removeFromList(mainTanks, player)
-            removeFromList(availableTanks, player)
-        elseif player:IsOfftank() then
-            removeFromList(offTanks, player)
-            removeFromList(offTanksWithHeal, player)
-            removeFromList(availableTanks, player)
-        end
-
-        if player:IsHealerMain() then
-            removeFromList(mainHealers, player)
-            removeFromList(availableHealers, player)
-        elseif player:IsOffhealer() then
-            removeFromList(offHealers, player)
-            removeFromList(availableHealers, player)
-        end
-
-        if player:IsDpsMain() then
-            removeFromList(mainDps, player)
-            removeFromList(availableDps, player)
-        elseif player:IsOffdps() then
-            removeFromList(offDps, player)
-            removeFromList(availableDps, player)
-        end
-
-        if player:HasBrez() then removeFromList(brezPlayers, player) end
-        if player:HasLust() then removeFromList(lustPlayers, player) end
+    if player:IsTankMain() then
+        removeFromList(ctx.mainTanks, player)
+        removeFromList(ctx.availableTanks, player)
+    elseif player:IsOfftank() then
+        removeFromList(ctx.offTanks, player)
+        removeFromList(ctx.offTanksWithHeal, player)
+        removeFromList(ctx.availableTanks, player)
     end
 
-    local function grabNextAvailablePlayer(availablePlayers, group)
-        local teammates = group:GetPlayers()
+    if player:IsHealerMain() then
+        removeFromList(ctx.mainHealers, player)
+        removeFromList(ctx.availableHealers, player)
+    elseif player:IsOffhealer() then
+        removeFromList(ctx.offHealers, player)
+        removeFromList(ctx.availableHealers, player)
+    end
 
-        -- Build ineligible set from previous groups
-        local ineligible = {}
-        for _, teammate in ipairs(teammates) do
-            local prev = lastGroupsDict[teammate.name]
-            if prev then
-                for name in pairs(prev) do
-                    ineligible[name] = true
-                end
+    if player:IsDpsMain() then
+        removeFromList(ctx.mainDps, player)
+        removeFromList(ctx.availableDps, player)
+    elseif player:IsOffdps() then
+        removeFromList(ctx.offDps, player)
+        removeFromList(ctx.availableDps, player)
+    end
+
+    if player:HasBrez() then removeFromList(ctx.brezPlayers, player) end
+    if player:HasLust() then removeFromList(ctx.lustPlayers, player) end
+end
+
+--- Grab the next available player from a pool, preferring non-duplicates.
+local function grabNextAvailablePlayer(ctx, availablePlayers, group)
+    local teammates = group:GetPlayers()
+
+    local ineligible = {}
+    for _, teammate in ipairs(teammates) do
+        local prev = ctx.lastGroupsDict[teammate.name]
+        if prev then
+            for name in pairs(prev) do
+                ineligible[name] = true
             end
         end
+    end
 
-        -- Prefer players not in previous group together
-        for _, p in ipairs(availablePlayers) do
-            if not ineligible[p.name] and not usedPlayers[p.name] then
-                removePlayer(p)
-                return p
-            end
+    for _, p in ipairs(availablePlayers) do
+        if not ineligible[p.name] and not ctx.usedPlayers[p.name] then
+            removePlayer(ctx, p)
+            return p
         end
+    end
 
-        -- Fallback: anyone unused
-        for _, p in ipairs(availablePlayers) do
-            if not usedPlayers[p.name] then
-                removePlayer(p)
-                return p
-            end
+    for _, p in ipairs(availablePlayers) do
+        if not ctx.usedPlayers[p.name] then
+            removePlayer(ctx, p)
+            return p
         end
-
-        return nil
     end
 
-    -- Create group slots
-    for _ = 1, maxGroups do
-        groups[#groups + 1] = Group:New()
-    end
+    return nil
+end
 
-    -- Assign tanks
-    for _, currentGroup in ipairs(groups) do
-        currentGroup.tank = grabNextAvailablePlayer(availableTanks, currentGroup)
-    end
+---------------------------------------------------------------------------
+-- Assignment phase functions
+---------------------------------------------------------------------------
 
-    -- Fill lust spot (no tanks have lust)
-    for _, currentGroup in ipairs(groups) do
+local function AssignTanks(ctx)
+    for _, currentGroup in ipairs(ctx.groups) do
+        currentGroup.tank = grabNextAvailablePlayer(ctx, ctx.availableTanks, currentGroup)
+    end
+end
+
+local function AssignLust(ctx)
+    for _, currentGroup in ipairs(ctx.groups) do
         if not currentGroup:HasLust() then
             local filtered = {}
-            for _, p in ipairs(lustPlayers) do
-                if not isInList(availableTanks, p) then
+            for _, p in ipairs(ctx.lustPlayers) do
+                if not isInList(ctx.availableTanks, p) then
                     filtered[#filtered + 1] = p
                 end
             end
-            local lustPlayer = grabNextAvailablePlayer(filtered, currentGroup)
+            local lustPlayer = grabNextAvailablePlayer(ctx, filtered, currentGroup)
             if lustPlayer then
-                if lustPlayer:IsHealerMain() or (offhealersToGrab > 0 and lustPlayer:IsOffhealer()) then
+                if lustPlayer:IsHealerMain() or (ctx.offhealersToGrab > 0 and lustPlayer:IsOffhealer()) then
                     currentGroup.healer = lustPlayer
-                    if lustPlayer:IsOffhealer() then offhealersToGrab = offhealersToGrab - 1 end
+                    if lustPlayer:IsOffhealer() then ctx.offhealersToGrab = ctx.offhealersToGrab - 1 end
                 elseif lustPlayer:IsDpsMain() then
                     currentGroup.dps[#currentGroup.dps + 1] = lustPlayer
                 end
             end
         end
     end
+end
 
-    -- Fill brez spot
-    for _, currentGroup in ipairs(groups) do
+local function AssignBrez(ctx)
+    for _, currentGroup in ipairs(ctx.groups) do
         if not currentGroup:HasBrez() then
             local brezPlayer
             if currentGroup.healer then
                 local filtered = {}
-                for _, p in ipairs(brezPlayers) do
-                    if not isInList(availableTanks, p) and not isInList(availableHealers, p) then
+                for _, p in ipairs(ctx.brezPlayers) do
+                    if not isInList(ctx.availableTanks, p) and not isInList(ctx.availableHealers, p) then
                         filtered[#filtered + 1] = p
                     end
                 end
-                brezPlayer = grabNextAvailablePlayer(filtered, currentGroup)
+                brezPlayer = grabNextAvailablePlayer(ctx, filtered, currentGroup)
             else
                 local filtered = {}
-                for _, p in ipairs(brezPlayers) do
-                    if not isInList(availableTanks, p) then
+                for _, p in ipairs(ctx.brezPlayers) do
+                    if not isInList(ctx.availableTanks, p) then
                         filtered[#filtered + 1] = p
                     end
                 end
-                brezPlayer = grabNextAvailablePlayer(filtered, currentGroup)
+                brezPlayer = grabNextAvailablePlayer(ctx, filtered, currentGroup)
             end
 
             if brezPlayer then
-                if brezPlayer:IsHealerMain() or (offhealersToGrab > 0 and brezPlayer:IsOffhealer()) then
+                if brezPlayer:IsHealerMain() or (ctx.offhealersToGrab > 0 and brezPlayer:IsOffhealer()) then
                     currentGroup.healer = brezPlayer
-                    if brezPlayer:IsOffhealer() then offhealersToGrab = offhealersToGrab - 1 end
+                    if brezPlayer:IsOffhealer() then ctx.offhealersToGrab = ctx.offhealersToGrab - 1 end
                 elseif brezPlayer:IsDpsMain() then
                     currentGroup.dps[#currentGroup.dps + 1] = brezPlayer
                 end
             end
         end
     end
+end
 
-    -- Fill healers
-    for _, currentGroup in ipairs(groups) do
+local function AssignHealers(ctx)
+    for _, currentGroup in ipairs(ctx.groups) do
         if not currentGroup.healer then
-            local mainHealer = grabNextAvailablePlayer(mainHealers, currentGroup)
+            local mainHealer = grabNextAvailablePlayer(ctx, ctx.mainHealers, currentGroup)
             if mainHealer then
                 currentGroup.healer = mainHealer
             else
-                local offHealer = grabNextAvailablePlayer(availableHealers, currentGroup)
+                local offHealer = grabNextAvailablePlayer(ctx, ctx.availableHealers, currentGroup)
                 if offHealer then
                     currentGroup.healer = offHealer
                 end
             end
         end
     end
+end
 
-    -- Try to get a ranged DPS per group
-    for _, currentGroup in ipairs(groups) do
+local function AssignRangedDps(ctx)
+    for _, currentGroup in ipairs(ctx.groups) do
         if not currentGroup:HasRanged() then
             local filtered = {}
-            for _, p in ipairs(availableDps) do
+            for _, p in ipairs(ctx.availableDps) do
                 if p:IsRanged() then filtered[#filtered + 1] = p end
             end
-            local rangedDps = grabNextAvailablePlayer(filtered, currentGroup)
+            local rangedDps = grabNextAvailablePlayer(ctx, filtered, currentGroup)
             if rangedDps then
                 currentGroup.dps[#currentGroup.dps + 1] = rangedDps
             end
         end
     end
+end
 
-    -- Fill remaining DPS slots
-    for _, currentGroup in ipairs(groups) do
+local function FillRemainingDps(ctx)
+    for _, currentGroup in ipairs(ctx.groups) do
         while #currentGroup.dps < 3 do
-            local dpsPlayer = grabNextAvailablePlayer(availableDps, currentGroup)
+            local dpsPlayer = grabNextAvailablePlayer(ctx, ctx.availableDps, currentGroup)
             if not dpsPlayer then break end
             currentGroup.dps[#currentGroup.dps + 1] = dpsPlayer
         end
     end
+end
 
-    -- Handle remainder players
+local function HandleRemainderPlayers(ctx)
     local totalUsed = 0
-    for _ in pairs(usedPlayers) do totalUsed = totalUsed + 1 end
+    for _ in pairs(ctx.usedPlayers) do totalUsed = totalUsed + 1 end
 
-    while totalUsed < #players do
+    while totalUsed < #ctx.players do
         local remainderGroup = Group:New()
         local added = false
-        while totalUsed < #players do
+        while totalUsed < #ctx.players do
             local remaining = {}
-            for _, p in ipairs(players) do
-                if not usedPlayers[p.name] then
+            for _, p in ipairs(ctx.players) do
+                if not ctx.usedPlayers[p.name] then
                     remaining[#remaining + 1] = p
                 end
             end
-            local player = grabNextAvailablePlayer(remaining, remainderGroup)
+            local player = grabNextAvailablePlayer(ctx, remaining, remainderGroup)
             if player then
                 added = true
                 totalUsed = totalUsed + 1
                 local placed = false
 
-                -- Priority 1: place by main role
                 if player:IsTankMain() and not remainderGroup.tank then
                     remainderGroup.tank = player
                     placed = true
@@ -349,7 +335,6 @@ function WHLSN:CreateMythicPlusGroups(players, guildId)
                 elseif player:IsDpsMain() and #remainderGroup.dps < 3 then
                     remainderGroup.dps[#remainderGroup.dps + 1] = player
                     placed = true
-                -- Priority 2: place by offspec
                 elseif player:IsOfftank() and not remainderGroup.tank then
                     remainderGroup.tank = player
                     placed = true
@@ -362,8 +347,7 @@ function WHLSN:CreateMythicPlusGroups(players, guildId)
                 end
 
                 if not placed then
-                    -- Group full, break to create another
-                    usedPlayers[player.name] = nil
+                    ctx.usedPlayers[player.name] = nil
                     totalUsed = totalUsed - 1
                     break
                 end
@@ -372,12 +356,61 @@ function WHLSN:CreateMythicPlusGroups(players, guildId)
             end
         end
         if added then
-            groups[#groups + 1] = remainderGroup
+            ctx.groups[#ctx.groups + 1] = remainderGroup
         else
             break
         end
     end
+end
 
-    lastGroups[guildId] = groups
-    return groups
+---------------------------------------------------------------------------
+-- Main entry point — clean pipeline
+---------------------------------------------------------------------------
+
+--- Create balanced Mythic+ groups from a player list.
+--- Port of createMythicPlusGroups() from parallelGroupCreator.ts.
+---@param players WHLSNPlayer[]
+---@param guildId? string
+---@return WHLSNGroup[]
+function WHLSN:CreateMythicPlusGroups(players, guildId)
+    guildId = guildId or "default"
+
+    local ctx = {
+        players         = copyList(players),
+        usedPlayers     = {},
+        groups          = {},
+        lastGroupsDict  = BuildLastGroupsDict(lastGroups[guildId] or {}),
+        mainTanks       = {},
+        offTanks        = {},
+        offTanksWithHeal = {},
+        mainHealers     = {},
+        offHealers      = {},
+        mainDps         = {},
+        offDps          = {},
+        brezPlayers     = {},
+        lustPlayers     = {},
+        availableTanks  = {},
+        availableHealers = {},
+        availableDps    = {},
+        maxGroups       = 0,
+        offhealersToGrab = 0,
+    }
+
+    BuildRolePools(ctx)
+    BuildAvailableLists(ctx)
+
+    for _ = 1, ctx.maxGroups do
+        ctx.groups[#ctx.groups + 1] = Group:New()
+    end
+
+    AssignTanks(ctx)
+    AssignLust(ctx)
+    AssignBrez(ctx)
+    AssignHealers(ctx)
+    AssignRangedDps(ctx)
+    FillRemainingDps(ctx)
+    HandleRemainderPlayers(ctx)
+
+    lastGroups[guildId] = ctx.groups
+    return ctx.groups
 end

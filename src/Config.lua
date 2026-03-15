@@ -101,6 +101,18 @@ WHLSN.LustClasses = {
     ["HUNTER"] = true,
 }
 
+-- Role colors for UI display (single source of truth)
+WHLSN.RoleColors = {
+    tank   = { r = 0.53, g = 0.76, b = 1.0,  hex = "87BCDE" },
+    healer = { r = 0.53, g = 1.0,  b = 0.53, hex = "87FF87" },
+    ranged = { r = 1.0,  g = 0.53, b = 0.53, hex = "FF8787" },
+    melee  = { r = 1.0,  g = 0.82, b = 0.53, hex = "FFD187" },
+}
+
+-- Shared utility icon paths
+WHLSN.BREZ_ICON = "Interface\\Icons\\Spell_Nature_Reincarnation"
+WHLSN.LUST_ICON = "Interface\\Icons\\Spell_Nature_Bloodlust"
+
 -- Max player level for current expansion (Midnight)
 WHLSN.MAX_LEVEL = 90
 
