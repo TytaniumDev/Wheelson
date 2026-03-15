@@ -88,17 +88,14 @@ end
 local function CreatePlayerLine(card, prefix, color, player, lineY)
     local lineFrame = CreateFrame("Frame", nil, card)
     lineFrame:SetPoint("TOPLEFT", 12, lineY)
-    lineFrame:SetPoint("TOPRIGHT", -12, lineY)
+    lineFrame:SetPoint("TOPRIGHT", -132, lineY)
     lineFrame:SetHeight(14)
     lineFrame:EnableMouse(true)
 
     local text = lineFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     text:SetPoint("LEFT")
     if player then
-        local utilStr = ""
-        if player:HasBrez() then utilStr = utilStr .. " |TInterface\\Icons\\Spell_Nature_Reincarnation:0|t" end
-        if player:HasLust() then utilStr = utilStr .. " |TInterface\\Icons\\Spell_Nature_Bloodlust:0|t" end
-        text:SetText(color .. prefix .. "|r  " .. player.name .. utilStr)
+        text:SetText(color .. prefix .. "|r  " .. player.name)
     else
         text:SetText("|cFF666666" .. prefix .. " (empty)|r")
     end
