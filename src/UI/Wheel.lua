@@ -34,7 +34,7 @@ local GOLD_R = 0.961
 local GOLD_G = 0.620
 local GOLD_B = 0.043
 
-local BASE_REEL_DURATIONS = { 4000, 4300, 4600, 4900, 5200 }
+local BASE_REEL_DURATIONS = { 8000, 8600, 9200, 9800, 10400 }
 
 local GLOW_DURATION     = 1.5
 local COLLAPSE_DURATION = 0.5
@@ -44,9 +44,9 @@ local TARGET_SPEED      = 500   -- px/s during linear phase (uniform across all 
 local MIN_SPIN_CYCLES   = 3     -- minimum full list cycles for visual spin effect
 
 -- Easing phase boundaries (as fractions of total reel duration)
-local P1_END = 0.0375   -- end of snap start (150ms / 4000ms)
-local P2_END = 0.625    -- end of full speed (2500ms / 4000ms)
-local P3_END = 0.925    -- end of deceleration (3700ms / 4000ms)
+local P1_END = 0.0375   -- end of snap start (300ms / 8000ms)
+local P2_END = 0.55     -- end of full speed (4400ms / 8000ms)
+local P3_END = 0.95     -- end of deceleration (7600ms / 8000ms)
 
 ---------------------------------------------------------------------------
 -- Animation State Variables
@@ -212,22 +212,23 @@ end
 --- Damped spring oscillation function used for Phase 4 (landing bounce).
 --- Returns a value that starts at 1 and oscillates around 1 with decaying
 --- amplitude, simulating a physical spring settling.
---- f(t) = 1 + e^(-k*t) * sin(w*t) * 0.15,  k=8, w=12
+--- f(t) = 1 + e^(-k*t) * sin(w*t) * 0.04,  k=12, w=8
 --- Clamped to return exactly 1 for t<=0 or t>=1.
 ---@param t number  normalised time [0, 1]
 ---@return number
 function WHLSN.DampedSpring(t)
     if t <= 0 or t >= 1 then return 1 end
-    local k = 8
-    local w = 12
-    return 1 + math.exp(-k * t) * math.sin(w * t) * 0.15
+    local k = 12
+    local w = 8
+    local amplitude = 0.04
+    return 1 + math.exp(-k * t) * math.sin(w * t) * amplitude
 end
 
 --- Four-phase slot-machine easing curve.
 ---
 ---  Phase 1 (0   → P1_END=0.0375): quartic ease-in,      maps scroll to  0% –  3%
----  Phase 2 (P1_END → P2_END=0.625): linear,              maps scroll to  3% – 85%
----  Phase 3 (P2_END → P3_END=0.925): easeOutCubic,        maps scroll to 85% – 100%
+---  Phase 2 (P1_END → P2_END=0.55):  linear,              maps scroll to  3% – 75%
+---  Phase 3 (P2_END → P3_END=0.95):  easeOutCubic,        maps scroll to 75% – 100%
 ---  Phase 4 (P3_END → 1.0):          DampedSpring bounce  (oscillates around 1)
 ---
 --- Returns 0 for t<=0, 1 for t>=1.
@@ -240,7 +241,7 @@ function WHLSN.SlotEasing(t)
     -- Output range for each phase (scroll progress)
     local P1_OUT_START = 0.00
     local P1_OUT_END   = 0.03
-    local P2_OUT_END   = 0.85
+    local P2_OUT_END   = 0.75
     local P3_OUT_END   = 1.00
 
     if t < P1_END then
@@ -608,7 +609,7 @@ end
 local OnUpdateHandler
 
 --- Calculate scroll metrics for a reel, targeting a uniform linear-phase speed.
---- Linear phase covers 82% of totalScroll in 58.75% of duration.
+--- Linear phase covers 72% of totalScroll in 51.25% of duration.
 --- numCycles is chosen so all reels scroll at ~TARGET_SPEED px/s.
 ---@param state table  reelState entry (needs .names and .duration)
 ---@return number numCycles, number listHeight, number winnerOffset, number totalScroll
@@ -617,8 +618,8 @@ function WHLSN._CalcScrollMetrics(state)
     local winnerOffset = (#state.names - 1) * ROW_HEIGHT
 
     -- Solve for totalScroll that yields TARGET_SPEED during linear phase:
-    -- TARGET_SPEED = 0.82 * totalScroll / (0.5875 * duration)
-    local idealTotal = TARGET_SPEED * 0.5875 * state.duration / 0.82
+    -- TARGET_SPEED = 0.72 * totalScroll / (0.5125 * duration)
+    local idealTotal = TARGET_SPEED * 0.5125 * state.duration / 0.72
     local numCycles  = math.max(MIN_SPIN_CYCLES, math.ceil((idealTotal - winnerOffset) / listHeight))
 
     local totalScroll = numCycles * listHeight + winnerOffset
@@ -691,8 +692,8 @@ OnUpdateHandler = function(_, dt)
             local reel = reelFrames[i]
             if reel and reel.slots then
                 for j = 1, 15 do
-                    local nameIdx = ((baseSlot + j - 1) % numNames) + 1
-                    local yPos    = -(j - 1) * ROW_HEIGHT - subPixel
+                    local nameIdx = ((baseSlot + j - 2) % numNames) + 1
+                    local yPos    = -(j - 2) * ROW_HEIGHT - subPixel
                     reel.slots[j]:ClearAllPoints()
                     reel.slots[j]:SetPoint("TOPLEFT", reel.inner, "TOPLEFT", 2, yPos)
                     reel.slots[j]:SetText(state.names[nameIdx])
@@ -700,7 +701,7 @@ OnUpdateHandler = function(_, dt)
                 end
 
                 -- Tick sound: detect when a new name crosses the centre line
-                local centerName = ((baseSlot + 1) % numNames) + 1  -- slot j=2 nameIdx
+                local centerName = ((baseSlot + 1) % numNames) + 1  -- slot j=3 nameIdx
                 if centerName ~= state.lastCenter and speed > 0.1 then
                     PlayTick()
                     state.lastCenter = centerName
@@ -712,15 +713,15 @@ OnUpdateHandler = function(_, dt)
                 state.landed = true
 
                 if reel and reel.slots then
-                    -- Snap: winner (names[1]) must land at slot j=2 (centre row, under pointer).
-                    -- At t=1, baseSlot = numNames-1, so: nameIdx = ((numNames-1+j-1) % numNames)+1
-                    -- j=2 → ((numNames-1+1) % numNames)+1 = 1 = winner ✓
+                    -- Snap: winner (names[1]) must land at slot j=3 (centre row, under pointer).
+                    -- At t=1, baseSlot = numNames-1, so: nameIdx = ((numNames-1+j-2) % numNames)+1
+                    -- j=3 → ((numNames-1+1) % numNames)+1 = 1 = winner ✓
                     for j = 1, 15 do
-                        local nameIdx = ((numNames - 1 + j - 1) % numNames) + 1
+                        local nameIdx = ((numNames - 1 + j - 2) % numNames) + 1
                         reel.slots[j]:ClearAllPoints()
-                        reel.slots[j]:SetPoint("TOPLEFT", reel.inner, "TOPLEFT", 2, -(j - 1) * ROW_HEIGHT)
+                        reel.slots[j]:SetPoint("TOPLEFT", reel.inner, "TOPLEFT", 2, -(j - 2) * ROW_HEIGHT)
                         reel.slots[j]:SetText(state.names[nameIdx])
-                        if j == 2 then
+                        if j == 3 then
                             -- Centre row: winner slot — gold highlight
                             reel.slots[j]:SetTextColor(GOLD_R, GOLD_G, GOLD_B, 1)
                         else
