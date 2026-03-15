@@ -40,6 +40,8 @@ local GLOW_DURATION     = 1.5
 local COLLAPSE_DURATION = 0.5
 local FINAL_PAUSE       = 2.0
 local MIN_POOL_SIZE     = 8
+local TARGET_SPEED      = 500   -- px/s during linear phase (uniform across all reels)
+local MIN_SPIN_CYCLES   = 3     -- minimum full list cycles for visual spin effect
 
 -- Easing phase boundaries (as fractions of total reel duration)
 local P1_END = 0.0375   -- end of snap start (150ms / 4000ms)
@@ -87,13 +89,19 @@ end
 -- SOUND_VICTORY : WoW 12.0 UI Alert – Slot Machine Coins (jackpot payout)
 ---------------------------------------------------------------------------
 
-local SOUND_TICK    = 271528  -- GamblingSlotMachine03_Tri_Face_Vertical_Spin
-local SOUND_LAND    = 272764  -- GamblingSlotMachine06_Wheel_Face_Spin_End
-local SOUND_VICTORY = 316718  -- 12.0_UI_Alert_Devices_Slot_Machine_Coins
-local SOUND_START   = 271526  -- Foley_Goblin_Casino_Slot_Machine_Arm_Crank_Start
+local SOUND_TICK    = 856     -- igMainMenuOptionCheckboxOn (ultra-short click)
+local SOUND_LAND    = 316717  -- 12.0_UI_Alert_Devices_Slot_Machine_Bell (short slot bell)
+local SOUND_VICTORY = 316769  -- 12.0_UI_Alert_War3_Fanfare (big fanfare)
+local SOUND_START   = 271526  -- Foley_Goblin_Casino_Slot_Machine_Arm_Crank_Start (keep)
+
+local TICK_THROTTLE = 0.15    -- seconds; at most one tick sound per 150ms across all reels
+local lastTickTime  = 0
 
 local function PlayTick()
     if not ShouldPlaySounds() then return end
+    local now = GetTime()
+    if now - lastTickTime < TICK_THROTTLE then return end
+    lastTickTime = now
     PlaySound(SOUND_TICK, "SFX")
 end
 
@@ -481,39 +489,42 @@ local function BuildReelNameLists()
 end
 
 --- Prepare the reel name list for a specific group spin.
---- Uses the pre-built name list but places the winner at index 1.
----@param reelIndex number 1-5
+--- Rotates the names so the winner lands at index 1, preserving all entries.
+--- If the winner is not in the list, prepends them.
+---@param baseNames string[]
 ---@param winner WHLSNPlayer|nil
 ---@return string[] names with winner at index 1
-local function PrepareReelNames(reelIndex, winner)
-    local baseNames = reelNameLists[reelIndex]
+function WHLSN._PrepareReelNames(baseNames, winner)
     if not winner or not baseNames or #baseNames == 0 then return baseNames end
 
     local winnerName = winner.name
 
-    -- Ensure winner is in the list (force-insert if not)
-    local found = false
-    for _, n in ipairs(baseNames) do
-        if n == winnerName then found = true; break end
+    -- Find first occurrence of winner in the list
+    local winnerPos = nil
+    for idx, n in ipairs(baseNames) do
+        if n == winnerName then
+            winnerPos = idx
+            break
+        end
     end
 
-    local names
-    if found then
-        -- Copy with winner removed, then prepend winner at index 1
-        names = { winnerName }
-        for _, n in ipairs(baseNames) do
-            if n ~= winnerName then
-                names[#names + 1] = n
-            end
-        end
-    else
-        -- Winner not in pool — prepend and keep existing names
-        names = { winnerName }
+    -- Winner not in pool — prepend and keep all existing names
+    if not winnerPos then
+        local names = { winnerName }
         for _, n in ipairs(baseNames) do
             names[#names + 1] = n
         end
+        return names
     end
 
+    -- Rotate list so winner is at index 1
+    local names = {}
+    for i = winnerPos, #baseNames do
+        names[#names + 1] = baseNames[i]
+    end
+    for i = 1, winnerPos - 1 do
+        names[#names + 1] = baseNames[i]
+    end
     return names
 end
 
@@ -548,7 +559,7 @@ local function SpinForGroup(groupIndex)
         local winner = winners[i]
 
         if winner then
-            local finalNames = PrepareReelNames(i, winner)
+            local finalNames = WHLSN._PrepareReelNames(reelNameLists[i], winner)
 
             reelState[i] = {
                 active     = true,
@@ -596,15 +607,21 @@ end
 --- Forward declaration for the OnUpdate handler; assigned below.
 local OnUpdateHandler
 
---- Calculate scroll metrics for a reel.
----@param state table  reelState entry
+--- Calculate scroll metrics for a reel, targeting a uniform linear-phase speed.
+--- Linear phase covers 82% of totalScroll in 58.75% of duration.
+--- numCycles is chosen so all reels scroll at ~TARGET_SPEED px/s.
+---@param state table  reelState entry (needs .names and .duration)
 ---@return number numCycles, number listHeight, number winnerOffset, number totalScroll
-local function CalcScrollMetrics(state)
-    local numCycles  = math.random(8, 11)
-    local listHeight = #state.names * ROW_HEIGHT
-    -- winner is at index 1; centre slot is visual row j=2 (0-indexed offset = 1*ROW_HEIGHT)
+function WHLSN._CalcScrollMetrics(state)
+    local listHeight   = #state.names * ROW_HEIGHT
     local winnerOffset = (#state.names - 1) * ROW_HEIGHT
-    local totalScroll  = numCycles * listHeight + winnerOffset
+
+    -- Solve for totalScroll that yields TARGET_SPEED during linear phase:
+    -- TARGET_SPEED = 0.82 * totalScroll / (0.5875 * duration)
+    local idealTotal = TARGET_SPEED * 0.5875 * state.duration / 0.82
+    local numCycles  = math.max(MIN_SPIN_CYCLES, math.ceil((idealTotal - winnerOffset) / listHeight))
+
+    local totalScroll = numCycles * listHeight + winnerOffset
     return numCycles, listHeight, winnerOffset, totalScroll
 end
 
@@ -616,7 +633,7 @@ function WHLSN._StartReelAnimations()
     for i = 1, 5 do
         local state = reelState[i]
         if state and state.active then
-            local _, listHeight, _, totalScroll = CalcScrollMetrics(state)
+            local _, listHeight, _, totalScroll = WHLSN._CalcScrollMetrics(state)
             state.listHeight  = listHeight
             state.totalScroll = totalScroll
             state.elapsed     = 0
