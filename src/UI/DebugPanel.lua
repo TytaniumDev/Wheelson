@@ -20,16 +20,17 @@ local MAX_WIDTH = 800
 local MAX_HEIGHT = 600
 
 ---------------------------------------------------------------------------
--- Tab Content Generators (each returns a string)
+-- GenerateStateText — decomposed into section generators
 ---------------------------------------------------------------------------
 
-local function GenerateStateText()
-    local lines = {}
+local function AppendAddonInfo(lines)
     lines[#lines + 1] = "=== Addon Info ==="
     lines[#lines + 1] = "version: " .. tostring(WHLSN.VERSION)
     lines[#lines + 1] = "commPrefix: " .. tostring(WHLSN.COMM_PREFIX)
     lines[#lines + 1] = ""
+end
 
+local function AppendSessionState(lines)
     lines[#lines + 1] = "=== Session State ==="
     lines[#lines + 1] = "status: " .. tostring(WHLSN.session.status or "(none)")
     lines[#lines + 1] = "host: " .. tostring(WHLSN.session.host or "(none)")
@@ -48,23 +49,27 @@ local function GenerateStateText()
         end
         lines[#lines + 1] = ""
     end
+end
 
-    if #WHLSN.session.groups > 0 then
-        lines[#lines + 1] = "=== Groups ==="
-        for i, g in ipairs(WHLSN.session.groups) do
-            lines[#lines + 1] = "  Group " .. i .. ":"
-            lines[#lines + 1] = "    tank: " .. (g.tank and g.tank.name or "(none)")
-            lines[#lines + 1] = "    healer: " .. (g.healer and g.healer.name or "(none)")
-            local dpsNames = {}
-            for _, d in ipairs(g.dps) do dpsNames[#dpsNames + 1] = d.name end
-            lines[#lines + 1] = "    dps: " .. (#dpsNames > 0 and table.concat(dpsNames, ", ") or "(none)")
-            lines[#lines + 1] = "    hasBrez: " .. tostring(g:HasBrez())
-            lines[#lines + 1] = "    hasLust: " .. tostring(g:HasLust())
-            lines[#lines + 1] = "    isComplete: " .. tostring(g:IsComplete())
-        end
-        lines[#lines + 1] = ""
+local function AppendGroupsState(lines)
+    if #WHLSN.session.groups == 0 then return end
+
+    lines[#lines + 1] = "=== Groups ==="
+    for i, g in ipairs(WHLSN.session.groups) do
+        lines[#lines + 1] = "  Group " .. i .. ":"
+        lines[#lines + 1] = "    tank: " .. (g.tank and g.tank.name or "(none)")
+        lines[#lines + 1] = "    healer: " .. (g.healer and g.healer.name or "(none)")
+        local dpsNames = {}
+        for _, d in ipairs(g.dps) do dpsNames[#dpsNames + 1] = d.name end
+        lines[#lines + 1] = "    dps: " .. (#dpsNames > 0 and table.concat(dpsNames, ", ") or "(none)")
+        lines[#lines + 1] = "    hasBrez: " .. tostring(g:HasBrez())
+        lines[#lines + 1] = "    hasLust: " .. tostring(g:HasLust())
+        lines[#lines + 1] = "    isComplete: " .. tostring(g:IsComplete())
     end
+    lines[#lines + 1] = ""
+end
 
+local function AppendSavedVars(lines)
     lines[#lines + 1] = "=== SavedVariables ==="
     if WHLSN.db and WHLSN.db.profile then
         local prof = WHLSN.db.profile
@@ -92,7 +97,9 @@ local function GenerateStateText()
         lines[#lines + 1] = "db: (not initialized)"
     end
     lines[#lines + 1] = ""
+end
 
+local function AppendTimers(lines)
     lines[#lines + 1] = "=== Timers ==="
     if WHLSN.lastActivity and WHLSN.lastActivity > 0 then
         lines[#lines + 1] = "lastActivity: " .. date("%H:%M:%S", WHLSN.lastActivity)
@@ -108,7 +115,15 @@ local function GenerateStateText()
     end
     lines[#lines + 1] = "rosterUpdatePending: " .. tostring(WHLSN.rosterUpdatePending or false)
     lines[#lines + 1] = "commPendingUpdate: " .. tostring(WHLSN.commPendingUpdate or false)
+end
 
+local function GenerateStateText()
+    local lines = {}
+    AppendAddonInfo(lines)
+    AppendSessionState(lines)
+    AppendGroupsState(lines)
+    AppendSavedVars(lines)
+    AppendTimers(lines)
     return table.concat(lines, "\n")
 end
 
@@ -231,7 +246,6 @@ local function AddLogEntry(entry)
 end
 
 local function SetupCommHooks()
-    -- Hook inbound messages
     hooksecurefunc(WHLSN, "OnCommReceived", function(_, prefix, message, _, sender)
         if prefix ~= WHLSN.COMM_PREFIX then return end
         local success, data = WHLSN:Deserialize(message)
@@ -241,7 +255,6 @@ local function SetupCommHooks()
         AddLogEntry(entry)
     end)
 
-    -- Hook outbound session updates
     hooksecurefunc(WHLSN, "SendSessionUpdate", function(_)
         local playerCount = #WHLSN.session.players
         local groupCount = #WHLSN.session.groups
@@ -251,20 +264,17 @@ local function SetupCommHooks()
         AddLogEntry(entry)
     end)
 
-    -- Hook outbound session end
     hooksecurefunc(WHLSN, "BroadcastSessionEnd", function(_)
         local entry = string.format("[%s] SEND | GUILD | SESSION_END", date("%H:%M:%S"))
         AddLogEntry(entry)
     end)
 
-    -- Hook outbound leave request
     hooksecurefunc(WHLSN, "LeaveSession", function(_)
         local entry = string.format("[%s] SEND | GUILD | LEAVE_REQUEST | player=%s",
             date("%H:%M:%S"), UnitName("player") or "?")
         AddLogEntry(entry)
     end)
 
-    -- Hook outbound join request
     hooksecurefunc(WHLSN, "RequestJoin", function(_)
         local entry = string.format("[%s] SEND | GUILD | JOIN_REQUEST | player=%s",
             date("%H:%M:%S"), UnitName("player") or "?")
@@ -273,7 +283,7 @@ local function SetupCommHooks()
 end
 
 ---------------------------------------------------------------------------
--- Frame Creation
+-- Frame Creation — decomposed
 ---------------------------------------------------------------------------
 
 local function CreateTabButton(parent, label, tabKey, xOffset)
@@ -292,54 +302,14 @@ local function UpdateTabHighlights(frame)
     local tabs = { state = frame.tabState, comm = frame.tabComm, api = frame.tabAPI }
     for key, btn in pairs(tabs) do
         if key == currentTab then
-            btn:SetEnabled(false) -- Visually depressed = active
+            btn:SetEnabled(false)
         else
             btn:SetEnabled(true)
         end
     end
 end
 
-local function CreateDebugFrame()
-    local frame = CreateFrame("Frame", "WHLSNDebugPanel", UIParent, "BackdropTemplate")
-    frame:SetSize(500, 400)
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetResizable(true)
-    frame:SetResizeBounds(MIN_WIDTH, MIN_HEIGHT, MAX_WIDTH, MAX_HEIGHT)
-    frame:SetClampedToScreen(true)
-    frame:SetFrameStrata("DIALOG")
-    frame:SetToplevel(true)
-
-    -- Backdrop
-    frame:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 16,
-        insets = { left = 4, right = 4, top = 4, bottom = 4 },
-    })
-    frame:SetBackdropColor(0.05, 0.05, 0.08, 0.95)
-
-    -- Dragging
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
-
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -8)
-    title:SetText("|cFFFFD100Wheelson Debug|r")
-
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -2, -2)
-
-    -- Tab buttons
-    frame.tabState = CreateTabButton(frame, "State", "state", 8)
-    frame.tabComm = CreateTabButton(frame, "Comm Log", "comm", 102)
-    frame.tabAPI = CreateTabButton(frame, "WoW API", "api", 196)
-
-    -- Scroll frame for content
+local function CreateDebugScrollContent(frame)
     local scrollFrame = CreateFrame(
         "ScrollFrame", "WHLSNDebugScrollFrame", frame, "UIPanelScrollFrameTemplate"
     )
@@ -347,7 +317,6 @@ local function CreateDebugFrame()
     scrollFrame:SetPoint("BOTTOMRIGHT", -30, 40)
     frame.scrollFrame = scrollFrame
 
-    -- EditBox inside scroll frame (read-only-ish, for text selection)
     local editBox = CreateFrame("EditBox", "WHLSNDebugEditBox", scrollFrame)
     editBox:SetMultiLine(true)
     editBox:SetMaxLetters(0)
@@ -355,7 +324,6 @@ local function CreateDebugFrame()
     editBox:SetFontObject("GameFontNormalSmall")
     editBox:SetWidth(scrollFrame:GetWidth())
     editBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    -- Prevent user edits but allow text selection
     editBox:SetScript("OnChar", function(self) self:SetText(self.lastText or "") end)
     editBox:SetScript("OnTextChanged", function(self, userInput)
         if userInput then
@@ -364,8 +332,9 @@ local function CreateDebugFrame()
     end)
     scrollFrame:SetScrollChild(editBox)
     frame.editBox = editBox
+end
 
-    -- Resize handle
+local function CreateDebugResizeHandle(frame)
     local resizer = CreateFrame("Button", nil, frame)
     resizer:SetSize(16, 16)
     resizer:SetPoint("BOTTOMRIGHT")
@@ -375,10 +344,11 @@ local function CreateDebugFrame()
     resizer:SetScript("OnMouseDown", function() frame:StartSizing("BOTTOMRIGHT") end)
     resizer:SetScript("OnMouseUp", function()
         frame:StopMovingOrSizing()
-        editBox:SetWidth(scrollFrame:GetWidth())
+        frame.editBox:SetWidth(frame.scrollFrame:GetWidth())
     end)
+end
 
-    -- Bottom buttons
+local function CreateDebugBottomButtons(frame)
     frame.copyAllBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     frame.copyAllBtn:SetSize(80, 24)
     frame.copyAllBtn:SetPoint("BOTTOMRIGHT", -8, 8)
@@ -397,7 +367,6 @@ local function CreateDebugFrame()
         WHLSN:RefreshDebugPanel()
     end)
 
-    -- Clear button (only visible on comm tab)
     frame.clearBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     frame.clearBtn:SetSize(80, 24)
     frame.clearBtn:SetPoint("BOTTOMLEFT", 8, 8)
@@ -406,6 +375,46 @@ local function CreateDebugFrame()
         wipe(WHLSN.debugLog)
         WHLSN:RefreshDebugPanel()
     end)
+end
+
+local function CreateDebugFrame()
+    local frame = CreateFrame("Frame", "WHLSNDebugPanel", UIParent, "BackdropTemplate")
+    frame:SetSize(500, 400)
+    frame:SetPoint("CENTER")
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:SetResizable(true)
+    frame:SetResizeBounds(MIN_WIDTH, MIN_HEIGHT, MAX_WIDTH, MAX_HEIGHT)
+    frame:SetClampedToScreen(true)
+    frame:SetFrameStrata("DIALOG")
+    frame:SetToplevel(true)
+
+    frame:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 },
+    })
+    frame:SetBackdropColor(0.05, 0.05, 0.08, 0.95)
+
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+
+    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", 0, -8)
+    title:SetText("|cFFFFD100Wheelson Debug|r")
+
+    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+    closeBtn:SetPoint("TOPRIGHT", -2, -2)
+
+    frame.tabState = CreateTabButton(frame, "State", "state", 8)
+    frame.tabComm = CreateTabButton(frame, "Comm Log", "comm", 102)
+    frame.tabAPI = CreateTabButton(frame, "WoW API", "api", 196)
+
+    CreateDebugScrollContent(frame)
+    CreateDebugResizeHandle(frame)
+    CreateDebugBottomButtons(frame)
 
     return frame
 end
@@ -433,7 +442,6 @@ function WHLSN:RefreshDebugPanel()
     debugFrame.editBox:SetText(text)
     debugFrame.editBox:SetCursorPosition(0)
 
-    -- Show Clear button only on comm tab
     debugFrame.clearBtn:SetShown(currentTab == "comm")
 end
 

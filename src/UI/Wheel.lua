@@ -6,8 +6,6 @@ local WHLSN = _G.Wheelson
 -- Slot-machine-style animated group reveal
 ---------------------------------------------------------------------------
 
-local wheelFrame = nil
-
 ---------------------------------------------------------------------------
 -- Constants
 ---------------------------------------------------------------------------
@@ -61,16 +59,20 @@ local P2_OUT_END = 0.60
 WHLSN._EASING = { P1_END = P1_END, P2_END = P2_END, P1_OUT_END = P1_OUT_END, P2_OUT_END = P2_OUT_END }
 
 ---------------------------------------------------------------------------
--- Animation State Variables
+-- Module State
 ---------------------------------------------------------------------------
 
-local reelFrames        = {}
-local reelState         = {}
-local summaryRows       = {}
-local currentGroupIndex = 0
-local isAnimating       = false
-local animTimer         = nil
-local reelNameLists     = {}   -- reelNameLists[1..5] = consistent name list per reel (built once)
+local ws = {
+    frame           = nil,
+    reelFrames      = {},
+    reelState       = {},
+    summaryCount    = 0,
+    currentGroup    = 0,
+    isAnimating     = false,
+    timer           = nil,
+    reelNames       = {},
+    soundEnabled    = true,
+}
 
 ---------------------------------------------------------------------------
 -- Helper Functions
@@ -81,13 +83,6 @@ local function GetAnimationSpeed()
         return WHLSN.db.profile.animationSpeed or 1.0
     end
     return 1.0
-end
-
-local function ShouldPlaySounds()
-    if WHLSN.db and WHLSN.db.profile then
-        return WHLSN.db.profile.soundEnabled ~= false
-    end
-    return true
 end
 
 ---------------------------------------------------------------------------
@@ -106,7 +101,7 @@ local TICK_THROTTLE = 0.15    -- seconds; at most one tick sound per 150ms acros
 local lastTickTime  = 0
 
 local function PlayTick()
-    if not ShouldPlaySounds() then return end
+    if not ws.soundEnabled then return end
     local now = GetTime()
     if now - lastTickTime < TICK_THROTTLE then return end
     lastTickTime = now
@@ -114,17 +109,17 @@ local function PlayTick()
 end
 
 local function PlayLand()
-    if not ShouldPlaySounds() then return end
+    if not ws.soundEnabled then return end
     PlaySoundFile(SOUND_LAND, "SFX")
 end
 
 local function PlayVictory()
-    if not ShouldPlaySounds() then return end
+    if not ws.soundEnabled then return end
     PlaySoundFile(SOUND_VICTORY, "SFX")
 end
 
 local function PlayStart()
-    if not ShouldPlaySounds() then return end
+    if not ws.soundEnabled then return end
     PlaySound(SOUND_START, "SFX")
 end
 
@@ -133,9 +128,6 @@ end
 ---------------------------------------------------------------------------
 
 --- Build the candidate pool (list of WHLSNPlayer) for a single reel.
---- Filters the players list by eligibility for the given role, excludes
---- names in excludeNames (except the winner), then force-inserts the winner
---- if they aren't already present.
 ---@param players WHLSNPlayer[]
 ---@param role string  "tank"|"healer"|"dps"
 ---@param winner string  name of the winning player
@@ -146,7 +138,6 @@ function WHLSN.BuildReelPool(players, role, winner, excludeNames)
     local winnerInPool = false
 
     for _, p in ipairs(players) do
-        -- Check eligibility for the requested role
         local eligible = false
         if role == "tank" then
             eligible = p:IsTankMain() or p:IsOfftank()
@@ -157,7 +148,6 @@ function WHLSN.BuildReelPool(players, role, winner, excludeNames)
         end
 
         if eligible then
-            -- Exclude logic: skip excluded names unless this player is the winner
             if p.name == winner or not excludeNames[p.name] then
                 pool[#pool + 1] = p
                 if p.name == winner then
@@ -167,8 +157,6 @@ function WHLSN.BuildReelPool(players, role, winner, excludeNames)
         end
     end
 
-    -- Force-insert the winner if they weren't found in the eligible pool.
-    -- When winner is nil (e.g. BuildReelNameLists), skip force-insert entirely.
     if winner and not winnerInPool then
         local found = false
         for _, p in ipairs(players) do
@@ -186,8 +174,7 @@ function WHLSN.BuildReelPool(players, role, winner, excludeNames)
     return pool
 end
 
---- Pad (or return as-is) a names array so it has at least minSize entries,
---- duplicating the FULL list each time so identical names are never adjacent.
+--- Pad (or return as-is) a names array so it has at least minSize entries.
 ---@param names string[]
 ---@param minSize number
 ---@return string[]
@@ -201,7 +188,6 @@ function WHLSN.PadReelPool(names, minSize)
         return result
     end
 
-    -- Repeat the entire list until we reach minSize
     local result = {}
     while #result < minSize do
         for i = 1, #names do
@@ -216,13 +202,6 @@ end
 ---------------------------------------------------------------------------
 
 --- Three-phase slot-machine easing curve.
----
----  Phase 1 (0   → P1_END=0.03):  quartic ease-in,       maps scroll to  0% –  1%
----  Phase 2 (P1_END → P2_END=0.45): linear,              maps scroll to  1% – 60%
----  Phase 3 (P2_END → 1.0):         elastic ease-out,    maps scroll to 60% – 100%
----                                   (overshoots past 1.0 and snaps back)
----
---- Returns 0 for t<=0, 1 for t>=1.
 ---@param t number  normalised time [0, 1]
 ---@return number
 function WHLSN.SlotEasing(t)
@@ -232,20 +211,15 @@ function WHLSN.SlotEasing(t)
     local P3_RANGE = 1.0 - P2_OUT_END
 
     if t < P1_END then
-        -- Phase 1: quartic ease-in
         local p = t / P1_END
         local eased = p * p * p * p
         return eased * P1_OUT_END
 
     elseif t < P2_END then
-        -- Phase 2: linear
         local p = (t - P1_END) / (P2_END - P1_END)
         return P1_OUT_END + p * (P2_OUT_END - P1_OUT_END)
 
     else
-        -- Phase 3: elastic ease-out with strong overshoot.
-        -- Rushes toward the target, overshoots hard, and snaps back —
-        -- like a physical reel slamming against its stop and bouncing.
         local p = (t - P2_END) / (1 - P2_END)
         local eased = 1.0 + (2 ^ (-10 * p)) * math.sin((10 * p - 0.75) * 2 * math.pi / 3)
         return P2_OUT_END + eased * P3_RANGE
@@ -253,29 +227,16 @@ function WHLSN.SlotEasing(t)
 end
 
 ---------------------------------------------------------------------------
--- Task 3: Reel Frame Scaffolding
+-- Reel Frame Creation (decomposed into composition functions)
 ---------------------------------------------------------------------------
 
---- Create a single reel frame for a given role.
----@param parent table  parent frame (the reel container)
----@param index number  1-based reel index (1=tank, 2=healer, 3-5=dps)
----@param roleDef table  entry from REEL_ROLES
----@return table  the reel frame
-local function CreateReelFrame(parent, index, roleDef)
-    local parentWidth = parent:GetWidth()
-    local reelWidth = math.floor((parentWidth - REEL_PADDING * (5 + 1)) / 5)
-    local xOffset = REEL_PADDING + (index - 1) * (reelWidth + REEL_PADDING)
-
-    local reel = CreateFrame("Frame", nil, parent)
-    reel:SetSize(reelWidth, REEL_HEIGHT)
-    reel:SetPoint("TOPLEFT", parent, "TOPLEFT", xOffset, 0)
-
-    -- Dark background tinted with role colour
+local function CreateReelBackground(reel, roleDef)
     local bg = reel:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     bg:SetColorTexture(roleDef.color.r * 0.12, roleDef.color.g * 0.12, roleDef.color.b * 0.12, 0.9)
+end
 
-    -- 4 role-coloured border edge textures (1px each side)
+local function CreateReelBorders(reel, roleDef)
     local borders = {}
 
     local bTop = reel:CreateTexture(nil, "BORDER")
@@ -306,22 +267,22 @@ local function CreateReelFrame(parent, index, roleDef)
     bRight:SetColorTexture(roleDef.color.r, roleDef.color.g, roleDef.color.b, 1)
     borders[#borders + 1] = bRight
 
-    reel.borders = borders
+    return borders
+end
 
-    -- Glow texture (on parent frame, behind reel, gold, initially hidden)
+local function CreateReelGlow(parent, reel, reelWidth)
     local glow = parent:CreateTexture(nil, "BACKGROUND")
     glow:SetSize(reelWidth + 8, REEL_HEIGHT + 8)
     glow:SetPoint("CENTER", reel, "CENTER", 0, 0)
     glow:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 0)
-    reel.glow = glow
+    return glow
+end
 
-    -- Inner clip frame holding 15 pre-created FontString name slots
-    -- SetClipsChildren ensures FontStrings outside the viewport are hidden
+local function CreateReelSlots(reel, reelWidth)
     local inner = CreateFrame("Frame", nil, reel)
     inner:SetPoint("TOPLEFT", reel, "TOPLEFT", 1, -1)
     inner:SetPoint("BOTTOMRIGHT", reel, "BOTTOMRIGHT", -1, 1)
     inner:SetClipsChildren(true)
-    reel.inner = inner
 
     local slots = {}
     for j = 1, MAX_SLOTS do
@@ -333,10 +294,11 @@ local function CreateReelFrame(parent, index, roleDef)
         fs:SetText("")
         slots[j] = fs
     end
-    reel.slots = slots
 
-    -- Gradient fade overlays — top and bottom
-    -- Use role-tinted background color so fades blend seamlessly with the reel bg
+    return inner, slots
+end
+
+local function CreateReelFades(reel, roleDef)
     local bgR, bgG, bgB = roleDef.color.r * 0.12, roleDef.color.g * 0.12, roleDef.color.b * 0.12
 
     local fadeTop = reel:CreateTexture(nil, "OVERLAY")
@@ -344,24 +306,57 @@ local function CreateReelFrame(parent, index, roleDef)
     fadeTop:SetPoint("TOPRIGHT", reel, "TOPRIGHT", -1, -1)
     fadeTop:SetHeight(FADE_HEIGHT)
     fadeTop:SetColorTexture(1, 1, 1, 1)
-    -- VERTICAL gradient: minColor = bottom, maxColor = top.
-    -- fadeTop sits at the reel top edge; top should be opaque, bottom transparent.
     fadeTop:SetGradient("VERTICAL",
         CreateColor(bgR, bgG, bgB, 0),
         CreateColor(bgR, bgG, bgB, 0.85))
-    reel.fadeTop = fadeTop
 
     local fadeBottom = reel:CreateTexture(nil, "OVERLAY")
     fadeBottom:SetPoint("BOTTOMLEFT", reel, "BOTTOMLEFT", 1, 1)
     fadeBottom:SetPoint("BOTTOMRIGHT", reel, "BOTTOMRIGHT", -1, 1)
     fadeBottom:SetHeight(FADE_HEIGHT)
     fadeBottom:SetColorTexture(1, 1, 1, 1)
-    -- fadeBottom sits at the reel bottom edge; bottom should be opaque, top transparent.
     fadeBottom:SetGradient("VERTICAL",
         CreateColor(bgR, bgG, bgB, 0.85),
         CreateColor(bgR, bgG, bgB, 0))
-    reel.fadeBottom = fadeBottom
 
+    return fadeTop, fadeBottom
+end
+
+local function CreateReelUtilityIcons(parent, reel)
+    local brezIcon = parent:CreateTexture(nil, "OVERLAY")
+    brezIcon:SetSize(12, 12)
+    brezIcon:SetPoint("TOPRIGHT", reel, "TOPRIGHT", -2, -2)
+    brezIcon:SetTexture(WHLSN.BREZ_ICON)
+    brezIcon:Hide()
+
+    local lustIcon = parent:CreateTexture(nil, "OVERLAY")
+    lustIcon:SetSize(12, 12)
+    lustIcon:SetPoint("TOPLEFT", reel, "TOPLEFT", 2, -2)
+    lustIcon:SetTexture(WHLSN.LUST_ICON)
+    lustIcon:Hide()
+
+    return brezIcon, lustIcon
+end
+
+--- Create a single reel frame for a given role (coordinator).
+---@param parent table  parent frame (the reel container)
+---@param index number  1-based reel index (1=tank, 2=healer, 3-5=dps)
+---@param roleDef table  entry from REEL_ROLES
+---@return table  the reel frame
+local function CreateReelFrame(parent, index, roleDef)
+    local parentWidth = parent:GetWidth()
+    local reelWidth = math.floor((parentWidth - REEL_PADDING * (5 + 1)) / 5)
+    local xOffset = REEL_PADDING + (index - 1) * (reelWidth + REEL_PADDING)
+
+    local reel = CreateFrame("Frame", nil, parent)
+    reel:SetSize(reelWidth, REEL_HEIGHT)
+    reel:SetPoint("TOPLEFT", parent, "TOPLEFT", xOffset, 0)
+
+    CreateReelBackground(reel, roleDef)
+    reel.borders = CreateReelBorders(reel, roleDef)
+    reel.glow = CreateReelGlow(parent, reel, reelWidth)
+    reel.inner, reel.slots = CreateReelSlots(reel, reelWidth)
+    reel.fadeTop, reel.fadeBottom = CreateReelFades(reel, roleDef)
 
     -- Role label FontString above reel
     local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -370,23 +365,14 @@ local function CreateReelFrame(parent, index, roleDef)
     label:SetTextColor(roleDef.color.r, roleDef.color.g, roleDef.color.b, 1)
     reel.label = label
 
-    -- Utility icons: brezIcon and lustIcon (12x12, initially hidden)
-    local brezIcon = parent:CreateTexture(nil, "OVERLAY")
-    brezIcon:SetSize(12, 12)
-    brezIcon:SetPoint("TOPRIGHT", reel, "TOPRIGHT", -2, -2)
-    brezIcon:SetTexture("Interface\\Icons\\Spell_Nature_Reincarnation")
-    brezIcon:Hide()
-    reel.brezIcon = brezIcon
-
-    local lustIcon = parent:CreateTexture(nil, "OVERLAY")
-    lustIcon:SetSize(12, 12)
-    lustIcon:SetPoint("TOPLEFT", reel, "TOPLEFT", 2, -2)
-    lustIcon:SetTexture("Interface\\Icons\\Spell_Nature_Bloodlust")
-    lustIcon:Hide()
-    reel.lustIcon = lustIcon
+    reel.brezIcon, reel.lustIcon = CreateReelUtilityIcons(parent, reel)
 
     return reel
 end
+
+---------------------------------------------------------------------------
+-- Wheel Frame Creation
+---------------------------------------------------------------------------
 
 --- Create the wheel frame and all child UI elements.
 ---@param parent table  parent content frame
@@ -411,10 +397,20 @@ local function CreateWheelFrame(parent)
     frame.reelContainer = reelContainer
 
     -- Create 5 reels
-    reelFrames = {}
+    ws.reelFrames = {}
     for i = 1, 5 do
-        reelFrames[i] = CreateReelFrame(reelContainer, i, REEL_ROLES[i])
+        ws.reelFrames[i] = CreateReelFrame(reelContainer, i, REEL_ROLES[i])
     end
+
+    -- Reusable AnimationGroup for collapse transitions (fixes leak)
+    local collapseAG = reelContainer:CreateAnimationGroup()
+    local collapseFade = collapseAG:CreateAnimation("Alpha")
+    collapseFade:SetFromAlpha(1)
+    collapseFade:SetToAlpha(0)
+    collapseFade:SetSmoothing("OUT")
+    collapseAG:SetToFinalAlpha(true)
+    frame.collapseAG = collapseAG
+    frame.collapseFade = collapseFade
 
     -- Summary container (scrolling list of previous groups, anchored near bottom)
     local summaryContainer = CreateFrame("Frame", nil, frame)
@@ -422,6 +418,16 @@ local function CreateWheelFrame(parent)
     summaryContainer:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, 40)
     summaryContainer:SetHeight(MAX_SUMMARY_ROWS * SUMMARY_ROW_HEIGHT)
     frame.summaryContainer = summaryContainer
+
+    -- Pre-create summary row FontStrings (fixes FontString accumulation)
+    frame.summarySlots = {}
+    for i = 1, MAX_SUMMARY_ROWS do
+        local fs = summaryContainer:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        fs:SetJustifyH("CENTER")
+        fs:SetSize(summaryContainer:GetWidth(), SUMMARY_ROW_HEIGHT)
+        fs:Hide()
+        frame.summarySlots[i] = fs
+    end
 
     -- Skip button
     local skipBtn = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
@@ -437,36 +443,64 @@ local function CreateWheelFrame(parent)
 end
 
 ---------------------------------------------------------------------------
--- Task 3 (continued): SpinForGroup
+-- Reel Visual Reset Helpers
+---------------------------------------------------------------------------
+
+local function ResetReelVisuals()
+    for i = 1, 5 do
+        local reel = ws.reelFrames[i]
+        if reel then
+            if reel.glow then
+                reel.glow:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 0)
+            end
+            for _, border in ipairs(reel.borders or {}) do
+                local roleDef = REEL_ROLES[i]
+                border:SetColorTexture(roleDef.color.r, roleDef.color.g, roleDef.color.b, 1)
+            end
+            if reel.brezIcon then reel.brezIcon:Hide() end
+            if reel.lustIcon then reel.lustIcon:Hide() end
+            for j = 1, MAX_SLOTS do
+                reel.slots[j]:SetText("")
+                reel.slots[j]:SetTextColor(1, 1, 1, 1)
+            end
+        end
+    end
+end
+
+local function ResetSummaryRows()
+    if ws.frame and ws.frame.summarySlots then
+        for i = 1, MAX_SUMMARY_ROWS do
+            ws.frame.summarySlots[i]:SetText("")
+            ws.frame.summarySlots[i]:Hide()
+        end
+    end
+    ws.summaryCount = 0
+end
+
+---------------------------------------------------------------------------
+-- SpinForGroup
 ---------------------------------------------------------------------------
 
 --- Build the consistent name lists for all 5 reels (called once per session spin).
---- Uses ALL session players — no exclusions between groups. The same names appear
---- in every group's reels; only the winner target changes ("movie magic").
 local function BuildReelNameLists()
     local players = WHLSN.session.players or {}
-    reelNameLists = {}
+    ws.reelNames = {}
 
     for i = 1, 5 do
         local roleDef = REEL_ROLES[i]
-        -- Build pool with no winner and no exclusions — just all eligible players
         local pool = WHLSN.BuildReelPool(players, roleDef.role, nil, {})
 
-        -- Extract names
         local names = {}
         for _, p in ipairs(pool) do
             names[#names + 1] = p.name
         end
 
-        -- Pad to MIN_POOL_SIZE
         names = WHLSN.PadReelPool(names, MIN_POOL_SIZE)
-        reelNameLists[i] = names
+        ws.reelNames[i] = names
     end
 end
 
 --- Prepare the reel name list for a specific group spin.
---- Rotates the names so the winner lands at index 1, preserving all entries.
---- If the winner is not in the list, prepends them.
 ---@param baseNames string[]
 ---@param winner WHLSNPlayer|nil
 ---@return string[] names with winner at index 1
@@ -475,7 +509,6 @@ function WHLSN._PrepareReelNames(baseNames, winner)
 
     local winnerName = winner.name
 
-    -- Find first occurrence of winner in the list
     local winnerPos = nil
     for idx, n in ipairs(baseNames) do
         if n == winnerName then
@@ -484,7 +517,6 @@ function WHLSN._PrepareReelNames(baseNames, winner)
         end
     end
 
-    -- Winner not in pool — prepend and keep all existing names
     if not winnerPos then
         local names = { winnerName }
         for _, n in ipairs(baseNames) do
@@ -493,7 +525,6 @@ function WHLSN._PrepareReelNames(baseNames, winner)
         return names
     end
 
-    -- Rotate list so winner is at index 1
     local names = {}
     for i = winnerPos, #baseNames do
         names[#names + 1] = baseNames[i]
@@ -505,17 +536,17 @@ function WHLSN._PrepareReelNames(baseNames, winner)
 end
 
 local function SpinForGroup(groupIndex)
-    currentGroupIndex = groupIndex
+    ws.currentGroup = groupIndex
     local groups = WHLSN.session.groups
     local totalGroups = #groups
     local group = groups[groupIndex]
 
     -- Update header text
-    if wheelFrame and wheelFrame.header then
+    if ws.frame and ws.frame.header then
         if totalGroups == 1 then
-            wheelFrame.header:SetText("Group 1")
+            ws.frame.header:SetText("Group 1")
         else
-            wheelFrame.header:SetText("Group " .. groupIndex .. " of " .. totalGroups)
+            ws.frame.header:SetText("Group " .. groupIndex .. " of " .. totalGroups)
         end
     end
 
@@ -529,100 +560,97 @@ local function SpinForGroup(groupIndex)
     }
 
     -- Initialise reelState
-    reelState = {}
+    ws.reelState = {}
 
     for i = 1, 5 do
         local winner = winners[i]
 
         if winner then
-            local finalNames = WHLSN._PrepareReelNames(reelNameLists[i], winner)
+            local finalNames = WHLSN._PrepareReelNames(ws.reelNames[i], winner)
+            local numNames = math.min(#finalNames, MAX_SLOTS)
 
-            reelState[i] = {
+            ws.reelState[i] = {
                 active     = true,
                 names      = finalNames,
-                winner     = winner,       -- WHLSNPlayer object (for HasBrez/HasLust)
+                numNames   = numNames,
+                winner     = winner,
                 elapsed    = 0,
                 duration   = BASE_REEL_DURATIONS[i] / 1000.0 / GetAnimationSpeed(),
                 landed     = false,
-                lastRow    = -1,           -- for tick sound tracking
+                lastRow    = -1,
             }
 
-            -- Show reel and assign fixed text per slot (one name per slot).
-            -- During animation only positions change — text is never reassigned.
-            if reelFrames[i] then
-                reelFrames[i]:Show()
-                local numNames = math.min(#finalNames, MAX_SLOTS)
+            if ws.reelFrames[i] then
+                ws.reelFrames[i]:Show()
                 for j = 1, MAX_SLOTS do
                     if j <= numNames then
-                        reelFrames[i].slots[j]:SetText(finalNames[j])
-                        reelFrames[i].slots[j]:SetTextColor(1, 1, 1, 0.5)
-                        reelFrames[i].slots[j]:SetAlpha(1)
+                        ws.reelFrames[i].slots[j]:SetText(finalNames[j])
+                        ws.reelFrames[i].slots[j]:SetTextColor(1, 1, 1, 0.5)
+                        ws.reelFrames[i].slots[j]:SetAlpha(1)
                     else
-                        reelFrames[i].slots[j]:SetText("")
-                        reelFrames[i].slots[j]:SetTextColor(1, 1, 1, 0)
+                        ws.reelFrames[i].slots[j]:SetText("")
+                        ws.reelFrames[i].slots[j]:SetTextColor(1, 1, 1, 0)
                     end
                 end
             end
         else
-            -- Inactive reel: show "(none)" in dim text
-            reelState[i] = { active = false, landed = true }
-            if reelFrames[i] then
-                reelFrames[i]:Show()
+            ws.reelState[i] = { active = false, landed = true }
+            if ws.reelFrames[i] then
+                ws.reelFrames[i]:Show()
                 for j = 1, MAX_SLOTS do
                     local text = (j == 2) and "(none)" or ""
-                    reelFrames[i].slots[j]:SetText(text)
-                    reelFrames[i].slots[j]:SetTextColor(0.5, 0.5, 0.5, 0.7)
+                    ws.reelFrames[i].slots[j]:SetText(text)
+                    ws.reelFrames[i].slots[j]:SetTextColor(0.5, 0.5, 0.5, 0.7)
                 end
             end
         end
     end
 
     -- Start animations
-    isAnimating = true
+    ws.isAnimating = true
     WHLSN._StartReelAnimations()
 end
 
 ---------------------------------------------------------------------------
--- Task 4: Reel Scroll Animation
+-- Reel Scroll Animation
 ---------------------------------------------------------------------------
 
 --- Forward declaration for the OnUpdate handler; assigned below.
 local OnUpdateHandler
 
 --- Calculate scroll metrics for a reel, targeting a uniform linear-phase speed.
---- Returns an exact scrollDistance (for consistent speed across reels) and a
---- scrollBase offset so the total is a multiple of listHeight (winner lands).
 ---@param state table  reelState entry (needs .names and .duration)
 ---@return number listHeight, number scrollBase, number scrollDistance
 function WHLSN._CalcScrollMetrics(state)
-    local listHeight = math.min(#state.names, MAX_SLOTS) * ROW_HEIGHT
+    local numNames = state.numNames or math.min(#state.names, MAX_SLOTS)
+    local listHeight = numNames * ROW_HEIGHT
 
-    -- Exact scroll distance that yields TARGET_SPEED during the linear phase.
-    -- speed = linearScrollFrac * scrollDistance / (linearTimeFrac * duration)
-    -- => scrollDistance = TARGET_SPEED * linearTimeFrac * duration / linearScrollFrac
     local linearTimeFrac   = P2_END - P1_END
     local linearScrollFrac = P2_OUT_END - P1_OUT_END
     local scrollDistance = TARGET_SPEED * linearTimeFrac * state.duration / linearScrollFrac
 
-    -- Round up to the next multiple of listHeight so winner lands at centre.
     local totalScroll = math.max(
         MIN_SPIN_CYCLES * listHeight,
         math.ceil(scrollDistance / listHeight) * listHeight
     )
 
-    -- scrollBase shifts the start position so that scrollBase + scrollDistance
-    -- overshoots into an exact multiple of listHeight.
     local scrollBase = totalScroll - scrollDistance
     return listHeight, scrollBase, scrollDistance
 end
 
 --- Start the scroll animation for all active reels.
 function WHLSN._StartReelAnimations()
+    -- Cache sound preference once at animation start
+    if WHLSN.db and WHLSN.db.profile then
+        ws.soundEnabled = WHLSN.db.profile.soundEnabled ~= false
+    else
+        ws.soundEnabled = true
+    end
+
     PlayStart()
 
-    -- Pre-calculate scroll metrics for each active reel
     for i = 1, 5 do
-        local state = reelState[i]
+        local state = ws.reelState[i]
         if state and state.active then
             local listHeight, scrollBase, scrollDistance = WHLSN._CalcScrollMetrics(state)
             state.listHeight     = listHeight
@@ -632,9 +660,116 @@ function WHLSN._StartReelAnimations()
         end
     end
 
-    -- Set a single shared OnUpdate handler on wheelFrame
-    if wheelFrame then
-        wheelFrame:SetScript("OnUpdate", OnUpdateHandler)
+    if ws.frame then
+        ws.frame:SetScript("OnUpdate", OnUpdateHandler)
+    end
+end
+
+---------------------------------------------------------------------------
+-- OnUpdate decomposed sub-functions
+---------------------------------------------------------------------------
+
+--- Update scroll position and tick sounds for a single active reel.
+local function UpdateReelScroll(i, state, dt)
+    state.elapsed = state.elapsed + dt
+    local t = state.elapsed / state.duration
+    if t > 1 then t = 1 end
+
+    local progress     = WHLSN.SlotEasing(t)
+    local scrollOffset = state.scrollBase + progress * state.scrollDistance
+    local listHeight   = state.listHeight
+    local numNames     = state.numNames
+
+    -- Motion-blur alpha based on speed
+    local speed = 0
+    if t > 0 and t < 1 then
+        if t >= P1_END and t < P2_END then
+            speed = 1.0
+        elseif t < P1_END then
+            speed = t / P1_END
+        else
+            speed = 1.0 - (t - P2_END) / (1 - P2_END)
+        end
+    end
+    local slotAlpha = 1.0 - speed * 0.5
+
+    -- Only update slots whose positions are within or near the visible viewport
+    local reel = ws.reelFrames[i]
+    if reel and reel.slots then
+        for j = 1, numNames do
+            local rawY = (-scrollOffset - (j - 1) * ROW_HEIGHT) % listHeight - ROW_HEIGHT
+            if rawY > ROW_HEIGHT then
+                rawY = rawY - listHeight
+            end
+            -- Only reposition slots near the visible area (viewport is 0 to -REEL_HEIGHT)
+            if rawY > -REEL_HEIGHT - ROW_HEIGHT and rawY < ROW_HEIGHT * 2 then
+                reel.slots[j]:ClearAllPoints()
+                reel.slots[j]:SetPoint("TOPLEFT", reel.inner, "TOPLEFT", 2, rawY)
+                reel.slots[j]:SetTextColor(1, 1, 1, slotAlpha)
+            end
+        end
+
+        -- Tick sound: detect when a new name scrolls past the centre row
+        local currentRow = math.floor(scrollOffset / ROW_HEIGHT)
+        if currentRow ~= state.lastRow and speed > 0.1 then
+            PlayTick()
+            state.lastRow = currentRow
+        end
+    end
+
+    return t
+end
+
+--- Highlight the winner on a landed reel.
+local function HighlightReelWinner(i, state)
+    local reel = ws.reelFrames[i]
+    if not reel or not reel.slots then return end
+
+    local numNames = state.numNames
+    for j = 1, numNames do
+        if j == 1 then
+            reel.slots[j]:SetTextColor(GOLD_R, GOLD_G, GOLD_B, 1)
+        else
+            reel.slots[j]:SetTextColor(0.7, 0.7, 0.7, 0.8)
+        end
+        reel.slots[j]:SetAlpha(1)
+    end
+
+    if reel.glow then
+        reel.glow:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 0.35)
+    end
+    for _, border in ipairs(reel.borders or {}) do
+        border:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 1)
+    end
+
+    local winner = state.winner
+    if winner then
+        if winner:HasBrez() and reel.brezIcon then reel.brezIcon:Show() end
+        if winner:HasLust() and reel.lustIcon then reel.lustIcon:Show() end
+    end
+
+    PlayLand()
+end
+
+--- Check if all reels have completed and handle completion.
+local function CheckAllReelsComplete()
+    local anyActive = false
+    for i = 1, 5 do
+        if ws.reelState[i] and ws.reelState[i].active then
+            anyActive = true
+            break
+        end
+    end
+    if anyActive then
+        if ws.frame then
+            ws.frame:SetScript("OnUpdate", nil)
+        end
+        WHLSN._OnAllReelsLanded()
+    else
+        if ws.frame then
+            ws.frame:SetScript("OnUpdate", nil)
+        end
+        ws.isAnimating = false
     end
 end
 
@@ -642,131 +777,28 @@ end
 ---@param _ table  frame (unused)
 ---@param dt number  seconds since last frame
 OnUpdateHandler = function(_, dt)
-    if not isAnimating then return end
+    if not ws.isAnimating then return end
     local allLanded = true
 
     for i = 1, 5 do
-        local state = reelState[i]
+        local state = ws.reelState[i]
         if state and state.active and not state.landed then
             allLanded = false
-
-            state.elapsed = state.elapsed + dt
-            local t = state.elapsed / state.duration
-            if t > 1 then t = 1 end
-
-            local progress     = WHLSN.SlotEasing(t)
-            local scrollOffset = state.scrollBase + progress * state.scrollDistance
-            local listHeight   = state.listHeight
-            local numNames     = math.min(#state.names, MAX_SLOTS)
-
-            -- Motion-blur alpha based on speed (fast = dim, slow = clear)
-            -- speed ∈ [0,1] where 1 is max speed (linear phase)
-            local speed = 0
-            if t > 0 and t < 1 then
-                if t >= P1_END and t < P2_END then
-                    speed = 1.0
-                elseif t < P1_END then
-                    speed = t / P1_END
-                else
-                    speed = 1.0 - (t - P2_END) / (1 - P2_END)
-                end
-            end
-            local slotAlpha = 1.0 - speed * 0.5  -- 0.5 at full speed, 1.0 at rest
-
-            -- Virtual-scroll: reposition each slot using modulo wrapping.
-            -- Text is fixed per slot (assigned once in SpinForGroup); only
-            -- position changes, like names painted on a physical drum.
-            -- Names scroll top-to-bottom (new names appear from the top).
-            local reel = reelFrames[i]
-            if reel and reel.slots then
-                for j = 1, numNames do
-                    local rawY = (-scrollOffset - (j - 1) * ROW_HEIGHT) % listHeight - ROW_HEIGHT
-                    -- Wrap slots that overflowed above the viewport back to the bottom
-                    if rawY > ROW_HEIGHT then
-                        rawY = rawY - listHeight
-                    end
-                    reel.slots[j]:ClearAllPoints()
-                    reel.slots[j]:SetPoint("TOPLEFT", reel.inner, "TOPLEFT", 2, rawY)
-                    reel.slots[j]:SetTextColor(1, 1, 1, slotAlpha)
-                end
-
-                -- Tick sound: detect when a new name scrolls past the centre row
-                local currentRow = math.floor(scrollOffset / ROW_HEIGHT)
-                if currentRow ~= state.lastRow and speed > 0.1 then
-                    PlayTick()
-                    state.lastRow = currentRow
-                end
-            end
-
-            -- When t >= 1: highlight winner (slot 1 = winner, at centre)
+            local t = UpdateReelScroll(i, state, dt)
             if t >= 1 then
                 state.landed = true
-
-                if reel and reel.slots then
-                    -- At t=1, scrollBase + scrollDistance is an exact multiple of listHeight.
-                    -- Slot 1 (winner) wraps to y = -ROW_HEIGHT = centre of viewport.
-                    for j = 1, numNames do
-                        if j == 1 then
-                            reel.slots[j]:SetTextColor(GOLD_R, GOLD_G, GOLD_B, 1)
-                        else
-                            reel.slots[j]:SetTextColor(0.7, 0.7, 0.7, 0.8)
-                        end
-                        reel.slots[j]:SetAlpha(1)
-                    end
-
-                    -- Gold glow on reel borders
-                    if reel.glow then
-                        reel.glow:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 0.35)
-                    end
-                    for _, border in ipairs(reel.borders or {}) do
-                        border:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 1)
-                    end
-
-                    -- Utility icons
-                    local winner = state.winner
-                    if winner then
-                        if winner:HasBrez() and reel.brezIcon then
-                            reel.brezIcon:Show()
-                        end
-                        if winner:HasLust() and reel.lustIcon then
-                            reel.lustIcon:Show()
-                        end
-                    end
-
-                    -- Landing sound
-                    PlayLand()
-                end
+                HighlightReelWinner(i, state)
             end
         end
     end
 
-    -- Check if all active reels have landed
     if allLanded then
-        local anyActive = false
-        for i = 1, 5 do
-            if reelState[i] and reelState[i].active then
-                anyActive = true
-                break
-            end
-        end
-        if anyActive then
-            -- Clear the OnUpdate handler
-            if wheelFrame then
-                wheelFrame:SetScript("OnUpdate", nil)
-            end
-            WHLSN._OnAllReelsLanded()
-        else
-            -- No active reels at all — clear handler so it doesn't fire every frame
-            if wheelFrame then
-                wheelFrame:SetScript("OnUpdate", nil)
-            end
-            isAnimating = false
-        end
+        CheckAllReelsComplete()
     end
 end
 
 ---------------------------------------------------------------------------
--- Task 5: Multi-Group Flow & Completion
+-- Multi-Group Flow & Completion
 ---------------------------------------------------------------------------
 
 --- Forward declarations for inter-calling local functions
@@ -775,7 +807,7 @@ local OnFinalGroupComplete
 
 --- Called once all 5 reels for the current group have settled.
 function WHLSN._OnAllReelsLanded()
-    isAnimating = false
+    ws.isAnimating = false
 
     PlayVictory()
 
@@ -783,27 +815,24 @@ function WHLSN._OnAllReelsLanded()
     local totalGroups = #groups
 
     local glowDelay = GLOW_DURATION / GetAnimationSpeed()
-    if currentGroupIndex < totalGroups then
-        -- More groups to show: wait GLOW_DURATION then collapse and advance
-        animTimer = C_Timer.NewTimer(glowDelay, function()
-            animTimer = nil
+    if ws.currentGroup < totalGroups then
+        ws.timer = C_Timer.NewTimer(glowDelay, function()
+            ws.timer = nil
             CollapseAndAdvance()
         end)
     else
-        -- Last group
-        animTimer = C_Timer.NewTimer(glowDelay, function()
-            animTimer = nil
+        ws.timer = C_Timer.NewTimer(glowDelay, function()
+            ws.timer = nil
             OnFinalGroupComplete()
         end)
     end
 end
 
---- Add a summary row for the given group index to the summary container.
+--- Add a summary row for the given group index using pre-created FontStrings.
 local function AddSummaryRow(groupIndex)
     local groups = WHLSN.session.groups
     local group  = groups[groupIndex]
 
-    -- Build summary text with role-coloured names joined by " · "
     local parts = {}
     local function addColored(player, colorR, colorG, colorB)
         if player then
@@ -824,26 +853,27 @@ local function AddSummaryRow(groupIndex)
 
     local summaryText = table.concat(parts, " · ")
 
-    -- Create summary FontString row in summaryContainer
-    if wheelFrame and wheelFrame.summaryContainer then
-        local sc  = wheelFrame.summaryContainer
-        local row = sc:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        row:SetJustifyH("CENTER")
-        row:SetSize(sc:GetWidth(), SUMMARY_ROW_HEIGHT)
-        row:SetText("Group " .. groupIndex .. ": " .. summaryText)
-
-        summaryRows[#summaryRows + 1] = row
+    -- Write to pre-created summary slot by index
+    if ws.frame and ws.frame.summarySlots then
+        ws.summaryCount = ws.summaryCount + 1
+        local sc = ws.frame.summaryContainer
 
         -- Position visible summary rows; hide oldest if > MAX_SUMMARY_ROWS
-        local visibleStart = math.max(1, #summaryRows - MAX_SUMMARY_ROWS + 1)
-        for idx, r in ipairs(summaryRows) do
+        local visibleStart = math.max(1, ws.summaryCount - MAX_SUMMARY_ROWS + 1)
+        for idx = 1, ws.summaryCount do
+            -- Map to slot index (circular use of pre-created slots)
+            local slotIdx = ((idx - 1) % MAX_SUMMARY_ROWS) + 1
+            local slot = ws.frame.summarySlots[slotIdx]
             if idx < visibleStart then
-                r:Hide()
+                slot:Hide()
             else
-                local rowPos = idx - visibleStart  -- 0-indexed from top
-                r:ClearAllPoints()
-                r:SetPoint("TOPLEFT", sc, "TOPLEFT", 0, -rowPos * SUMMARY_ROW_HEIGHT)
-                r:Show()
+                local rowPos = idx - visibleStart
+                if idx == ws.summaryCount then
+                    slot:SetText("Group " .. idx .. ": " .. summaryText)
+                end
+                slot:ClearAllPoints()
+                slot:SetPoint("TOPLEFT", sc, "TOPLEFT", 0, -rowPos * SUMMARY_ROW_HEIGHT)
+                slot:Show()
             end
         end
     end
@@ -851,55 +881,30 @@ end
 
 --- Collapse the current reels into a summary row and spin for the next group.
 CollapseAndAdvance = function()
-    AddSummaryRow(currentGroupIndex)
+    AddSummaryRow(ws.currentGroup)
 
-    -- Fade out the reel container using AnimationGroup
-    local container = wheelFrame and wheelFrame.reelContainer
-    if container then
-        local ag = container:CreateAnimationGroup()
-        local fade = ag:CreateAnimation("Alpha")
-        fade:SetFromAlpha(1)
-        fade:SetToAlpha(0)
-        fade:SetDuration(COLLAPSE_DURATION / GetAnimationSpeed())
-        fade:SetSmoothing("OUT")
-        ag:SetToFinalAlpha(true)
+    -- Reuse the pre-created AnimationGroup for collapse fade
+    local container = ws.frame and ws.frame.reelContainer
+    if container and ws.frame.collapseAG then
+        local ag = ws.frame.collapseAG
+        ag:Stop()
+        ws.frame.collapseFade:SetDuration(COLLAPSE_DURATION / GetAnimationSpeed())
         ag:SetScript("OnFinished", function()
-            -- Reset reel visuals for the next spin
             container:SetAlpha(1)
-            for i = 1, 5 do
-                local reel = reelFrames[i]
-                if reel then
-                    if reel.glow then
-                        reel.glow:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 0)
-                    end
-                    for _, border in ipairs(reel.borders or {}) do
-                        local roleDef = REEL_ROLES[i]
-                        border:SetColorTexture(roleDef.color.r, roleDef.color.g, roleDef.color.b, 1)
-                    end
-                    if reel.brezIcon then reel.brezIcon:Hide() end
-                    if reel.lustIcon then reel.lustIcon:Hide() end
-                    for j = 1, MAX_SLOTS do
-                        reel.slots[j]:SetText("")
-                        reel.slots[j]:SetTextColor(1, 1, 1, 1)
-                    end
-                end
-            end
-
-            -- Advance to next group
-            SpinForGroup(currentGroupIndex + 1)
+            ResetReelVisuals()
+            SpinForGroup(ws.currentGroup + 1)
         end)
         ag:Play()
     else
-        -- No container to fade; advance directly
-        SpinForGroup(currentGroupIndex + 1)
+        SpinForGroup(ws.currentGroup + 1)
     end
 end
 
 --- Called after the last group's glow period expires.
 OnFinalGroupComplete = function()
-    AddSummaryRow(currentGroupIndex)
-    animTimer = C_Timer.NewTimer(FINAL_PAUSE / GetAnimationSpeed(), function()
-        animTimer = nil
+    AddSummaryRow(ws.currentGroup)
+    ws.timer = C_Timer.NewTimer(FINAL_PAUSE / GetAnimationSpeed(), function()
+        ws.timer = nil
         WHLSN:OnWheelComplete()
     end)
 end
@@ -910,38 +915,41 @@ end
 
 --- Hide the wheel view and cancel any pending animation timers.
 function WHLSN:HideWheelView()
-    if animTimer then
-        animTimer:Cancel()
-        animTimer = nil
+    if ws.timer then
+        ws.timer:Cancel()
+        ws.timer = nil
     end
-    if wheelFrame then
-        wheelFrame:SetScript("OnUpdate", nil)
-        wheelFrame:Hide()
+    if ws.frame then
+        ws.frame:SetScript("OnUpdate", nil)
+        ws.frame:Hide()
     end
-    isAnimating = false
+    ws.isAnimating = false
 end
 
 --- Show the wheel view inside the given content frame.
 ---@param parent table
 function WHLSN:ShowWheelView(parent)
-    -- Reset animation state
-    reelFrames        = {}
-    reelState         = {}
-    summaryRows       = {}
-    currentGroupIndex = 0
-    isAnimating       = false
-    if animTimer then
-        animTimer:Cancel()
-        animTimer = nil
+    -- Cancel any pending timers from a previous spin
+    if ws.timer then
+        ws.timer:Cancel()
+        ws.timer = nil
     end
+    ws.isAnimating = false
 
-    -- Create or recreate the wheel frame
-    if wheelFrame then
-        wheelFrame:Hide()
-        wheelFrame = nil
+    -- Create frame on first call; reuse on subsequent calls
+    if not ws.frame then
+        ws.frame = CreateWheelFrame(parent)
     end
-    wheelFrame = CreateWheelFrame(parent)
-    wheelFrame:Show()
+    ws.frame:SetParent(parent)
+    ws.frame:SetAllPoints()
+
+    -- Reset visual state for new spin
+    ws.reelState  = {}
+    ws.currentGroup = 0
+    ResetReelVisuals()
+    ResetSummaryRows()
+
+    ws.frame:Show()
 
     -- Build consistent reel name lists once for all groups
     BuildReelNameLists()
@@ -956,14 +964,14 @@ end
 
 --- Skip remaining animation and jump straight to completion.
 function WHLSN:SkipWheelAnimation()
-    if animTimer then
-        animTimer:Cancel()
-        animTimer = nil
+    if ws.timer then
+        ws.timer:Cancel()
+        ws.timer = nil
     end
-    if wheelFrame then
-        wheelFrame:SetScript("OnUpdate", nil)
+    if ws.frame then
+        ws.frame:SetScript("OnUpdate", nil)
     end
-    isAnimating = false
+    ws.isAnimating = false
     self:OnWheelComplete()
 end
 

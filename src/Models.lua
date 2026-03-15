@@ -137,7 +137,10 @@ function Group:GetPlayers()
 end
 
 function Group:GetSize()
-    return #self:GetPlayers()
+    local n = #self.dps
+    if self.tank then n = n + 1 end
+    if self.healer then n = n + 1 end
+    return n
 end
 
 function Group:IsComplete()
@@ -145,21 +148,27 @@ function Group:IsComplete()
 end
 
 function Group:HasBrez()
-    for _, p in ipairs(self:GetPlayers()) do
+    if self.tank and self.tank:HasBrez() then return true end
+    if self.healer and self.healer:HasBrez() then return true end
+    for _, p in ipairs(self.dps) do
         if p:HasBrez() then return true end
     end
     return false
 end
 
 function Group:HasLust()
-    for _, p in ipairs(self:GetPlayers()) do
+    if self.tank and self.tank:HasLust() then return true end
+    if self.healer and self.healer:HasLust() then return true end
+    for _, p in ipairs(self.dps) do
         if p:HasLust() then return true end
     end
     return false
 end
 
 function Group:HasRanged()
-    for _, p in ipairs(self:GetPlayers()) do
+    if self.tank and self.tank:IsRanged() then return true end
+    if self.healer and self.healer:IsRanged() then return true end
+    for _, p in ipairs(self.dps) do
         if p:IsRanged() then return true end
     end
     return false
