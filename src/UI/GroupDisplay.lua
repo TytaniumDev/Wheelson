@@ -43,9 +43,10 @@ local function CreateGroupDisplayFrame(parent)
     -- Bottom button bar: chain left-to-right to avoid overlap
     -- Row 1 (left-aligned): Invite, Post, Report
     frame.inviteButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.inviteButton:SetSize(110, 24)
-    frame.inviteButton:SetPoint("BOTTOMLEFT", 8, 8)
+    frame.inviteButton:SetSize(130, 30)
+    frame.inviteButton:SetPoint("BOTTOMLEFT", 8, 5)
     frame.inviteButton:SetText("Invite My Group")
+    frame.inviteButton:GetFontString():SetFontObject("GameFontNormalLarge")
     frame.inviteButton:SetScript("OnClick", function()
         WHLSN:InviteMyGroup()
     end)
@@ -70,22 +71,14 @@ local function CreateGroupDisplayFrame(parent)
         end
     end)
 
-    -- Row 1 (right-aligned): New Session, End Session
+    -- Row 1 (right-aligned): Finish
     frame.endButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.endButton:SetSize(90, 24)
+    frame.endButton:SetSize(70, 24)
     frame.endButton:SetPoint("BOTTOMRIGHT", -8, 8)
-    frame.endButton:SetText("End Session")
+    frame.endButton:SetText("Finish")
     frame.endButton:SetScript("OnClick", function()
+        WHLSN:ToggleMainFrame()
         WHLSN:EndSession()
-    end)
-
-    frame.newButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.newButton:SetSize(90, 24)
-    frame.newButton:SetPoint("RIGHT", frame.endButton, "LEFT", -4, 0)
-    frame.newButton:SetText("New Session")
-    frame.newButton:SetScript("OnClick", function()
-        WHLSN:EndSession()
-        WHLSN:StartSession()
     end)
 
     return frame
@@ -269,7 +262,6 @@ function WHLSN:UpdateGroupDisplayView()
     local isHost = self.session.host == UnitName("player")
     local isViewing = self.session.viewingHistory or false
     displayFrame.endButton:SetShown(isHost or isViewing)
-    displayFrame.newButton:SetShown(isHost and not isViewing)
     displayFrame.inviteButton:SetShown(not isViewing)
     displayFrame.postButton:SetShown(not isViewing)
     displayFrame.reportButton:SetShown(not isViewing and WHLSN.session.algorithmSnapshot ~= nil)
@@ -280,7 +272,7 @@ function WHLSN:UpdateGroupDisplayView()
         displayFrame.endButton:SetText("Close")
     else
         displayFrame.title:SetText("|cFFFFD100Mythic+ Groups|r")
-        displayFrame.endButton:SetText("End Session")
+        displayFrame.endButton:SetText("Finish")
     end
 
     -- Render each group
