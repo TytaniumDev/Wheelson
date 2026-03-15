@@ -241,3 +241,83 @@ describe("PadReelPool", function()
         end
     end)
 end)
+
+-- ---------------------------------------------------------------------------
+-- SlotEasing tests
+-- ---------------------------------------------------------------------------
+
+describe("SlotEasing", function()
+    it("should return 0 at t=0", function()
+        assert.near(0, WHLSN.SlotEasing(0), 1e-9)
+    end)
+
+    it("should return ~1 at t=1", function()
+        assert.near(1, WHLSN.SlotEasing(1), 1e-6)
+    end)
+
+    it("should accelerate quickly in phase 1", function()
+        -- At 50% through phase 1, progress should be > 0 (quartic: grows fast)
+        local midP1 = 0.0375 * 0.5
+        local val = WHLSN.SlotEasing(midP1)
+        assert.is_true(val > 0)
+    end)
+
+    it("should be monotonically increasing before bounce phase (check up to t=0.92)", function()
+        local prev = WHLSN.SlotEasing(0)
+        local step = 0.01
+        local t = step
+        while t <= 0.92 do
+            local curr = WHLSN.SlotEasing(t)
+            assert.is_true(curr >= prev, "not monotonically increasing at t=" .. t)
+            prev = curr
+            t = t + step
+        end
+    end)
+
+    it("should be continuous at phase boundaries", function()
+        -- Phase 1 → Phase 2 boundary (t ≈ 0.0375)
+        local eps = 1e-5
+        local before1 = WHLSN.SlotEasing(0.0375 - eps)
+        local after1  = WHLSN.SlotEasing(0.0375 + eps)
+        assert.near(before1, after1, 0.01)
+
+        -- Phase 2 → Phase 3 boundary (t ≈ 0.625)
+        local before2 = WHLSN.SlotEasing(0.625 - eps)
+        local after2  = WHLSN.SlotEasing(0.625 + eps)
+        assert.near(before2, after2, 0.01)
+
+        -- Phase 3 → Phase 4 boundary (t ≈ 0.925)
+        local before3 = WHLSN.SlotEasing(0.925 - eps)
+        local after3  = WHLSN.SlotEasing(0.925 + eps)
+        assert.near(before3, after3, 0.01)
+    end)
+end)
+
+-- ---------------------------------------------------------------------------
+-- DampedSpring tests
+-- ---------------------------------------------------------------------------
+
+describe("DampedSpring", function()
+    it("should return 1 at t=0", function()
+        -- DampedSpring(0): envelope = e^0 = 1, sin(0)=0 → 1 + 0 = 1
+        assert.near(1, WHLSN.DampedSpring(0), 1e-9)
+    end)
+
+    it("should overshoot past 1 briefly", function()
+        -- With 1 + e^(-k*t)*sin(w*t)*0.15, the first half-lobe of sin is positive → overshoots above 1
+        local found_overshoot = false
+        local t = 0.01
+        while t <= 0.5 do
+            if WHLSN.DampedSpring(t) > 1.0 then
+                found_overshoot = true
+                break
+            end
+            t = t + 0.01
+        end
+        assert.is_true(found_overshoot)
+    end)
+
+    it("should settle near 1 at t=1", function()
+        assert.near(1, WHLSN.DampedSpring(1), 0.01)
+    end)
+end)
