@@ -322,9 +322,11 @@ local function CreateReelFrame(parent, index, roleDef)
     reel.glow = glow
 
     -- Inner clip frame holding 15 pre-created FontString name slots
+    -- SetClipsChildren ensures FontStrings outside the viewport are hidden
     local inner = CreateFrame("Frame", nil, reel)
     inner:SetPoint("TOPLEFT", reel, "TOPLEFT", 1, -1)
     inner:SetPoint("BOTTOMRIGHT", reel, "BOTTOMRIGHT", -1, 1)
+    inner:SetClipsChildren(true)
     reel.inner = inner
 
     local slots = {}
