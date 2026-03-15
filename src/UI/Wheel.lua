@@ -3,319 +3,117 @@ local WHLSN = _G.Wheelson
 
 ---------------------------------------------------------------------------
 -- Wheel View
--- Animated group reveal (mirrors the activity wheel animation)
+-- Slot-machine-style animated group reveal
 ---------------------------------------------------------------------------
 
 local wheelFrame = nil
-local revealTimer = nil
-local currentRevealGroup = 0
-local currentRevealPlayer = 0 -- For per-player reveal within a group
-local groupFrames = {}
-local playerTexts = {} -- playerTexts[groupIndex] = { fontStrings... }
 
--- Animation timing (seconds) — base values, scaled by animationSpeed
-local BASE_GROUP_DELAY = 1.5   -- Delay between each group reveal
-local BASE_PLAYER_DELAY = 0.4  -- Delay between each player in a group
-local BASE_FADE_DURATION = 0.4 -- Fade-in duration
+---------------------------------------------------------------------------
+-- Candidate Pool Helpers
+---------------------------------------------------------------------------
 
-local function GetAnimationSpeed()
-    if WHLSN.db and WHLSN.db.profile then
-        return WHLSN.db.profile.animationSpeed or 1.0
-    end
-    return 1.0
-end
+--- Build the candidate pool (list of WHLSNPlayer) for a single reel.
+--- Filters the players list by eligibility for the given role, excludes
+--- names in excludeNames (except the winner), then force-inserts the winner
+--- if they aren't already present.
+---@param players WHLSNPlayer[]
+---@param role string  "tank"|"healer"|"dps"
+---@param winner string  name of the winning player
+---@param excludeNames table  map of name→true for names to skip
+---@return WHLSNPlayer[]
+function WHLSN.BuildReelPool(players, role, winner, excludeNames)
+    local pool = {}
+    local winnerInPool = false
 
-local function GetGroupDelay()
-    return BASE_GROUP_DELAY / GetAnimationSpeed()
-end
+    for _, p in ipairs(players) do
+        -- Check eligibility for the requested role
+        local eligible = false
+        if role == "tank" then
+            eligible = p:IsTankMain() or p:IsOfftank()
+        elseif role == "healer" then
+            eligible = p:IsHealerMain() or p:IsOffhealer()
+        elseif role == "dps" then
+            eligible = p:IsDpsMain() or p:IsOffdps()
+        end
 
-local function GetPlayerDelay()
-    return BASE_PLAYER_DELAY / GetAnimationSpeed()
-end
-
-local function GetFadeDuration()
-    return BASE_FADE_DURATION / GetAnimationSpeed()
-end
-
-local function ShouldPlaySounds()
-    if WHLSN.db and WHLSN.db.profile then
-        return WHLSN.db.profile.soundEnabled ~= false
-    end
-    return true
-end
-
-local function CreateWheelFrame(parent)
-    local frame = CreateFrame("Frame", "WHLSNWheelFrame", parent)
-    frame:SetAllPoints()
-
-    -- Title
-    frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    frame.title:SetPoint("TOP", 0, -4)
-    frame.title:SetText("Forming Groups...")
-    frame.title:SetTextColor(1, 0.82, 0)
-
-    -- Group display area (groups revealed one at a time)
-    frame.groupContainer = CreateFrame("Frame", nil, frame)
-    frame.groupContainer:SetPoint("TOPLEFT", 8, -32)
-    frame.groupContainer:SetPoint("BOTTOMRIGHT", -8, 48)
-
-    -- Skip button
-    frame.skipButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.skipButton:SetSize(100, 28)
-    frame.skipButton:SetPoint("BOTTOMRIGHT", -8, 8)
-    frame.skipButton:SetText("Skip")
-    frame.skipButton:SetScript("OnClick", function()
-        WHLSN:SkipWheelAnimation()
-    end)
-
-    -- Re-spin button (go back to lobby with same players)
-    frame.respinButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.respinButton:SetSize(100, 28)
-    frame.respinButton:SetPoint("BOTTOMLEFT", 8, 8)
-    frame.respinButton:SetText("Re-spin")
-    frame.respinButton:Hide()
-    frame.respinButton:SetScript("OnClick", function()
-        WHLSN:ReSpin()
-    end)
-
-    -- Continue button (navigate to full results view)
-    frame.continueButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.continueButton:SetSize(100, 28)
-    frame.continueButton:SetPoint("BOTTOMRIGHT", -8, 8)
-    frame.continueButton:SetText("Continue")
-    frame.continueButton:Hide()
-    frame.continueButton:SetScript("OnClick", function()
-        WHLSN:UpdateUI()
-    end)
-
-    return frame
-end
-
-local function GetUtilString(player)
-    if not player then return "" end
-    local utilStr = ""
-    if player:HasBrez() then utilStr = utilStr .. " |cFF00FF00[BR]|r" end
-    if player:HasLust() then utilStr = utilStr .. " |cFFFF4400[BL]|r" end
-    return utilStr
-end
-
-local function CreateGroupCard(parent, index, group)
-    local card = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-
-    local columns = 2
-    local cardWidth = (parent:GetWidth() - 16) / columns - 8
-    local cardHeight = 110
-    local col = (index - 1) % columns
-    local row = math.floor((index - 1) / columns)
-
-    card:SetSize(cardWidth, cardHeight)
-    card:SetPoint("TOPLEFT", 4 + col * (cardWidth + 8), -(row * (cardHeight + 8)))
-
-    card:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 12,
-        insets = { left = 3, right = 3, top = 3, bottom = 3 },
-    })
-    card:SetBackdropColor(0.1, 0.1, 0.15, 0.9)
-
-    -- Group header
-    local header = card:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    header:SetPoint("TOP", 0, -6)
-    header:SetText("|cFFFFD100Group " .. index .. "|r")
-
-    -- Player lines (created hidden for per-player reveal)
-    local texts = {}
-    local yOff = -24
-
-    -- Tank line
-    local tankText = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    tankText:SetPoint("TOPLEFT", 8, yOff)
-    if group.tank then
-        tankText:SetText("|cFF87BCDE[T]|r " .. group.tank.name .. GetUtilString(group.tank))
-    else
-        tankText:SetText("|cFF87BCDE[T]|r |cFF666666(no tank)|r")
-    end
-    tankText:SetAlpha(0)
-    texts[#texts + 1] = tankText
-
-    -- Healer line
-    yOff = yOff - 16
-    local healerText = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    healerText:SetPoint("TOPLEFT", 8, yOff)
-    if group.healer then
-        healerText:SetText("|cFF87FF87[H]|r " .. group.healer.name .. GetUtilString(group.healer))
-    else
-        healerText:SetText("|cFF87FF87[H]|r |cFF666666(no healer)|r")
-    end
-    healerText:SetAlpha(0)
-    texts[#texts + 1] = healerText
-
-    -- DPS lines
-    for _, dps in ipairs(group.dps) do
-        yOff = yOff - 16
-        local dpsText = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        dpsText:SetPoint("TOPLEFT", 8, yOff)
-        local roleTag = dps:IsRanged() and "|cFFFF8787[R]|r" or "|cFFFFD187[M]|r"
-        dpsText:SetText(roleTag .. " " .. dps.name .. GetUtilString(dps))
-        dpsText:SetAlpha(0)
-        texts[#texts + 1] = dpsText
-    end
-
-    card:SetAlpha(0)
-    return card, texts
-end
-
---- Hide the wheel view and cancel any pending animation timers.
-function WHLSN:HideWheelView()
-    if revealTimer then
-        revealTimer:Cancel()
-        revealTimer = nil
-    end
-    if wheelFrame then wheelFrame:Hide() end
-end
-
---- Show the wheel view inside the given content frame.
-function WHLSN:ShowWheelView(parent)
-    if wheelFrame then wheelFrame:Hide() end
-    groupFrames = {}
-    playerTexts = {}
-    currentRevealGroup = 0
-    currentRevealPlayer = 0
-
-    wheelFrame = CreateWheelFrame(parent)
-    wheelFrame:Show()
-
-    -- Start reveal sequence
-    self:StartWheelReveal()
-end
-
---- Update the wheel view.
-function WHLSN:UpdateWheelView()
-    -- Animation is self-driven via timers
-end
-
---- Start the sequential group reveal animation.
-function WHLSN:StartWheelReveal()
-    if not wheelFrame then return end
-
-    -- Create all group cards (hidden)
-    for i, group in ipairs(self.session.groups) do
-        local card, texts = CreateGroupCard(wheelFrame.groupContainer, i, group)
-        groupFrames[i] = card
-        playerTexts[i] = texts
-    end
-
-    -- Play wheel sound
-    if ShouldPlaySounds() then
-        PlaySound(SOUNDKIT.AUCTION_WINDOW_OPEN)
-    end
-
-    -- Start revealing groups one by one
-    currentRevealGroup = 0
-    currentRevealPlayer = 0
-    self:RevealNextGroup()
-end
-
---- Reveal the next group card with animation.
-function WHLSN:RevealNextGroup()
-    currentRevealGroup = currentRevealGroup + 1
-    currentRevealPlayer = 0
-
-    if currentRevealGroup > #groupFrames then
-        -- All groups revealed
-        self:OnWheelComplete()
-        return
-    end
-
-    local card = groupFrames[currentRevealGroup]
-
-    -- Fade in the card background
-    local fadeIn = card:CreateAnimationGroup()
-    local alpha = fadeIn:CreateAnimation("Alpha")
-    alpha:SetFromAlpha(0)
-    alpha:SetToAlpha(1)
-    alpha:SetDuration(GetFadeDuration())
-    alpha:SetSmoothing("OUT")
-    fadeIn:SetScript("OnFinished", function()
-        card:SetAlpha(1)
-        -- Start per-player reveal
-        WHLSN:RevealNextPlayer()
-    end)
-    fadeIn:Play()
-
-    -- Play reveal sound
-    if ShouldPlaySounds() then
-        PlaySound(SOUNDKIT.UI_EPICLOOT_TOAST)
-    end
-end
-
---- Reveal the next player within the current group.
-function WHLSN:RevealNextPlayer()
-    currentRevealPlayer = currentRevealPlayer + 1
-
-    local texts = playerTexts[currentRevealGroup]
-    if not texts or currentRevealPlayer > #texts then
-        -- All players in this group revealed, move to next group
-        revealTimer = C_Timer.NewTimer(GetGroupDelay(), function()
-            WHLSN:RevealNextGroup()
-        end)
-        return
-    end
-
-    local textWidget = texts[currentRevealPlayer]
-    textWidget:SetAlpha(1)
-
-    -- Schedule next player reveal
-    revealTimer = C_Timer.NewTimer(GetPlayerDelay(), function()
-        WHLSN:RevealNextPlayer()
-    end)
-end
-
---- Skip remaining animation and show all groups.
-function WHLSN:SkipWheelAnimation()
-    if revealTimer then
-        revealTimer:Cancel()
-        revealTimer = nil
-    end
-
-    for i, card in ipairs(groupFrames) do
-        card:SetAlpha(1)
-        if playerTexts[i] then
-            for _, text in ipairs(playerTexts[i]) do
-                text:SetAlpha(1)
+        if eligible then
+            -- Exclude logic: skip excluded names unless this player is the winner
+            if p.name == winner or not excludeNames[p.name] then
+                pool[#pool + 1] = p
+                if p.name == winner then
+                    winnerInPool = true
+                end
             end
         end
     end
 
-    self:OnWheelComplete()
-end
-
---- Go back to lobby with same players and re-spin.
-function WHLSN:ReSpin()
-    if self.session.host ~= UnitName("player") then return end
-
-    self.session.status = self.Status.LOBBY
-    self.session.groups = {}
-    self:ResetView()
-    self:SpinGroups()
-end
-
---- Called when all groups have been revealed.
-function WHLSN:OnWheelComplete()
-    if wheelFrame then
-        wheelFrame.title:SetText("Groups Complete!")
-        wheelFrame.skipButton:Hide()
-        wheelFrame.continueButton:Show()
-
-        -- Show re-spin button for host
-        if self.session.host == UnitName("player") then
-            wheelFrame.respinButton:Show()
+    -- Force-insert the winner if they weren't found in the eligible pool.
+    -- Search the full players list first; if the winner isn't there at all,
+    -- synthesise a minimal Player entry so the reel can still show the name.
+    if not winnerInPool then
+        local found = false
+        for _, p in ipairs(players) do
+            if p.name == winner then
+                pool[#pool + 1] = p
+                found = true
+                break
+            end
+        end
+        if not found then
+            pool[#pool + 1] = WHLSN.Player:New(winner, nil, {}, {})
         end
     end
 
-    if ShouldPlaySounds() then
-        PlaySound(SOUNDKIT.READY_CHECK)
+    return pool
+end
+
+--- Pad (or return as-is) a names array so it has at least minSize entries,
+--- cycling through the existing names as needed.
+---@param names string[]
+---@param minSize number
+---@return string[]
+function WHLSN.PadReelPool(names, minSize)
+    if #names >= minSize then
+        -- Return a copy up to minSize so callers get a fresh table
+        local result = {}
+        for i = 1, #names do
+            result[#result + 1] = names[i]
+        end
+        return result
     end
-    self:CompleteSession()
+
+    local result = {}
+    local i = 1
+    while #result < minSize do
+        result[#result + 1] = names[i]
+        i = i + 1
+        if i > #names then i = 1 end
+    end
+    return result
+end
+
+---------------------------------------------------------------------------
+-- Public API stubs
+---------------------------------------------------------------------------
+
+--- Hide the wheel view and cancel any pending animation timers.
+function WHLSN:HideWheelView()
+    if wheelFrame then wheelFrame:Hide() end
+end
+
+--- Show the wheel view inside the given content frame (stub).
+---@param parent table
+function WHLSN:ShowWheelView(parent) -- luacheck: ignore 212
+end
+
+--- Update the wheel view (no-op stub; animation is self-driven).
+function WHLSN:UpdateWheelView()
+end
+
+--- Skip remaining animation and show all reels at their final positions (stub).
+function WHLSN:SkipWheelAnimation()
+end
+
+--- Called when all reels have settled (stub).
+function WHLSN:OnWheelComplete()
 end
