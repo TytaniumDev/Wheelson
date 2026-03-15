@@ -304,7 +304,9 @@ local function getClipboardFrame(self)
         editBox:SetMaxLetters(0)
         editBox:SetAutoFocus(false)
         editBox:SetFontObject("ChatFontNormal")
-        editBox:SetWidth(scrollFrame:GetWidth())
+        scrollFrame:SetScript("OnSizeChanged", function(_, w)
+            editBox:SetWidth(w - 20)
+        end)
         editBox:SetScript("OnEscapePressed", function()
             frame:Hide()
         end)
@@ -324,22 +326,22 @@ local function getClipboardFrame(self)
     return self.clipboardFrame
 end
 
+local function showClipboardPopup(self, text)
+    local frame = getClipboardFrame(self)
+    frame:Show()
+    self.clipboardEditBox:SetText(text)
+    self.clipboardEditBox:HighlightText()
+    self.clipboardEditBox:SetFocus()
+end
+
 --- Copy group results to clipboard.
 ---@param groups WHLSNGroup[]
 function WHLSN:CopyGroupsToClipboard(groups)
-    local frame = getClipboardFrame(self)
-    frame:Show()
-    self.clipboardEditBox:SetText(self:FormatGroupSummary(groups))
-    self.clipboardEditBox:HighlightText()
-    self.clipboardEditBox:SetFocus()
+    showClipboardPopup(self, self:FormatGroupSummary(groups))
 end
 
 --- Copy a bug report to the clipboard and show instructions.
 ---@param snapshot table  algorithmSnapshot from session
 function WHLSN:CopyReportToClipboard(snapshot)
-    local frame = getClipboardFrame(self)
-    frame:Show()
-    self.clipboardEditBox:SetText(self:FormatBugReport(snapshot))
-    self.clipboardEditBox:HighlightText()
-    self.clipboardEditBox:SetFocus()
+    showClipboardPopup(self, self:FormatBugReport(snapshot))
 end
