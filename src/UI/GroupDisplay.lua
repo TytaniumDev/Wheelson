@@ -260,7 +260,7 @@ function WHLSN:UpdateGroupDisplayView()
     if not displayFrame then return end
 
     local isViewing = self.session.viewingHistory or false
-    displayFrame.endButton:SetShown(not isViewing)
+    displayFrame.endButton:SetShown(true)
     displayFrame.inviteButton:SetShown(not isViewing)
     displayFrame.reportButton:SetShown(not isViewing and WHLSN.session.algorithmSnapshot ~= nil)
 

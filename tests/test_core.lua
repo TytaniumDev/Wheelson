@@ -664,6 +664,17 @@ describe("HandleSessionEnd", function()
         assert.is_false(WHLSN.session.hostEnded)
     end)
 
+    it("should ignore SESSION_END when not in a session", function()
+        -- No active session (host is nil)
+        WHLSN.session.status = nil
+        WHLSN.session.host = nil
+
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX,
+            { type = "SESSION_END" }, "GUILD", "SomeHost")
+
+        assert.is_false(WHLSN.session.hostEnded)
+    end)
+
     it("should allow new session after hostEnded", function()
         WHLSN.session.status = "completed"
         WHLSN.session.host = nil

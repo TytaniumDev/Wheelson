@@ -535,8 +535,8 @@ function WHLSN:HandleSessionUpdate(data, sender)
 end
 
 function WHLSN:HandleSessionEnd(sender)
-    -- Only accept end from the session host
-    if self.session.host and sender ~= self.session.host then return end
+    -- Only accept end from the session host; ignore if not in a session
+    if not self.session.host or self.session.host ~= sender then return end
 
     -- Non-host: preserve display state, mark session as host-ended
     self.session.hostEnded = true
