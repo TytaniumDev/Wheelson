@@ -61,8 +61,13 @@ local function CreateGroupDisplayFrame(parent)
     frame.endButton:SetPoint("BOTTOMRIGHT", -8, 8)
     frame.endButton:SetText("Finish")
     frame.endButton:SetScript("OnClick", function()
+        local isHost = WHLSN.session.host == UnitName("player")
         WHLSN:ToggleMainFrame()
-        WHLSN:EndSession()
+        if isHost then
+            WHLSN:EndSession()
+        else
+            WHLSN:ClearSessionState()
+        end
     end)
 
     return frame
@@ -254,9 +259,8 @@ end
 function WHLSN:UpdateGroupDisplayView()
     if not displayFrame then return end
 
-    local isHost = self.session.host == UnitName("player")
     local isViewing = self.session.viewingHistory or false
-    displayFrame.endButton:SetShown(isHost or isViewing)
+    displayFrame.endButton:SetShown(not isViewing)
     displayFrame.inviteButton:SetShown(not isViewing)
     displayFrame.reportButton:SetShown(not isViewing and WHLSN.session.algorithmSnapshot ~= nil)
 
