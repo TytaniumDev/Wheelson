@@ -40,6 +40,12 @@ luac.out
 # Superpowers planning documents
 docs/superpowers/
 
+# Superpowers brainstorm sessions
+.superpowers/
+
+# Git worktrees
+.worktrees/
+
 # Executables
 *.exe
 *.out

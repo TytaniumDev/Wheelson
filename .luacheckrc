@@ -24,9 +24,13 @@ read_globals = {
     "os",
 
     -- WoW API functions
+    "AutoCompleteEditBox_SetAutoCompleteSource",
     "C_Timer",
+    "ChatFrame_OpenChat",
     "ConvertToRaid",
     "CreateFrame",
+    MenuUtil = { other_fields = true },
+    AUTOCOMPLETE_LIST = { other_fields = true },
     GameTooltip = { other_fields = true },
     "GetGuildInfo",
     "GetGuildRosterInfo",

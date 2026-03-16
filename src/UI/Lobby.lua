@@ -7,6 +7,7 @@ local WHLSN = _G.Wheelson
 ---------------------------------------------------------------------------
 
 local lobbyState = { frame = nil, playerRows = {}, historyRows = {} }
+local communityPanel = nil
 
 local ROLE_ICONS = {
     tank = "Interface\\LFGFrame\\LFGRole_BW",
@@ -110,44 +111,91 @@ local function CreateLobbyFrame(parent)
         WHLSN:EndSession()
     end)
 
-    -- Add Player button (host only, during active session)
-    frame.addPlayerButton = CreateFrame("Button", "WHLSNAddPlayerButton", frame, "UIPanelButtonTemplate")
-    frame.addPlayerButton:SetSize(80, 32)
-    frame.addPlayerButton:SetPoint("BOTTOMRIGHT", -8, 8)
-    frame.addPlayerButton:SetText("Add Player")
-    frame.addPlayerButton:SetScript("OnClick", function()
-        if frame.addPlayerInput:IsShown() then
-            frame.addPlayerInput:Hide()
-            frame.addPlayerConfirm:Hide()
-        else
-            frame.addPlayerInput:Show()
-            frame.addPlayerConfirm:Show()
-            frame.addPlayerInput:SetFocus()
+    -- Community Roster button (host only, during active session)
+    frame.communityRosterButton = CreateFrame("Button", "WHLSNCommunityRosterButton", frame, "UIPanelButtonTemplate")
+    frame.communityRosterButton:SetSize(120, 32)
+    frame.communityRosterButton:SetPoint("BOTTOMRIGHT", -8, 8)
+    frame.communityRosterButton:SetText("Community Roster")
+    frame.communityRosterButton:SetScript("OnClick", function()
+        WHLSN:ToggleCommunityPanel()
+    end)
+
+    return frame
+end
+
+local COMMUNITY_PANEL_BACKDROP = {
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 16,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 },
+}
+
+local function CreateCommunityPanel()
+    local mainFrame = _G["WHLSNMainFrame"]
+    if not mainFrame then return nil end
+
+    local panel = CreateFrame("Frame", "WHLSNCommunityPanel", mainFrame, "BackdropTemplate")
+    panel:SetWidth(200)
+    panel:SetPoint("TOPLEFT", mainFrame, "TOPRIGHT", -2, 0)
+    panel:SetPoint("BOTTOMLEFT", mainFrame, "BOTTOMRIGHT", -2, 0)
+    panel:SetBackdrop(COMMUNITY_PANEL_BACKDROP)
+    panel:SetBackdropColor(0.05, 0.05, 0.08, 0.95)
+    panel:SetClampedToScreen(true)
+    panel:SetFrameStrata("DIALOG")
+    panel:EnableMouse(true)
+
+    -- Title
+    panel.title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    panel.title:SetPoint("TOP", 0, -12)
+    panel.title:SetText("|cFFFFD100Community Roster|r")
+
+    -- Member count
+    panel.countText = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    panel.countText:SetPoint("TOP", panel.title, "BOTTOM", 0, -2)
+    panel.countText:SetTextColor(0.6, 0.6, 0.6)
+
+    -- Add player input (with autocomplete fallback)
+    local template = "InputBoxTemplate"
+    if type(AutoCompleteEditBox_SetAutoCompleteSource) == "function" then
+        template = "AutoCompleteEditBoxTemplate"
+    end
+
+    panel.input = CreateFrame("EditBox", "WHLSNCommunityInput", panel, template)
+    panel.input:SetSize(140, 20)
+    panel.input:SetPoint("TOPLEFT", 12, -48)
+    panel.input:SetAutoFocus(false)
+    panel.input.Instructions = panel.input:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    panel.input.Instructions:SetPoint("LEFT", 6, 0)
+    panel.input.Instructions:SetText("Character name...")
+    panel.input.Instructions:SetTextColor(0.5, 0.5, 0.5)
+    panel.input:SetScript("OnEditFocusGained", function(self)
+        self.Instructions:Hide()
+    end)
+    panel.input:SetScript("OnEditFocusLost", function(self)
+        if self:GetText() == "" then
+            self.Instructions:Show()
         end
     end)
 
-    -- Add Player input (hidden by default)
-    frame.addPlayerInput = CreateFrame("EditBox", "WHLSNAddPlayerInput", frame, "InputBoxTemplate")
-    frame.addPlayerInput:SetSize(160, 20)
-    frame.addPlayerInput:SetPoint("BOTTOMRIGHT", frame.addPlayerButton, "TOPRIGHT", 0, 4)
-    frame.addPlayerInput:SetAutoFocus(false)
-    frame.addPlayerInput:Hide()
+    -- Set up autocomplete if available
+    if template == "AutoCompleteEditBoxTemplate" and AUTOCOMPLETE_LIST then
+        AutoCompleteEditBox_SetAutoCompleteSource(panel.input, AUTOCOMPLETE_LIST.ALL)
+    end
 
-    -- Confirm button for add player
-    frame.addPlayerConfirm = CreateFrame("Button", "WHLSNAddPlayerConfirm", frame, "UIPanelButtonTemplate")
-    frame.addPlayerConfirm:SetSize(40, 20)
-    frame.addPlayerConfirm:SetPoint("RIGHT", frame.addPlayerInput, "LEFT", -2, 0)
-    frame.addPlayerConfirm:SetText("OK")
-    frame.addPlayerConfirm:Hide()
+    -- OK button
+    panel.okButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    panel.okButton:SetSize(36, 20)
+    panel.okButton:SetPoint("LEFT", panel.input, "RIGHT", 2, 0)
+    panel.okButton:SetText("OK")
 
+    -- Add player logic
     local function ConfirmAddPlayer()
-        local name = frame.addPlayerInput:GetText()
+        local name = panel.input:GetText()
         if name and strtrim(name) ~= "" then
-            local ok, err = WHLSN:AddCommunityPlayer(name)
-            if ok then
+            local added, err = WHLSN:AddCommunityPlayer(name)
+            if added then
                 local normalized = WHLSN:NormalizeCommunityName(name)
                 WHLSN:Print("Added " .. normalized .. " to community roster.")
-                -- Immediately ping if session is active
                 if WHLSN.session.status == WHLSN.Status.LOBBY then
                     local pingData = {
                         type = "SESSION_PING",
@@ -158,24 +206,135 @@ local function CreateLobbyFrame(parent)
                     local serialized = WHLSN:Serialize(pingData)
                     WHLSN:SendCommMessage(WHLSN.COMM_PREFIX, serialized, "WHISPER", normalized)
                 end
+                WHLSN:RefreshCommunityPanel()
+                WHLSN:UpdateLobbyView()
             else
                 WHLSN:Print("Could not add: " .. (err or "unknown error"))
             end
         end
-        frame.addPlayerInput:SetText("")
-        frame.addPlayerInput:Hide()
-        frame.addPlayerConfirm:Hide()
+        panel.input:SetText("")
+        panel.input.Instructions:Show()
+        panel.input:ClearFocus()
     end
 
-    frame.addPlayerConfirm:SetScript("OnClick", ConfirmAddPlayer)
-    frame.addPlayerInput:SetScript("OnEnterPressed", ConfirmAddPlayer)
-    frame.addPlayerInput:SetScript("OnEscapePressed", function(self)
+    panel.okButton:SetScript("OnClick", ConfirmAddPlayer)
+    panel.input:SetScript("OnEnterPressed", ConfirmAddPlayer)
+    panel.input:SetScript("OnEscapePressed", function(self)
         self:SetText("")
-        self:Hide()
-        frame.addPlayerConfirm:Hide()
+        self.Instructions:Show()
+        self:ClearFocus()
     end)
 
-    return frame
+    -- Divider line
+    local divider = panel:CreateTexture(nil, "ARTWORK")
+    divider:SetHeight(1)
+    divider:SetPoint("TOPLEFT", 8, -74)
+    divider:SetPoint("TOPRIGHT", -8, -74)
+    divider:SetColorTexture(0.3, 0.3, 0.3, 0.8)
+
+    -- Container for roster rows
+    panel.rosterContainer = CreateFrame("Frame", nil, panel)
+    panel.rosterContainer:SetPoint("TOPLEFT", 8, -80)
+    panel.rosterContainer:SetPoint("BOTTOMRIGHT", -8, 8)
+
+    panel.rosterRows = {}
+
+    panel:Hide()
+    return panel
+end
+
+function WHLSN:ToggleCommunityPanel()
+    if not communityPanel then
+        communityPanel = CreateCommunityPanel()
+        if not communityPanel then return end
+        UISpecialFrames[#UISpecialFrames + 1] = "WHLSNCommunityPanel"
+    end
+
+    if communityPanel:IsShown() then
+        communityPanel:Hide()
+    else
+        communityPanel:Show()
+        self:RefreshCommunityPanel()
+    end
+end
+
+function WHLSN:HideCommunityPanel()
+    if communityPanel and communityPanel:IsShown() then
+        communityPanel:Hide()
+    end
+end
+
+local function OnRosterRowEnter(r)
+    GameTooltip:SetOwner(r, "ANCHOR_RIGHT")
+    GameTooltip:SetText(r.fullName, 1, 1, 1)
+    GameTooltip:Show()
+end
+
+local function OnRosterRowLeave()
+    GameTooltip:Hide()
+end
+
+local function OnRosterRowMouseUp(r, button)
+    if button == "RightButton" then
+        MenuUtil.CreateContextMenu(r, function(_, rootDescription)
+            rootDescription:CreateTitle(r.fullName)
+            rootDescription:CreateButton("Whisper", function()
+                ChatFrame_OpenChat("/w " .. r.fullName .. " ")
+            end)
+            rootDescription:CreateButton("|cFFFF6666Remove|r", function()
+                WHLSN:RemoveCommunityPlayer(r.fullName)
+                WHLSN:Print("Removed " .. r.fullName .. " from community roster.")
+                WHLSN:RefreshCommunityPanel()
+            end)
+        end)
+    end
+end
+
+function WHLSN:RefreshCommunityPanel()
+    if not communityPanel or not communityPanel:IsShown() then return end
+
+    local roster = self.db.profile.communityRoster
+    communityPanel.countText:SetText(#roster .. " members")
+
+    -- Hide existing rows
+    for _, row in ipairs(communityPanel.rosterRows) do
+        row:Hide()
+    end
+
+    -- Create/update rows
+    for i, entry in ipairs(roster) do
+        local row = communityPanel.rosterRows[i]
+        if not row then
+            row = CreateFrame("Frame", nil, communityPanel.rosterContainer)
+            row:SetHeight(20)
+            row:EnableMouse(true)
+
+            row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            row.nameText:SetPoint("LEFT", 4, 0)
+            row.nameText:SetJustifyH("LEFT")
+
+            local highlight = row:CreateTexture(nil, "HIGHLIGHT")
+            highlight:SetAllPoints()
+            highlight:SetColorTexture(1, 0.82, 0, 0.1)
+
+            row:SetScript("OnEnter", OnRosterRowEnter)
+            row:SetScript("OnLeave", OnRosterRowLeave)
+            row:SetScript("OnMouseUp", OnRosterRowMouseUp)
+
+            communityPanel.rosterRows[i] = row
+        end
+
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", 0, -(i - 1) * 22)
+        row:SetPoint("RIGHT", 0, 0)
+
+        local displayName = self:StripRealmName(entry.name)
+        row.nameText:SetText(displayName)
+        row.nameText:SetTextColor(0.9, 0.9, 0.9)
+        row.fullName = entry.name
+
+        row:Show()
+    end
 end
 
 local function CreatePlayerRow(parent, index)
@@ -300,10 +459,9 @@ local function UpdateLobbyButtons(frame, isHost, hasSession, isInSession, player
     frame.startButton:SetShown(not hasSession)
     frame.testButton:SetShown(not hasSession)
     frame.endButton:SetShown(isHost and hasSession)
-    frame.addPlayerButton:SetShown(isHost and hasSession)
+    frame.communityRosterButton:SetShown(isHost and hasSession)
     if not (isHost and hasSession) then
-        frame.addPlayerInput:Hide()
-        frame.addPlayerConfirm:Hide()
+        WHLSN:HideCommunityPanel()
     end
 end
 
