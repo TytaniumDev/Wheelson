@@ -38,7 +38,7 @@ _G.LibStub = function(name, silent)
             end,
         }
     elseif name == "LibDBIcon-1.0" then
-        return _G._test_ldbicon or {
+        return {
             Register = function() end,
             Show = function() end,
             Hide = function() end,
@@ -318,7 +318,6 @@ describe("ToggleMinimapIcon", function()
     local printed_messages
 
     before_each(function()
-        _G._test_ldbicon = nil
         WHLSN:OnInitialize()
         WHLSN.db.profile.minimap = { hide = false }
 
@@ -326,8 +325,8 @@ describe("ToggleMinimapIcon", function()
         ldbicon_hidden = false
         printed_messages = {}
 
-        -- Mock LibDBIcon
-        _G._test_ldbicon = {
+        -- Override ldbIcon with tracking mock
+        WHLSN.ldbIcon = {
             Show = function(_, name) ldbicon_shown = true end,
             Hide = function(_, name) ldbicon_hidden = true end,
         }

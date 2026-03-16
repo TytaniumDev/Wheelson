@@ -38,7 +38,7 @@ function WHLSN:OnInitialize()
 
     -- Minimap icon via LibDataBroker + LibDBIcon
     local LDB = LibStub("LibDataBroker-1.1")
-    local LDBIcon = LibStub("LibDBIcon-1.0")
+    self.ldbIcon = LibStub("LibDBIcon-1.0")
 
     local launcher = LDB:NewDataObject("Wheelson", {
         type = "launcher",
@@ -64,7 +64,7 @@ function WHLSN:OnInitialize()
             tooltip:AddLine("|cFFFFFFFFRight-click:|r Debug panel", 0.8, 0.8, 0.8)
         end,
     })
-    LDBIcon:Register("Wheelson", launcher, self.db.profile.minimap)
+    self.ldbIcon:Register("Wheelson", launcher, self.db.profile.minimap)
 
     self:Print("Wheelson loaded. Type /wheelson to open.")
 end
@@ -72,7 +72,7 @@ end
 --- Toggle minimap icon visibility and persist the setting.
 function WHLSN:ToggleMinimapIcon()
     local db = self.db.profile.minimap
-    local icon = LibStub("LibDBIcon-1.0")
+    local icon = self.ldbIcon
     db.hide = not db.hide
     if db.hide then
         icon:Hide("Wheelson")
