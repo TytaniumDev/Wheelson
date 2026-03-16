@@ -156,7 +156,7 @@ local function CreateCommunityPanel()
 
     -- Add player input (with autocomplete fallback)
     local template = "InputBoxTemplate"
-    local ok = pcall(CreateFrame, "EditBox", nil, panel, "AutoCompleteEditBoxTemplate")
+    local ok = pcall(CreateFrame, "EditBox", nil, nil, "AutoCompleteEditBoxTemplate")
     if ok then
         template = "AutoCompleteEditBoxTemplate"
     end
@@ -265,6 +265,32 @@ function WHLSN:HideCommunityPanel()
     end
 end
 
+local function OnRosterRowEnter(r)
+    GameTooltip:SetOwner(r, "ANCHOR_RIGHT")
+    GameTooltip:SetText(r.fullName, 1, 1, 1)
+    GameTooltip:Show()
+end
+
+local function OnRosterRowLeave()
+    GameTooltip:Hide()
+end
+
+local function OnRosterRowMouseUp(r, button)
+    if button == "RightButton" then
+        MenuUtil.CreateContextMenu(r, function(_, rootDescription)
+            rootDescription:CreateTitle(r.fullName)
+            rootDescription:CreateButton("Whisper", function()
+                ChatFrame_OpenChat("/w " .. r.fullName .. " ")
+            end)
+            rootDescription:CreateButton("|cFFFF6666Remove|r", function()
+                WHLSN:RemoveCommunityPlayer(r.fullName)
+                WHLSN:Print("Removed " .. r.fullName .. " from community roster.")
+                WHLSN:RefreshCommunityPanel()
+            end)
+        end)
+    end
+end
+
 function WHLSN:RefreshCommunityPanel()
     if not communityPanel or not communityPanel:IsShown() then return end
 
@@ -292,6 +318,10 @@ function WHLSN:RefreshCommunityPanel()
             highlight:SetAllPoints()
             highlight:SetColorTexture(1, 0.82, 0, 0.1)
 
+            row:SetScript("OnEnter", OnRosterRowEnter)
+            row:SetScript("OnLeave", OnRosterRowLeave)
+            row:SetScript("OnMouseUp", OnRosterRowMouseUp)
+
             communityPanel.rosterRows[i] = row
         end
 
@@ -303,33 +333,6 @@ function WHLSN:RefreshCommunityPanel()
         row.nameText:SetText(displayName)
         row.nameText:SetTextColor(0.9, 0.9, 0.9)
         row.fullName = entry.name
-
-        -- Tooltip showing full realm-qualified name
-        row:SetScript("OnEnter", function(r)
-            GameTooltip:SetOwner(r, "ANCHOR_RIGHT")
-            GameTooltip:SetText(r.fullName, 1, 1, 1)
-            GameTooltip:Show()
-        end)
-        row:SetScript("OnLeave", function()
-            GameTooltip:Hide()
-        end)
-
-        -- Right-click context menu
-        row:SetScript("OnMouseUp", function(r, button)
-            if button == "RightButton" then
-                MenuUtil.CreateContextMenu(r, function(_, rootDescription)
-                    rootDescription:CreateTitle(r.fullName)
-                    rootDescription:CreateButton("Whisper", function()
-                        ChatFrame_OpenChat("/w " .. r.fullName .. " ")
-                    end)
-                    rootDescription:CreateButton("|cFFFF6666Remove|r", function()
-                        WHLSN:RemoveCommunityPlayer(r.fullName)
-                        WHLSN:Print("Removed " .. r.fullName .. " from community roster.")
-                        WHLSN:RefreshCommunityPanel()
-                    end)
-                end)
-            end
-        end)
 
         row:Show()
     end
