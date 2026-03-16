@@ -73,6 +73,7 @@ function WHLSN:OnInitialize()
     })
     self.ldbIcon:Register("Wheelson", launcher, self.db.profile.minimap)
 
+    self:SetupOptionsPanel()
     self:Print("Wheelson loaded. Type /wheelson to open.")
 end
 
@@ -757,4 +758,8 @@ end
 
 function WHLSN:ToggleDebugFrame()
     -- Overridden by UI/DebugPanel.lua
+end
+
+function WHLSN:SetupOptionsPanel()
+    -- Overridden by UI/OptionsPanel.lua
 end

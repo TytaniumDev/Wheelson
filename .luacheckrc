@@ -24,7 +24,9 @@ read_globals = {
     "os",
 
     -- WoW API functions
-    "AutoCompleteEditBox_SetAutoCompleteSource",
+    "AUTOCOMPLETE_FLAG_ALL",
+    "AUTOCOMPLETE_FLAG_NONE",
+    "GetAutoCompleteResults",
     "C_Timer",
     "ChatFrame_OpenChat",
     "ConvertToRaid",

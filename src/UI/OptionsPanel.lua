@@ -7,9 +7,6 @@ local WHLSN = _G.Wheelson
 -- Displays online guild members who have the addon installed.
 ---------------------------------------------------------------------------
 
-local AceConfig = LibStub("AceConfig-3.0")
-local AceConfigDialog = LibStub("AceConfigDialog-3.0")
-
 local function GetDiscoveryText()
     if WHLSN.isScanning then
         return "Scanning..."
@@ -149,5 +146,9 @@ local options = {
     },
 }
 
-AceConfig:RegisterOptionsTable("Wheelson", options)
-AceConfigDialog:AddToBlizOptions("Wheelson")
+function WHLSN:SetupOptionsPanel()
+    local AceConfig = LibStub("AceConfig-3.0")
+    local AceConfigDialog = LibStub("AceConfigDialog-3.0")
+    AceConfig:RegisterOptionsTable("Wheelson", options)
+    AceConfigDialog:AddToBlizOptions("Wheelson")
+end
