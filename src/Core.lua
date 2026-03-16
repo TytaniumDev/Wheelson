@@ -507,6 +507,7 @@ function WHLSN:HandleSessionUpdate(data, sender)
 
         -- Clear stale leftSessionHost when accepting a new session
         self.leftSessionHost = nil
+        self.session.hostEnded = false
 
         -- Update full player list from host
         if data.players then
@@ -531,12 +532,11 @@ function WHLSN:HandleSessionEnd(sender)
     -- Only accept end from the session host
     if self.session.host and sender ~= self.session.host then return end
 
-    self.session.status = nil
-    self.session.host = nil
-    self.session.players = {}
-    self.session.groups = {}
+    -- Non-host: preserve display state, mark session as host-ended
+    self.session.hostEnded = true
+    self.session.host = nil  -- allow new sessions through the host-match guard
     self.session.algorithmSnapshot = nil
-    self.session.viewingHistory = false
+
     self:UpdateUI()
 end
 

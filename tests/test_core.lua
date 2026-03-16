@@ -548,3 +548,58 @@ describe("leftSessionHost", function()
         assert.is_nil(WHLSN.leftSessionHost)
     end)
 end)
+
+describe("HandleSessionEnd", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+        WHLSN.UpdateUI = function() end
+    end)
+
+    it("should preserve groups and status for non-hosts", function()
+        WHLSN.session.status = "completed"
+        WHLSN.session.host = "HostPlayer"
+        WHLSN.session.groups = { WHLSN.Group:New(WHLSN.Player:New("T1", "tank"), nil, {}) }
+        WHLSN.session.players = { WHLSN.Player:New("TestPlayer", "tank") }
+
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX,
+            { type = "SESSION_END" }, "GUILD", "HostPlayer")
+
+        assert.equals("completed", WHLSN.session.status)
+        assert.equals(1, #WHLSN.session.groups)
+        assert.equals(1, #WHLSN.session.players)
+        assert.is_true(WHLSN.session.hostEnded)
+        assert.is_nil(WHLSN.session.host)
+    end)
+
+    it("should still reject SESSION_END from non-host sender", function()
+        WHLSN.session.status = "completed"
+        WHLSN.session.host = "HostPlayer"
+
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX,
+            { type = "SESSION_END" }, "GUILD", "RandomPlayer")
+
+        assert.equals("HostPlayer", WHLSN.session.host)
+        assert.is_false(WHLSN.session.hostEnded)
+    end)
+
+    it("should allow new session after hostEnded", function()
+        WHLSN.session.status = "completed"
+        WHLSN.session.host = nil
+        WHLSN.session.hostEnded = true
+
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "NewHost",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "NewHost")
+
+        assert.equals("lobby", WHLSN.session.status)
+        assert.equals("NewHost", WHLSN.session.host)
+        assert.is_false(WHLSN.session.hostEnded)
+    end)
+end)
