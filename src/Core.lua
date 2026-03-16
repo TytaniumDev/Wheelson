@@ -69,6 +69,20 @@ function WHLSN:OnInitialize()
     self:Print("Wheelson loaded. Type /wheelson to open.")
 end
 
+--- Toggle minimap icon visibility and persist the setting.
+function WHLSN:ToggleMinimapIcon()
+    local db = self.db.profile.minimap
+    local icon = LibStub("LibDBIcon-1.0")
+    db.hide = not db.hide
+    if db.hide then
+        icon:Hide("Wheelson")
+        self:Print("Minimap icon hidden. Type /wheelson minimap to show it again.")
+    else
+        icon:Show("Wheelson")
+        self:Print("Minimap icon shown.")
+    end
+end
+
 function WHLSN:OnEnable()
     self:RegisterEvent("GROUP_ROSTER_UPDATE")
     self:RegisterEvent("GUILD_ROSTER_UPDATE")

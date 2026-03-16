@@ -38,8 +38,10 @@ _G.LibStub = function(name, silent)
             end,
         }
     elseif name == "LibDBIcon-1.0" then
-        return {
+        return _G._test_ldbicon or {
             Register = function() end,
+            Show = function() end,
+            Hide = function() end,
         }
     end
     if silent then return nil end
@@ -316,6 +318,7 @@ describe("ToggleMinimapIcon", function()
     local printed_messages
 
     before_each(function()
+        _G._test_ldbicon = nil
         WHLSN:OnInitialize()
         WHLSN.db.profile.minimap = { hide = false }
 
