@@ -40,12 +40,9 @@ local options = {
             desc = "Show or hide the Wheelson minimap button",
             get = function() return not WHLSN.db.profile.minimap.hide end,
             set = function(_, value)
-                WHLSN.db.profile.minimap.hide = not value
-                local icon = WHLSN.ldbIcon
-                if value then
-                    icon:Show("Wheelson")
-                else
-                    icon:Hide("Wheelson")
+                local isVisible = not WHLSN.db.profile.minimap.hide
+                if value ~= isVisible then
+                    WHLSN:ToggleMinimapIcon()
                 end
             end,
         },
