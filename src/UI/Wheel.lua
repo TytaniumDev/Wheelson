@@ -11,12 +11,10 @@ local WHLSN = _G.Wheelson
 ---------------------------------------------------------------------------
 
 -- Cache math functions as upvalues for hot-path performance
-local math_sin   = math.sin
 local math_floor = math.floor
 local math_ceil  = math.ceil
 local math_min   = math.min
 local math_max   = math.max
-local PI         = math.pi
 
 local ROW_HEIGHT        = 20
 local VISIBLE_ROWS      = 3
@@ -62,6 +60,15 @@ local P2_END = 0.45     -- end of full speed
 -- Easing output ranges (fraction of total scroll at each phase boundary)
 local P1_OUT_END = 0.01
 local P2_OUT_END = 0.60
+
+-- Phase 3 Hermite spline coefficients (velocity-continuous deceleration with bounce)
+-- m0 matches Phase 2's exit velocity for a smooth transition at the boundary;
+-- m1 < 0 creates overshoot-and-settle (slot machine bounce, ~1 name past winner).
+local P3_RANGE = 1.0 - P2_OUT_END
+local P3_M0 = ((P2_OUT_END - P1_OUT_END) * (1 - P2_END)) / ((P2_END - P1_END) * P3_RANGE)
+local P3_M1 = -0.5
+local P3_A  = P3_M0 + P3_M1 - 2
+local P3_B  = 3 - 2 * P3_M0 - P3_M1
 
 -- Expose easing constants for testing
 WHLSN._EASING = { P1_END = P1_END, P2_END = P2_END, P1_OUT_END = P1_OUT_END, P2_OUT_END = P2_OUT_END }
@@ -216,8 +223,6 @@ function WHLSN.SlotEasing(t)
     if t <= 0 then return 0 end
     if t >= 1 then return 1 end
 
-    local P3_RANGE = 1.0 - P2_OUT_END
-
     if t < P1_END then
         local p = t / P1_END
         local eased = p * p * p * p
@@ -229,7 +234,7 @@ function WHLSN.SlotEasing(t)
 
     else
         local p = (t - P2_END) / (1 - P2_END)
-        local eased = 1.0 + (2 ^ (-10 * p)) * math_sin((10 * p - 0.75) * 2 * PI / 3)
+        local eased = P3_A * p * p * p + P3_B * p * p + P3_M0 * p
         return P2_OUT_END + eased * P3_RANGE
     end
 end
@@ -718,7 +723,6 @@ local function UpdateReelScroll(i, state, dt)
     end
     local slotAlpha = 1.0 - speed * 0.5
 
-    -- Only update slots whose positions are within or near the visible viewport
     local reel = ws.reelFrames[i]
     if reel and reel.slots then
         local alphaChanged = slotAlpha ~= state.lastAlpha
@@ -729,15 +733,12 @@ local function UpdateReelScroll(i, state, dt)
             if rawY > ROW_HEIGHT then
                 rawY = rawY - listHeight
             end
-            -- Only reposition slots near the visible area (viewport is 0 to -REEL_HEIGHT)
-            if rawY > -REEL_HEIGHT - ROW_HEIGHT and rawY < ROW_HEIGHT * 2 then
-                local slot = slots[j]
-                -- SetPoint with the same anchor name replaces the existing point;
-                -- ClearAllPoints() is unnecessary when only one anchor is used.
-                slot:SetPoint("TOPLEFT", inner, "TOPLEFT", 2, rawY)
-                if alphaChanged then
-                    slot:SetTextColor(1, 1, 1, slotAlpha)
-                end
+            local slot = slots[j]
+            -- SetPoint with the same anchor name replaces the existing point;
+            -- ClearAllPoints() is unnecessary when only one anchor is used.
+            slot:SetPoint("TOPLEFT", inner, "TOPLEFT", 2, rawY)
+            if alphaChanged then
+                slot:SetTextColor(1, 1, 1, slotAlpha)
             end
         end
         state.lastAlpha = slotAlpha
