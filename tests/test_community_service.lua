@@ -110,9 +110,15 @@ describe("CommunityService", function()
             assert.is_true(ok)
         end)
 
-        it("should reject bare names with hyphens", function()
-            local ok = WHLSN:ValidateCommunityName("My-Name-Realm")
-            assert.is_false(ok)
+        it("should accept hyphenated realm names", function()
+            local ok = WHLSN:ValidateCommunityName("Tyler-Azjol-Nerub")
+            assert.is_true(ok)
+        end)
+
+        it("should treat first hyphen as realm separator", function()
+            -- "My-Name-Realm" → character "My" on realm "Name-Realm"
+            local ok = WHLSN:ValidateCommunityName("My-NameRealm")
+            assert.is_true(ok)
         end)
     end)
 
