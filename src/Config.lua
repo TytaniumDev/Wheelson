@@ -143,5 +143,6 @@ WHLSN.defaults = {
         framePosition = nil,
         animationSpeed = 1.0,
         soundEnabled = true,
+        communityRoster = {},
     },
 }
