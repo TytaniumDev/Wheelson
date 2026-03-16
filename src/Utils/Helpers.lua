@@ -52,12 +52,12 @@ function WHLSN:FormatGroupSummary(groups)
     return table.concat(lines, "\n")
 end
 
---- Get a role-colored name string for display.
+--- Get a class-colored name string for display.
 ---@param player WHLSNPlayer
 ---@return string
 function WHLSN:ColoredPlayerName(player)
-    local rc = self.RoleColors[player.mainRole]
-    local color = rc and rc.hex or "FFFFFF"
+    local cc = player.classToken and self.CLASS_COLORS[player.classToken]
+    local color = cc and cc.hex or "FFFFFF"
     return "|cFF" .. color .. player.name .. "|r"
 end
 
@@ -103,7 +103,12 @@ end
 ---@param player WHLSNPlayer  player data
 function WHLSN:ShowPlayerTooltip(owner, player)
     GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-    GameTooltip:AddLine(player.name, 1, 1, 1)
+    local cc = player.classToken and self.CLASS_COLORS[player.classToken]
+    if cc then
+        GameTooltip:AddLine(player.name, cc.r, cc.g, cc.b)
+    else
+        GameTooltip:AddLine(player.name, 1, 1, 1)
+    end
 
     local role = player.mainRole
     if role then

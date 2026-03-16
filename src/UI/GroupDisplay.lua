@@ -157,7 +157,9 @@ end
 
 local function UpdatePlayerLine(lineFrame, prefix, hexColor, player)
     if player then
-        lineFrame.text:SetText("|cFF" .. hexColor .. prefix .. "|r  " .. player.name)
+        local cc = player.classToken and WHLSN.CLASS_COLORS[player.classToken]
+        local nameColor = cc and cc.hex or "FFFFFF"
+        lineFrame.text:SetText("|cFF" .. hexColor .. prefix .. "|r  |cFF" .. nameColor .. player.name .. "|r")
         lineFrame:SetScript("OnEnter", function(self)
             WHLSN:ShowPlayerTooltip(self, player)
         end)
@@ -180,8 +182,8 @@ local function UpdateUtilityRow(row, players)
     else
         local parts = {}
         for _, p in ipairs(players) do
-            local rc = WHLSN.RoleColors[p.mainRole]
-            local c = rc and rc.hex or DEFAULT_ROLE_COLOR
+            local cc = p.classToken and WHLSN.CLASS_COLORS[p.classToken]
+            local c = cc and cc.hex or DEFAULT_ROLE_COLOR
             parts[#parts + 1] = "|cFF" .. c .. p.name .. "|r"
         end
         row.names:SetText(table.concat(parts, "\n"))

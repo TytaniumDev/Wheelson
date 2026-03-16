@@ -872,21 +872,21 @@ local function AddSummaryRow(groupIndex)
     local group  = groups[groupIndex]
 
     local parts = {}
-    local function addColored(player, colorR, colorG, colorB)
+    local function addColored(player)
         if player then
-            parts[#parts + 1] = "|cff"
-                .. string.format("%02x%02x%02x",
-                    math_floor(colorR * 255),
-                    math_floor(colorG * 255),
-                    math_floor(colorB * 255))
-                .. player.name .. "|r"
+            local cc = player.classToken and WHLSN.CLASS_COLORS[player.classToken]
+            if cc then
+                parts[#parts + 1] = "|cFF" .. cc.hex .. player.name .. "|r"
+            else
+                parts[#parts + 1] = player.name
+            end
         end
     end
 
-    addColored(group.tank,   REEL_ROLES[1].color.r, REEL_ROLES[1].color.g, REEL_ROLES[1].color.b)
-    addColored(group.healer, REEL_ROLES[2].color.r, REEL_ROLES[2].color.g, REEL_ROLES[2].color.b)
+    addColored(group.tank)
+    addColored(group.healer)
     for k = 1, 3 do
-        addColored(group.dps[k], REEL_ROLES[3].color.r, REEL_ROLES[3].color.g, REEL_ROLES[3].color.b)
+        addColored(group.dps[k])
     end
 
     local summaryText = table.concat(parts, " · ")

@@ -83,7 +83,7 @@ function WHLSN:DetectLocalPlayer(selectedOffspecs, overrideRole)
         utilities[#utilities + 1] = "lust"
     end
 
-    return WHLSN.Player:New(name, mainRole, offspecs, utilities)
+    return WHLSN.Player:New(name, mainRole, offspecs, utilities, classToken)
 end
 
 --- Strip realm name from a character name.
@@ -113,5 +113,5 @@ function WHLSN:DetectGuildMember(name, classToken)
         utilities[#utilities + 1] = "lust"
     end
 
-    return WHLSN.Player:New(name, nil, {}, utilities)
+    return WHLSN.Player:New(name, nil, {}, utilities, classToken)
 end

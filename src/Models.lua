@@ -10,6 +10,7 @@ local WHLSN = _G.Wheelson
 ---@field mainRole string|nil  "tank"|"healer"|"ranged"|"melee"
 ---@field offspecs string[]
 ---@field utilities string[]
+---@field classToken string|nil  WoW class token (e.g. "WARRIOR", "PRIEST")
 local Player = {}
 Player.__index = Player
 WHLSN.Player = Player
@@ -19,13 +20,15 @@ WHLSN.Player = Player
 ---@param mainRole string|nil
 ---@param offspecs? string[]
 ---@param utilities? string[]
+---@param classToken? string
 ---@return WHLSNPlayer
-function Player:New(name, mainRole, offspecs, utilities)
+function Player:New(name, mainRole, offspecs, utilities, classToken)
     local p = setmetatable({}, self)
     p.name = name
     p.mainRole = mainRole
     p.offspecs = offspecs or {}
     p.utilities = utilities or {}
+    p.classToken = classToken
     return p
 end
 
@@ -90,6 +93,7 @@ function Player:ToDict()
         mainRole = self.mainRole,
         offspecs = self.offspecs,
         utilities = self.utilities,
+        classToken = self.classToken,
     }
 end
 
@@ -101,7 +105,8 @@ function Player.FromDict(data)
         data.name,
         data.mainRole,
         data.offspecs or {},
-        data.utilities or {}
+        data.utilities or {},
+        data.classToken
     )
 end
 

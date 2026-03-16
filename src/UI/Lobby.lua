@@ -536,11 +536,14 @@ local function PopulatePlayerRows(frame, players)
             local tc = ROLE_TEXCOORDS[role]
             row.roleIcon:SetTexCoord(tc[1], tc[2], tc[3], tc[4])
             row.roleIcon:Show()
-
-            local rc = WHLSN.RoleColors[role]
-            row.nameText:SetTextColor(rc.r, rc.g, rc.b)
         else
             row.roleIcon:Hide()
+        end
+
+        local cc = player.classToken and WHLSN.CLASS_COLORS[player.classToken]
+        if cc then
+            row.nameText:SetTextColor(cc.r, cc.g, cc.b)
+        else
             row.nameText:SetTextColor(1, 1, 1)
         end
 
