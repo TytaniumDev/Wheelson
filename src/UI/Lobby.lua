@@ -301,6 +301,10 @@ local function UpdateLobbyButtons(frame, isHost, hasSession, isInSession, player
     frame.testButton:SetShown(not hasSession)
     frame.endButton:SetShown(isHost and hasSession)
     frame.addPlayerButton:SetShown(isHost and hasSession)
+    if not (isHost and hasSession) then
+        frame.addPlayerInput:Hide()
+        frame.addPlayerConfirm:Hide()
+    end
 end
 
 local function PopulatePlayerRows(frame, players)
