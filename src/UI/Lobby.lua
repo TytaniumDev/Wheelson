@@ -190,9 +190,10 @@ local function CreateCommunityPanel()
     local function UpdateAC()
         local text = panel.input:GetText()
         if not text or #text == 0 then HideAC(); return end
-        local ok, results = pcall(GetAutoCompleteResults, text, 8, #text, true, acInclude, acExclude)
+        local MAX_AC_RESULTS = 8
+        local ok, results = pcall(GetAutoCompleteResults, text, MAX_AC_RESULTS, #text, true, acInclude, acExclude)
         if not ok or not results or #results == 0 then HideAC(); return end
-        local count = math.min(#results, 8)
+        local count = math.min(#results, MAX_AC_RESULTS)
         for i = 1, count do
             local btn = acDropdown.buttons[i]
             if not btn then
@@ -230,7 +231,9 @@ local function CreateCommunityPanel()
         acDropdown:Show()
     end
 
-    panel.input:SetScript("OnTextChanged", UpdateAC)
+    panel.input:SetScript("OnTextChanged", function(_, userInput)
+        if userInput then UpdateAC() end
+    end)
 
     -- OK button
     panel.okButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
