@@ -82,6 +82,7 @@ dofile("src/Services/SpecService.lua")
 _G.random = math.random
 _G.wipe = function(t) for k in pairs(t) do t[k] = nil end end
 dofile("src/GroupCreator.lua")
+dofile("src/UI/Lobby.lua")
 
 local WHLSN = _G.Wheelson
 
@@ -432,5 +433,118 @@ describe("Slash command routing", function()
     it("should handle extra whitespace", function()
         SlashCmdList["WHEELSON"]("  minimap  ")
         assert.is_true(toggled_minimap)
+    end)
+
+    it("should fall back to main frame for unknown args", function()
+        SlashCmdList["WHEELSON"]("unknown")
+        assert.is_true(toggled_main)
+        assert.is_false(toggled_minimap)
+    end)
+end)
+
+describe("leftSessionHost", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.sent_messages = {}
+        WHLSN.SendCommMessage = function(self, prefix, msg, channel)
+            self.sent_messages[#self.sent_messages + 1] = { prefix = prefix, msg = msg, channel = channel }
+        end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+        WHLSN.UpdateUI = function() end
+        WHLSN.ShowMainFrame = function() end
+        WHLSN.DetectLocalPlayer = function()
+            return WHLSN.Player:New("TestPlayer", "tank", {}, {})
+        end
+    end)
+
+    it("should suppress updates from the host you left", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "HostA"
+        WHLSN:LeaveSession()
+
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostA",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostA")
+
+        assert.is_nil(WHLSN.session.status)
+    end)
+
+    it("should allow updates from a different host after leaving", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "HostA"
+        WHLSN:LeaveSession()
+
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostB",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostB")
+
+        assert.equals("lobby", WHLSN.session.status)
+        assert.equals("HostB", WHLSN.session.host)
+    end)
+
+    it("should clear leftSessionHost on StartSession", function()
+        WHLSN.leftSessionHost = "HostA"
+        WHLSN:StartSession()
+
+        assert.is_nil(WHLSN.leftSessionHost)
+    end)
+
+    it("should clear leftSessionHost on RequestJoin", function()
+        WHLSN.leftSessionHost = "HostA"
+        WHLSN.session.host = "HostB"
+
+        WHLSN:RequestJoin()
+
+        assert.is_nil(WHLSN.leftSessionHost)
+    end)
+
+    it("should block RequestJoin when hostEnded is true", function()
+        WHLSN.session.host = "HostA"
+        WHLSN.session.hostEnded = true
+
+        WHLSN:RequestJoin()
+
+        assert.equals(0, #WHLSN.sent_messages)
+    end)
+
+    it("LeaveSession should use ClearSessionState and set leftSessionHost", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "HostA"
+        WHLSN.session.hostEnded = true
+        WHLSN.session.algorithmSnapshot = { timestamp = 123 }
+
+        WHLSN:LeaveSession()
+
+        assert.equals("HostA", WHLSN.leftSessionHost)
+        assert.is_nil(WHLSN.session.status)
+        assert.is_nil(WHLSN.session.host)
+        assert.is_false(WHLSN.session.hostEnded)
+        assert.is_nil(WHLSN.session.algorithmSnapshot)
+    end)
+
+    it("should clear leftSessionHost when accepting a new session", function()
+        WHLSN.leftSessionHost = "HostA"
+
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostB",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostB")
+
+        assert.is_nil(WHLSN.leftSessionHost)
     end)
 end)

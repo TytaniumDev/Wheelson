@@ -124,7 +124,7 @@ function WHLSN:StartSession()
         return
     end
 
-    self.hasLeftSession = false
+    self.leftSessionHost = nil
     self.session.status = self.Status.LOBBY
     self.session.host = UnitName("player")
     self.session.players = {}
@@ -196,7 +196,8 @@ function WHLSN:LeaveSession()
         return
     end
 
-    -- Send leave notification to host
+    self.leftSessionHost = self.session.host
+
     local data = {
         type = "LEAVE_REQUEST",
         playerName = myName,
@@ -204,11 +205,7 @@ function WHLSN:LeaveSession()
     local serialized = self:Serialize(data)
     self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
 
-    self.session.status = nil
-    self.session.host = nil
-    self.session.players = {}
-    self.session.groups = {}
-    self.hasLeftSession = true
+    self:ClearSessionState()
     self:Print("You have left the session.")
 end
 
@@ -498,15 +495,19 @@ function WHLSN:OnCommReceived(prefix, message, _distribution, sender)
 end
 
 function WHLSN:HandleSessionUpdate(data, sender)
-    -- Ignore updates after intentionally leaving a session
-    if self.hasLeftSession then return end
+    -- Suppress updates from the specific host we left (scoped, not global)
+    if self.leftSessionHost and sender == self.leftSessionHost then return end
 
-    -- Only accept updates from the session host
+    -- Only accept updates from the session host (or accept new sessions when no host set)
     if self.session.host and sender ~= self.session.host then return end
 
     if data.host then
         self.session.status = data.status
         self.session.host = data.host
+
+        -- Clear stale leftSessionHost when accepting a new session
+        self.leftSessionHost = nil
+
         -- Update full player list from host
         if data.players then
             self.session.players = {}

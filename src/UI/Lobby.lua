@@ -361,7 +361,12 @@ function WHLSN:RequestJoin()
         return
     end
 
-    self.hasLeftSession = false
+    if self.session.hostEnded then
+        self:Print("That session has ended.")
+        return
+    end
+
+    self.leftSessionHost = nil
 
     local playerData = WHLSN:DetectLocalPlayer()
     if not playerData then
