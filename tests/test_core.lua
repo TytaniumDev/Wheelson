@@ -310,3 +310,65 @@ describe("SpinGroups", function()
         assert.equals("Tank1", snap.players[1].name)
     end)
 end)
+
+describe("ToggleMinimapIcon", function()
+    local ldbicon_shown, ldbicon_hidden
+    local printed_messages
+
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.db.profile.minimap = { hide = false }
+
+        ldbicon_shown = false
+        ldbicon_hidden = false
+        printed_messages = {}
+
+        -- Mock LibDBIcon
+        _G._test_ldbicon = {
+            Show = function(_, name) ldbicon_shown = true end,
+            Hide = function(_, name) ldbicon_hidden = true end,
+        }
+
+        WHLSN.Print = function(_, msg)
+            printed_messages[#printed_messages + 1] = msg
+        end
+    end)
+
+    it("should hide the icon when currently shown", function()
+        WHLSN.db.profile.minimap.hide = false
+
+        WHLSN:ToggleMinimapIcon()
+
+        assert.is_true(WHLSN.db.profile.minimap.hide)
+        assert.is_true(ldbicon_hidden)
+        assert.is_false(ldbicon_shown)
+    end)
+
+    it("should show the icon when currently hidden", function()
+        WHLSN.db.profile.minimap.hide = true
+
+        WHLSN:ToggleMinimapIcon()
+
+        assert.is_false(WHLSN.db.profile.minimap.hide)
+        assert.is_true(ldbicon_shown)
+        assert.is_false(ldbicon_hidden)
+    end)
+
+    it("should print restore hint when hiding", function()
+        WHLSN.db.profile.minimap.hide = false
+
+        WHLSN:ToggleMinimapIcon()
+
+        assert.equals(1, #printed_messages)
+        assert.truthy(printed_messages[1]:find("/wheelson minimap"))
+    end)
+
+    it("should print confirmation when showing", function()
+        WHLSN.db.profile.minimap.hide = true
+
+        WHLSN:ToggleMinimapIcon()
+
+        assert.equals(1, #printed_messages)
+        assert.truthy(printed_messages[1]:find("shown"))
+    end)
+end)
