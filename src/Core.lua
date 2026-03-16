@@ -603,7 +603,9 @@ function WHLSN:HandleJoinRequest(data, sender, distribution)
     if not data.player then return end
     if self:StripRealmName(data.player.name) ~= self:StripRealmName(sender) then return end
 
-    -- Validate sender: guild channel is self-validating; whisper requires community roster check
+    -- Only accept joins over expected channels
+    if distribution ~= "GUILD" and distribution ~= "WHISPER" then return end
+    -- Whisper joins require community roster membership
     if distribution == "WHISPER" then
         if not self:IsCommunityRosterMember(sender) then return end
     end
