@@ -63,7 +63,7 @@ local P2_OUT_END = 0.60
 
 -- Phase 3 Hermite spline coefficients (velocity-continuous deceleration with bounce)
 -- m0 matches Phase 2's exit velocity for a smooth transition at the boundary;
--- m1 < 0 creates overshoot-and-settle (slot machine bounce, ~4 names past winner).
+-- m1 < 0 creates overshoot-and-settle (slot machine bounce, ~1 name past winner).
 local P3_RANGE = 1.0 - P2_OUT_END
 local P3_M0 = ((P2_OUT_END - P1_OUT_END) * (1 - P2_END)) / ((P2_END - P1_END) * P3_RANGE)
 local P3_M1 = -0.5
@@ -734,6 +734,8 @@ local function UpdateReelScroll(i, state, dt)
                 rawY = rawY - listHeight
             end
             local slot = slots[j]
+            -- SetPoint with the same anchor name replaces the existing point;
+            -- ClearAllPoints() is unnecessary when only one anchor is used.
             slot:SetPoint("TOPLEFT", inner, "TOPLEFT", 2, rawY)
             if alphaChanged then
                 slot:SetTextColor(1, 1, 1, slotAlpha)
