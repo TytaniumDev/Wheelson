@@ -63,6 +63,7 @@ src/Core.lua
 # Services
 src/Services/SpecService.lua
 src/Services/GuildService.lua
+src/Services/CommunityService.lua
 src/Services/PartyService.lua
 
 # Utilities

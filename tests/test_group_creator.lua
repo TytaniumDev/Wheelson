@@ -22,9 +22,19 @@ _G.LibStub = function()
     return addon
 end
 
+-- WoW API stubs for SpecService
+_G.UnitName = function() return "TestPlayer" end
+_G.UnitClass = function() return "Warrior", "WARRIOR" end
+_G.C_SpecializationInfo = {
+    GetSpecialization = function() return 1 end,
+    GetSpecializationInfo = function() return 71 end,
+}
+_G.GetNumSpecializations = function() return 3 end
+
 -- Load source files in order
 dofile("src/Config.lua")
 dofile("src/Models.lua")
+dofile("src/Services/SpecService.lua")
 dofile("src/GroupCreator.lua")
 
 local Player = Wheelson.Player

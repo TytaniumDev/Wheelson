@@ -7,6 +7,7 @@ local mock_db = {
         minimap = { hide = false },
         lastSession = nil,
         sessionHistory = {},
+        communityRoster = {},
     },
 }
 
@@ -58,6 +59,7 @@ _G.C_SpecializationInfo = {
     GetSpecializationInfo = function() return 71 end,
 }
 _G.GetNumSpecializations = function() return 3 end
+_G.GetNormalizedRealmName = function() return "Illidan" end
 _G.time = os.time
 _G.date = os.date
 _G.C_Timer = {
@@ -86,6 +88,7 @@ dofile("src/GroupCreator.lua")
 dofile("src/Core.lua")
 dofile("src/Services/SpecService.lua")
 dofile("src/Services/GuildService.lua")
+dofile("src/Services/CommunityService.lua")
 dofile("src/Services/PartyService.lua")
 dofile("src/Utils/Helpers.lua")
 

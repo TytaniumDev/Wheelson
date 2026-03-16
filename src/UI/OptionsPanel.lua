@@ -66,6 +66,66 @@ local options = {
                 WHLSN:SendAddonPing()
             end,
         },
+        communityHeader = {
+            order = 20,
+            type = "header",
+            name = "Community Roster",
+        },
+        communityDesc = {
+            order = 21,
+            type = "description",
+            name = "Add non-guild players who have Wheelson installed. They'll be whispered when you start a session.",
+            fontSize = "medium",
+        },
+        communityAddName = {
+            order = 22,
+            type = "input",
+            name = "Add Player",
+            desc = "Enter player name (e.g., 'Tyler' for same realm, 'Tyler-Illidan' for cross-realm)",
+            set = function(_, val)
+                local ok, err = WHLSN:AddCommunityPlayer(val)
+                if ok then
+                    WHLSN:Print("Added " .. WHLSN:NormalizeCommunityName(val) .. " to community roster.")
+                else
+                    WHLSN:Print("Could not add: " .. (err or "unknown error"))
+                end
+            end,
+            get = function() return "" end,
+            width = "full",
+        },
+        communityList = {
+            order = 23,
+            type = "description",
+            name = function()
+                local roster = WHLSN.db and WHLSN.db.profile.communityRoster or {}
+                if #roster == 0 then
+                    return "No players in roster."
+                end
+                local lines = {}
+                for _, entry in ipairs(roster) do
+                    lines[#lines + 1] = "  " .. entry.name
+                end
+                return table.concat(lines, "\n")
+            end,
+            fontSize = "medium",
+        },
+        communityRemoveName = {
+            order = 24,
+            type = "input",
+            name = "Remove Player",
+            desc = "Enter player name to remove from roster",
+            set = function(_, val)
+                if not val or strtrim(val) == "" then return end
+                local ok = WHLSN:RemoveCommunityPlayer(val)
+                if ok then
+                    WHLSN:Print("Removed '" .. val .. "' from community roster.")
+                else
+                    WHLSN:Print("Player '" .. val .. "' not found in roster.")
+                end
+            end,
+            get = function() return "" end,
+            width = "full",
+        },
         versionHeader = {
             order = 10,
             type = "header",

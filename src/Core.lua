@@ -17,6 +17,9 @@ function WHLSN:OnInitialize()
         isTest = false,  -- true when running a test session (no guild comms)
         viewingHistory = false, -- true when displaying a past session
         hostEnded = false, -- true when the host explicitly ended the session
+        connectedCommunity = {},  -- bare name -> realm-qualified name (host only)
+        commChannel = nil,        -- "GUILD" or "WHISPER" (community clients only)
+        hostFullName = nil,       -- realm-qualified host name (community clients only)
     }
 
     -- Throttle timer for roster update events
@@ -130,6 +133,7 @@ function WHLSN:StartSession()
     self.session.players = {}
     self.session.groups = {}
     self.session.algorithmSnapshot = nil
+    self.session.connectedCommunity = {}
     -- Auto-add the host as the first player
     local hostPlayer = self:DetectLocalPlayer()
     if hostPlayer then
@@ -140,6 +144,7 @@ function WHLSN:StartSession()
     self:ResetSessionTimeout()
     self:ShowMainFrame()
     self:BroadcastSessionUpdate()
+    self:SendCommunityPings()
     self:Print("Session started! Guild members can join via the Wheelson addon.")
 end
 
@@ -170,11 +175,12 @@ function WHLSN:EndSession()
 
     local wasViewing = self.session.viewingHistory or false
     local wasTest = self.session.isTest or false
+    local wasCommunity = self.session.connectedCommunity or {}
 
     self:ClearSessionState()
 
     if not wasViewing and not wasTest then
-        self:BroadcastSessionEnd()
+        self:BroadcastSessionEnd(wasCommunity)
         self:Print("Session ended.")
     elseif wasTest then
         self:Print("[Test Mode] Session ended.")
@@ -191,7 +197,7 @@ function WHLSN:LeaveSession()
     end
 
     local myName = UnitName("player")
-    if self.session.host == myName then
+    if self:StripRealmName(self.session.host) == myName then
         self:Print("You are the host. Use the End Session button to end the session.")
         return
     end
@@ -203,7 +209,12 @@ function WHLSN:LeaveSession()
         playerName = myName,
     }
     local serialized = self:Serialize(data)
-    self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
+
+    if self.session.commChannel == "WHISPER" and self.session.hostFullName then
+        self:SendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", self.session.hostFullName)
+    else
+        self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
+    end
 
     self:ClearSessionState()
     self:Print("You have left the session.")
@@ -342,8 +353,9 @@ function WHLSN:KickPlayer(playerName)
     if self.session.status ~= self.Status.LOBBY then return end
 
     for i, p in ipairs(self.session.players) do
-        if p.name == playerName then
+        if self:StripRealmName(p.name) == self:StripRealmName(playerName) then
             table.remove(self.session.players, i)
+            self.session.connectedCommunity[self:StripRealmName(playerName)] = nil
             self:BroadcastSessionUpdate()
             self:Print(playerName .. " removed from session.")
             return
@@ -397,6 +409,9 @@ function WHLSN:ClearSessionState()
     self.session.viewingHistory = false
     self.session.hostEnded = false
     self.session.isTest = nil
+    self.session.connectedCommunity = {}
+    self.session.commChannel = nil
+    self.session.hostFullName = nil
 end
 
 ---------------------------------------------------------------------------
@@ -452,25 +467,33 @@ function WHLSN:SendSessionUpdate()
 
     local serialized = self:Serialize(data)
     self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
+
+    -- Also whisper connected community players
+    self:WhisperCommunityPlayers(serialized)
 end
 
---- Broadcast session end to the guild.
-function WHLSN:BroadcastSessionEnd()
+--- Broadcast session end to the guild (and community players).
+---@param communityList table|nil Optional community list captured before session cleanup
+function WHLSN:BroadcastSessionEnd(communityList)
     if self.session.isTest then return end
     local serialized = self:Serialize({ type = "SESSION_END" })
     self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
+
+    if communityList then
+        self:WhisperCommunityPlayers(serialized, communityList)
+    end
 end
 
 --- Handle incoming addon messages.
-function WHLSN:OnCommReceived(prefix, message, _distribution, sender)
+function WHLSN:OnCommReceived(prefix, message, distribution, sender)
     if prefix ~= self.COMM_PREFIX then return end
     if sender == UnitName("player") then return end
 
     local success, data = self:Deserialize(message)
     if not success then return end
 
-    -- Version handshake warning (skip for discovery messages to avoid noise)
-    if data.type ~= "ADDON_PING" and data.type ~= "ADDON_PONG" then
+    -- Version handshake warning (skip for discovery and ping messages to avoid noise)
+    if data.type ~= "ADDON_PING" and data.type ~= "ADDON_PONG" and data.type ~= "SESSION_PING" then
         if data.version and data.version ~= self.VERSION then
             if data.version ~= "@project-version@" and self.VERSION ~= "@project-version@" then
                 self:Print("Warning: " .. sender .. " is using addon version " .. tostring(data.version)
@@ -484,9 +507,11 @@ function WHLSN:OnCommReceived(prefix, message, _distribution, sender)
     elseif data.type == "SESSION_END" then
         self:HandleSessionEnd(sender)
     elseif data.type == "JOIN_REQUEST" then
-        self:HandleJoinRequest(data, sender)
+        self:HandleJoinRequest(data, sender, distribution)
     elseif data.type == "LEAVE_REQUEST" then
         self:HandleLeaveRequest(data, sender)
+    elseif data.type == "SESSION_PING" then
+        self:HandleSessionPing(data, sender)
     elseif data.type == "ADDON_PING" then
         self:HandleAddonPing(sender)
     elseif data.type == "ADDON_PONG" then
@@ -494,12 +519,34 @@ function WHLSN:OnCommReceived(prefix, message, _distribution, sender)
     end
 end
 
+function WHLSN:HandleSessionPing(data, sender)
+    -- Ignore if already in any active session (guild members get SESSION_UPDATE via GUILD,
+    -- so a SESSION_PING would incorrectly overwrite their channel to WHISPER)
+    if self.session.status then return end
+    -- Ignore if we intentionally left this host
+    if self.leftSessionHost and self:StripRealmName(self.leftSessionHost) == self:StripRealmName(data.host) then
+        return
+    end
+
+    self.session.status = data.status
+    self.session.host = data.host
+    self.session.commChannel = "WHISPER"
+    self.session.hostFullName = sender
+
+    self:ShowMainFrame()
+    self:UpdateUI()
+end
+
 function WHLSN:HandleSessionUpdate(data, sender)
     -- Suppress updates from the specific host we left (scoped, not global)
-    if self.leftSessionHost and sender == self.leftSessionHost then return end
+    if self.leftSessionHost and self:StripRealmName(sender) == self:StripRealmName(self.leftSessionHost) then
+        return
+    end
 
     -- Only accept updates from the session host (or accept new sessions when no host set)
-    if self.session.host and sender ~= self.session.host then return end
+    if self.session.host and self:StripRealmName(sender) ~= self:StripRealmName(self.session.host) then
+        return
+    end
 
     if data.host then
         -- Notify on first lobby discovery (no active session, or previous session ended by host)
@@ -536,7 +583,8 @@ end
 
 function WHLSN:HandleSessionEnd(sender)
     -- Only accept end from the session host; ignore if not in a session
-    if not self.session.host or self.session.host ~= sender then return end
+    if not self.session.host then return end
+    if self:StripRealmName(self.session.host) ~= self:StripRealmName(sender) then return end
 
     -- Non-host: preserve display state, mark session as host-ended
     self.session.hostEnded = true
@@ -546,21 +594,26 @@ function WHLSN:HandleSessionEnd(sender)
     self:UpdateUI()
 end
 
-function WHLSN:HandleJoinRequest(data, sender)
+function WHLSN:HandleJoinRequest(data, sender, distribution)
     -- Only the host processes join requests
     if self.session.host ~= UnitName("player") then return end
     if self.session.status ~= self.Status.LOBBY then return end
 
-    -- Validate sender matches the player data to prevent spoofing
-    if not data.player or data.player.name ~= sender then return end
+    -- Validate sender matches the player data (strip realm for comparison)
+    if not data.player then return end
+    if self:StripRealmName(data.player.name) ~= self:StripRealmName(sender) then return end
 
-    -- Validate guild membership
-    if not self:IsGuildMember(sender) then return end
+    -- Only accept joins over expected channels
+    if distribution ~= "GUILD" and distribution ~= "WHISPER" then return end
+    -- Whisper joins require community roster membership
+    if distribution == "WHISPER" then
+        if not self:IsCommunityRosterMember(sender) then return end
+    end
 
     local player = WHLSN.Player.FromDict(data.player)
     -- Replace if already in list
     for i, p in ipairs(self.session.players) do
-        if p.name == player.name then
+        if self:StripRealmName(p.name) == self:StripRealmName(player.name) then
             self.session.players[i] = player
             self:BroadcastSessionUpdate()
             return
@@ -568,17 +621,25 @@ function WHLSN:HandleJoinRequest(data, sender)
     end
 
     self.session.players[#self.session.players + 1] = player
+
+    -- Track community player for whisper broadcasts
+    if distribution == "WHISPER" then
+        self.session.connectedCommunity[self:StripRealmName(sender)] = sender
+    end
+
     self:BroadcastSessionUpdate()
 end
 
 function WHLSN:HandleLeaveRequest(data, sender)
     -- Only the host processes leave requests
     if self.session.host ~= UnitName("player") then return end
-    if not data.playerName or data.playerName ~= sender then return end
+    if not data.playerName then return end
+    if self:StripRealmName(data.playerName) ~= self:StripRealmName(sender) then return end
 
     for i, p in ipairs(self.session.players) do
-        if p.name == sender then
+        if self:StripRealmName(p.name) == self:StripRealmName(sender) then
             table.remove(self.session.players, i)
+            self.session.connectedCommunity[self:StripRealmName(sender)] = nil
             self:BroadcastSessionUpdate()
             return
         end

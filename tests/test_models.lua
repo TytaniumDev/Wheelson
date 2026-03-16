@@ -19,9 +19,19 @@ _G.LibStub = function()
     return addon
 end
 
+-- WoW API stubs needed by SpecService
+_G.UnitName = function() return "TestPlayer" end
+_G.UnitClass = function() return "Warrior", "WARRIOR" end
+_G.C_SpecializationInfo = {
+    GetSpecialization = function() return 1 end,
+    GetSpecializationInfo = function() return 71 end,
+}
+_G.GetNumSpecializations = function() return 3 end
+
 -- Load source files in order
 dofile("src/Config.lua")
 dofile("src/Models.lua")
+dofile("src/Services/SpecService.lua")
 
 local Player = Wheelson.Player
 local Group = Wheelson.Group
@@ -121,6 +131,13 @@ describe("Player", function()
             local a = Player:New("Alice", "tank")
             local b = Player:New("Bob", "tank")
             assert.is_false(a:Equals(b))
+        end)
+
+        it("should consider players equal when one has a realm suffix", function()
+            local p1 = Player:New("Tyler", "tank", {}, {})
+            local p2 = Player:New("Tyler-Illidan", "tank", {}, {})
+            assert.is_true(p1:Equals(p2))
+            assert.is_true(p2:Equals(p1))
         end)
     end)
 
