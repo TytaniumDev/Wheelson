@@ -7,6 +7,7 @@ local mock_db = {
         minimap = { hide = false },
         lastSession = nil,
         sessionHistory = {},
+        communityRoster = {},
     },
 }
 
@@ -74,6 +75,8 @@ _G.Settings = {
     RegisterAddOnCategory = function() end,
 }
 
+_G.GetNormalizedRealmName = function() return "Illidan" end
+
 -- Load source files in order
 dofile("src/Config.lua")
 dofile("src/Models.lua")
@@ -82,6 +85,7 @@ dofile("src/Services/SpecService.lua")
 _G.random = math.random
 _G.wipe = function(t) for k in pairs(t) do t[k] = nil end end
 dofile("src/GroupCreator.lua")
+dofile("src/Services/CommunityService.lua")
 dofile("src/UI/Lobby.lua")
 
 local WHLSN = _G.Wheelson
@@ -692,5 +696,130 @@ describe("HandleSessionEnd", function()
         assert.equals("lobby", WHLSN.session.status)
         assert.equals("NewHost", WHLSN.session.host)
         assert.is_false(WHLSN.session.hostEnded)
+    end)
+end)
+
+describe("HandleSessionPing", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.UpdateUI = function() end
+        WHLSN.ShowMainFrame = function() end
+    end)
+
+    it("should set commChannel to WHISPER", function()
+        local data = { type = "SESSION_PING", host = "HostPlayer", status = "lobby", version = WHLSN.VERSION }
+        WHLSN:HandleSessionPing(data, "HostPlayer-Illidan")
+        assert.equals("WHISPER", WHLSN.session.commChannel)
+    end)
+
+    it("should store realm-qualified host name", function()
+        local data = { type = "SESSION_PING", host = "HostPlayer", status = "lobby", version = WHLSN.VERSION }
+        WHLSN:HandleSessionPing(data, "HostPlayer-Illidan")
+        assert.equals("HostPlayer-Illidan", WHLSN.session.hostFullName)
+    end)
+
+    it("should set session status and host", function()
+        local data = { type = "SESSION_PING", host = "HostPlayer", status = "lobby", version = WHLSN.VERSION }
+        WHLSN:HandleSessionPing(data, "HostPlayer-Illidan")
+        assert.equals("lobby", WHLSN.session.status)
+        assert.equals("HostPlayer", WHLSN.session.host)
+    end)
+
+    it("should not overwrite an active session from a different host", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "ExistingHost"
+
+        local data = { type = "SESSION_PING", host = "OtherHost", status = "lobby", version = WHLSN.VERSION }
+        WHLSN:HandleSessionPing(data, "OtherHost-Illidan")
+        assert.equals("ExistingHost", WHLSN.session.host)
+    end)
+end)
+
+describe("HandleJoinRequest community", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer"
+        WHLSN.session.players = { WHLSN.Player:New("TestPlayer", "tank", {}, {}) }
+        WHLSN.BroadcastSessionUpdate = function() end
+    end)
+
+    it("should accept join from realm-qualified sender", function()
+        local data = {
+            type = "JOIN_REQUEST",
+            player = { name = "OtherPlayer", mainRole = "tank", offspecs = {}, utilities = {} },
+        }
+        WHLSN:HandleJoinRequest(data, "OtherPlayer-Illidan", "GUILD")
+        assert.equals(2, #WHLSN.session.players)
+    end)
+
+    it("should reject whisper join from non-community-roster player", function()
+        local data = {
+            type = "JOIN_REQUEST",
+            player = { name = "Stranger", mainRole = "tank", offspecs = {}, utilities = {} },
+        }
+        WHLSN:HandleJoinRequest(data, "Stranger-Stormrage", "WHISPER")
+        assert.equals(1, #WHLSN.session.players)
+    end)
+
+    it("should accept whisper join from community roster member", function()
+        WHLSN:AddCommunityPlayer("CommunityGuy-Stormrage")
+        local data = {
+            type = "JOIN_REQUEST",
+            player = { name = "CommunityGuy", mainRole = "healer", offspecs = {}, utilities = {} },
+        }
+        WHLSN:HandleJoinRequest(data, "CommunityGuy-Stormrage", "WHISPER")
+        assert.equals(2, #WHLSN.session.players)
+    end)
+
+    it("should track community player in connectedCommunity", function()
+        WHLSN:AddCommunityPlayer("CommunityGuy-Stormrage")
+        local data = {
+            type = "JOIN_REQUEST",
+            player = { name = "CommunityGuy", mainRole = "healer", offspecs = {}, utilities = {} },
+        }
+        WHLSN:HandleJoinRequest(data, "CommunityGuy-Stormrage", "WHISPER")
+        assert.equals("CommunityGuy-Stormrage", WHLSN.session.connectedCommunity["CommunityGuy"])
+    end)
+end)
+
+describe("SendSessionUpdate with community", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer"
+        WHLSN.session.players = { WHLSN.Player:New("TestPlayer", "tank", {}, {}) }
+        WHLSN.session.connectedCommunity = { ["CommunityGuy"] = "CommunityGuy-Stormrage" }
+        WHLSN.sent_messages = {}
+        WHLSN.SendCommMessage = function(self, prefix, msg, channel, target)
+            self.sent_messages[#self.sent_messages + 1] = { channel = channel, target = target }
+        end
+        WHLSN.Serialize = function(self, data) return data end
+    end)
+
+    it("should send to GUILD and WHISPER community players", function()
+        WHLSN:SendSessionUpdate()
+        assert.equals(2, #WHLSN.sent_messages)
+        assert.equals("GUILD", WHLSN.sent_messages[1].channel)
+        assert.equals("WHISPER", WHLSN.sent_messages[2].channel)
+        assert.equals("CommunityGuy-Stormrage", WHLSN.sent_messages[2].target)
+    end)
+end)
+
+describe("ClearSessionState community fields", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+    end)
+
+    it("should clear community session fields", function()
+        WHLSN.session.connectedCommunity = { ["Tyler"] = "Tyler-Stormrage" }
+        WHLSN.session.commChannel = "WHISPER"
+        WHLSN.session.hostFullName = "Host-Realm"
+
+        WHLSN:ClearSessionState()
+
+        assert.same({}, WHLSN.session.connectedCommunity)
+        assert.is_nil(WHLSN.session.commChannel)
+        assert.is_nil(WHLSN.session.hostFullName)
     end)
 end)

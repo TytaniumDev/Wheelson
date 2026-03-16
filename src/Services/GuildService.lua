@@ -36,20 +36,3 @@ function WHLSN:GetGuildName()
     local guildName = GetGuildInfo("player")
     return guildName
 end
-
---- Check if a player name is in the guild roster.
----@param playerName string
----@return boolean
-function WHLSN:IsGuildMember(playerName)
-    local numTotal = GetNumGuildMembers()
-    for i = 1, numTotal do
-        local name = GetGuildRosterInfo(i)
-        if name then
-            local shortName = self:StripRealmName(name)
-            if shortName == playerName then
-                return true
-            end
-        end
-    end
-    return false
-end
