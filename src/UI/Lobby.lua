@@ -110,69 +110,13 @@ local function CreateLobbyFrame(parent)
         WHLSN:EndSession()
     end)
 
-    -- Add Player button (host only, during active session)
-    frame.addPlayerButton = CreateFrame("Button", "WHLSNAddPlayerButton", frame, "UIPanelButtonTemplate")
-    frame.addPlayerButton:SetSize(80, 32)
-    frame.addPlayerButton:SetPoint("BOTTOMRIGHT", -8, 8)
-    frame.addPlayerButton:SetText("Add Player")
-    frame.addPlayerButton:SetScript("OnClick", function()
-        if frame.addPlayerInput:IsShown() then
-            frame.addPlayerInput:Hide()
-            frame.addPlayerConfirm:Hide()
-        else
-            frame.addPlayerInput:Show()
-            frame.addPlayerConfirm:Show()
-            frame.addPlayerInput:SetFocus()
-        end
-    end)
-
-    -- Add Player input (hidden by default)
-    frame.addPlayerInput = CreateFrame("EditBox", "WHLSNAddPlayerInput", frame, "InputBoxTemplate")
-    frame.addPlayerInput:SetSize(160, 20)
-    frame.addPlayerInput:SetPoint("BOTTOMRIGHT", frame.addPlayerButton, "TOPRIGHT", 0, 4)
-    frame.addPlayerInput:SetAutoFocus(false)
-    frame.addPlayerInput:Hide()
-
-    -- Confirm button for add player
-    frame.addPlayerConfirm = CreateFrame("Button", "WHLSNAddPlayerConfirm", frame, "UIPanelButtonTemplate")
-    frame.addPlayerConfirm:SetSize(40, 20)
-    frame.addPlayerConfirm:SetPoint("RIGHT", frame.addPlayerInput, "LEFT", -2, 0)
-    frame.addPlayerConfirm:SetText("OK")
-    frame.addPlayerConfirm:Hide()
-
-    local function ConfirmAddPlayer()
-        local name = frame.addPlayerInput:GetText()
-        if name and strtrim(name) ~= "" then
-            local ok, err = WHLSN:AddCommunityPlayer(name)
-            if ok then
-                local normalized = WHLSN:NormalizeCommunityName(name)
-                WHLSN:Print("Added " .. normalized .. " to community roster.")
-                -- Immediately ping if session is active
-                if WHLSN.session.status == WHLSN.Status.LOBBY then
-                    local pingData = {
-                        type = "SESSION_PING",
-                        host = UnitName("player"),
-                        status = WHLSN.session.status,
-                        version = WHLSN.VERSION,
-                    }
-                    local serialized = WHLSN:Serialize(pingData)
-                    WHLSN:SendCommMessage(WHLSN.COMM_PREFIX, serialized, "WHISPER", normalized)
-                end
-            else
-                WHLSN:Print("Could not add: " .. (err or "unknown error"))
-            end
-        end
-        frame.addPlayerInput:SetText("")
-        frame.addPlayerInput:Hide()
-        frame.addPlayerConfirm:Hide()
-    end
-
-    frame.addPlayerConfirm:SetScript("OnClick", ConfirmAddPlayer)
-    frame.addPlayerInput:SetScript("OnEnterPressed", ConfirmAddPlayer)
-    frame.addPlayerInput:SetScript("OnEscapePressed", function(self)
-        self:SetText("")
-        self:Hide()
-        frame.addPlayerConfirm:Hide()
+    -- Community Roster button (host only, during active session)
+    frame.communityRosterButton = CreateFrame("Button", "WHLSNCommunityRosterButton", frame, "UIPanelButtonTemplate")
+    frame.communityRosterButton:SetSize(120, 32)
+    frame.communityRosterButton:SetPoint("BOTTOMRIGHT", -8, 8)
+    frame.communityRosterButton:SetText("Community Roster")
+    frame.communityRosterButton:SetScript("OnClick", function()
+        WHLSN:ToggleCommunityPanel()
     end)
 
     return frame
@@ -300,10 +244,9 @@ local function UpdateLobbyButtons(frame, isHost, hasSession, isInSession, player
     frame.startButton:SetShown(not hasSession)
     frame.testButton:SetShown(not hasSession)
     frame.endButton:SetShown(isHost and hasSession)
-    frame.addPlayerButton:SetShown(isHost and hasSession)
+    frame.communityRosterButton:SetShown(isHost and hasSession)
     if not (isHost and hasSession) then
-        frame.addPlayerInput:Hide()
-        frame.addPlayerConfirm:Hide()
+        WHLSN:HideCommunityPanel()
     end
 end
 
