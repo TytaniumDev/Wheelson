@@ -14,9 +14,11 @@ function WHLSN:InvitePlayers(players)
 
     for _, player in ipairs(players) do
         if self:StripRealmName(player.name) ~= myName then
-            -- Use realm-qualified name for community players, bare name for guild
-            local inviteName = self.session.connectedCommunity
-                and self.session.connectedCommunity[player.name]
+            -- Use realm-qualified name for community players; fall back to
+            -- community roster lookup, then bare name for same-realm guild members
+            local inviteName = (self.session.connectedCommunity
+                and self.session.connectedCommunity[player.name])
+                or self:GetCommunityPlayerFullName(player.name)
                 or player.name
             if not self.session.isTest then
                 C_PartyInfo.InviteUnit(inviteName)

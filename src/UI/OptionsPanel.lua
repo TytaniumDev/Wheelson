@@ -115,11 +115,12 @@ local options = {
             name = "Remove Player",
             desc = "Enter player name to remove from roster",
             set = function(_, val)
+                if not val or strtrim(val) == "" then return end
                 local ok = WHLSN:RemoveCommunityPlayer(val)
                 if ok then
-                    WHLSN:Print("Removed from community roster.")
+                    WHLSN:Print("Removed '" .. val .. "' from community roster.")
                 else
-                    WHLSN:Print("Player not found in roster.")
+                    WHLSN:Print("Player '" .. val .. "' not found in roster.")
                 end
             end,
             get = function() return "" end,
