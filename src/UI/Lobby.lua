@@ -156,8 +156,7 @@ local function CreateCommunityPanel()
 
     -- Add player input (with autocomplete fallback)
     local template = "InputBoxTemplate"
-    local ok = pcall(CreateFrame, "EditBox", nil, nil, "AutoCompleteEditBoxTemplate")
-    if ok then
+    if type(AutoCompleteEditBox_SetAutoCompleteSource) == "function" then
         template = "AutoCompleteEditBoxTemplate"
     end
 
