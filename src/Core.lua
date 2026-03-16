@@ -48,6 +48,8 @@ function WHLSN:OnInitialize()
                 WHLSN:ToggleMainFrame()
             elseif button == "RightButton" then
                 WHLSN:ToggleDebugFrame()
+            elseif button == "MiddleButton" then
+                WHLSN:ToggleMinimapIcon()
             end
         end,
         OnTooltipShow = function(tooltip)
@@ -62,6 +64,7 @@ function WHLSN:OnInitialize()
             tooltip:AddLine(" ")
             tooltip:AddLine("|cFFFFFFFFLeft-click:|r Open addon", 0.8, 0.8, 0.8)
             tooltip:AddLine("|cFFFFFFFFRight-click:|r Debug panel", 0.8, 0.8, 0.8)
+            tooltip:AddLine("|cFFFFFFFFMiddle-click:|r Hide icon", 0.8, 0.8, 0.8)
         end,
     })
     self.ldbIcon:Register("Wheelson", launcher, self.db.profile.minimap)
@@ -100,8 +103,13 @@ end
 SLASH_WHEELSON1 = "/wheelson"
 SLASH_WHEELSON2 = "/wheel"
 
-SlashCmdList["WHEELSON"] = function()
-    WHLSN:ToggleMainFrame()
+SlashCmdList["WHEELSON"] = function(msg)
+    local cmd = strtrim(msg):lower()
+    if cmd == "minimap" then
+        WHLSN:ToggleMinimapIcon()
+    else
+        WHLSN:ToggleMainFrame()
+    end
 end
 
 ---------------------------------------------------------------------------

@@ -374,3 +374,31 @@ describe("ToggleMinimapIcon", function()
         assert.truthy(printed_messages[1]:find("shown"))
     end)
 end)
+
+describe("Slash command routing", function()
+    local toggled_main, toggled_minimap
+
+    before_each(function()
+        toggled_main = false
+        toggled_minimap = false
+        WHLSN.ToggleMainFrame = function() toggled_main = true end
+        WHLSN.ToggleMinimapIcon = function() toggled_minimap = true end
+    end)
+
+    it("should open main frame with no args", function()
+        SlashCmdList["WHEELSON"]("")
+        assert.is_true(toggled_main)
+        assert.is_false(toggled_minimap)
+    end)
+
+    it("should toggle minimap with 'minimap' arg", function()
+        SlashCmdList["WHEELSON"]("minimap")
+        assert.is_true(toggled_minimap)
+        assert.is_false(toggled_main)
+    end)
+
+    it("should handle extra whitespace", function()
+        SlashCmdList["WHEELSON"]("  minimap  ")
+        assert.is_true(toggled_minimap)
+    end)
+end)
