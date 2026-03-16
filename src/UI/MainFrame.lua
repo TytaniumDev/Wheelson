@@ -87,6 +87,7 @@ function WHLSN:HideAllViews()
     self:HideLobbyView()
     self:HideWheelView()
     self:HideGroupDisplayView()
+    self:HideCommunityPanel()
 end
 
 --- Update the UI based on current session state.
