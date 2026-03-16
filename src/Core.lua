@@ -520,10 +520,9 @@ function WHLSN:OnCommReceived(prefix, message, distribution, sender)
 end
 
 function WHLSN:HandleSessionPing(data, sender)
-    -- Ignore if already in an active session with a different host
-    if self.session.status and self:StripRealmName(self.session.host) ~= self:StripRealmName(data.host) then
-        return
-    end
+    -- Ignore if already in any active session (guild members get SESSION_UPDATE via GUILD,
+    -- so a SESSION_PING would incorrectly overwrite their channel to WHISPER)
+    if self.session.status then return end
     -- Ignore if we intentionally left this host
     if self.leftSessionHost and self:StripRealmName(self.leftSessionHost) == self:StripRealmName(data.host) then
         return

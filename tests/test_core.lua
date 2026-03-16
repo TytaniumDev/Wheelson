@@ -733,6 +733,16 @@ describe("HandleSessionPing", function()
         WHLSN:HandleSessionPing(data, "OtherHost-Illidan")
         assert.equals("ExistingHost", WHLSN.session.host)
     end)
+
+    it("should not overwrite an active GUILD session from same host", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "SameHost"
+
+        local data = { type = "SESSION_PING", host = "SameHost", status = "lobby", version = WHLSN.VERSION }
+        WHLSN:HandleSessionPing(data, "SameHost-Illidan")
+        -- Should not set commChannel to WHISPER since session is already active via GUILD
+        assert.is_nil(WHLSN.session.commChannel)
+    end)
 end)
 
 describe("HandleJoinRequest community", function()
