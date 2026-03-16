@@ -154,15 +154,11 @@ local function CreateCommunityPanel()
     panel.countText:SetPoint("TOP", panel.title, "BOTTOM", 0, -2)
     panel.countText:SetTextColor(0.6, 0.6, 0.6)
 
-    -- Add player input (with autocomplete fallback)
-    local template = "InputBoxTemplate"
-    if type(AutoCompleteEditBox_SetAutoCompleteSource) == "function" then
-        template = "AutoCompleteEditBoxTemplate"
-    end
-
-    panel.input = CreateFrame("EditBox", "WHLSNCommunityInput", panel, template)
+    -- Add player input
+    panel.input = CreateFrame("EditBox", "WHLSNCommunityInput", panel, "InputBoxTemplate")
     panel.input:SetSize(140, 20)
     panel.input:SetPoint("TOPLEFT", 12, -48)
+    panel.input:SetFontObject("ChatFontNormal")
     panel.input:SetAutoFocus(false)
     panel.input.Instructions = panel.input:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     panel.input.Instructions:SetPoint("LEFT", 6, 0)
@@ -177,10 +173,64 @@ local function CreateCommunityPanel()
         end
     end)
 
-    -- Set up autocomplete if available
-    if template == "AutoCompleteEditBoxTemplate" and AUTOCOMPLETE_LIST then
-        AutoCompleteEditBox_SetAutoCompleteSource(panel.input, AUTOCOMPLETE_LIST.ALL)
+    -- Autocomplete dropdown (GetAutoCompleteResults signature changed in 12.0)
+    local acInclude = AUTOCOMPLETE_FLAG_ALL or 0xFFFFFFFF
+    local acExclude = AUTOCOMPLETE_FLAG_NONE or 0
+    local acDropdown = CreateFrame("Frame", nil, panel.input, "BackdropTemplate")
+    acDropdown:SetBackdrop(COMMUNITY_PANEL_BACKDROP)
+    acDropdown:SetBackdropColor(0.1, 0.1, 0.12, 0.95)
+    acDropdown:SetPoint("TOPLEFT", panel.input, "BOTTOMLEFT", 0, -2)
+    acDropdown:SetPoint("RIGHT", panel.input, "RIGHT")
+    acDropdown:SetFrameStrata("TOOLTIP")
+    acDropdown:Hide()
+    acDropdown.buttons = {}
+
+    local function HideAC() acDropdown:Hide() end
+
+    local function UpdateAC()
+        local text = panel.input:GetText()
+        if not text or #text == 0 then HideAC(); return end
+        local ok, results = pcall(GetAutoCompleteResults, text, 8, #text, true, acInclude, acExclude)
+        if not ok or not results or #results == 0 then HideAC(); return end
+        local count = math.min(#results, 8)
+        for i = 1, count do
+            local btn = acDropdown.buttons[i]
+            if not btn then
+                btn = CreateFrame("Button", nil, acDropdown)
+                btn:SetHeight(18)
+                btn:SetNormalFontObject("GameFontHighlightSmall")
+                local hl = btn:CreateTexture(nil, "HIGHLIGHT")
+                hl:SetAllPoints()
+                hl:SetColorTexture(1, 0.82, 0, 0.15)
+                btn:SetScript("OnClick", function(self)
+                    panel.input:SetText(self.acName)
+                    panel.input:SetCursorPosition(#self.acName)
+                    HideAC()
+                end)
+                acDropdown.buttons[i] = btn
+            end
+            btn:ClearAllPoints()
+            btn:SetPoint("TOPLEFT", 4, -(i - 1) * 18 - 4)
+            btn:SetPoint("RIGHT", -4, 0)
+            local r = results[i]
+            local name = type(r) == "table" and r.name or tostring(r)
+            if not name:find("-") then
+                name = name .. "-" .. GetNormalizedRealmName()
+            end
+            btn.acName = name
+            btn:SetText(name)
+            local fs = btn:GetFontString()
+            fs:ClearAllPoints()
+            fs:SetPoint("LEFT", btn, "LEFT", 2, 0)
+            fs:SetJustifyH("LEFT")
+            btn:Show()
+        end
+        for i = count + 1, #acDropdown.buttons do acDropdown.buttons[i]:Hide() end
+        acDropdown:SetHeight(count * 18 + 8)
+        acDropdown:Show()
     end
+
+    panel.input:SetScript("OnTextChanged", UpdateAC)
 
     -- OK button
     panel.okButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
@@ -190,6 +240,7 @@ local function CreateCommunityPanel()
 
     -- Add player logic
     local function ConfirmAddPlayer()
+        HideAC()
         local name = panel.input:GetText()
         if name and strtrim(name) ~= "" then
             local added, err = WHLSN:AddCommunityPlayer(name)
@@ -220,6 +271,7 @@ local function CreateCommunityPanel()
     panel.okButton:SetScript("OnClick", ConfirmAddPlayer)
     panel.input:SetScript("OnEnterPressed", ConfirmAddPlayer)
     panel.input:SetScript("OnEscapePressed", function(self)
+        HideAC()
         self:SetText("")
         self.Instructions:Show()
         self:ClearFocus()
@@ -328,8 +380,7 @@ function WHLSN:RefreshCommunityPanel()
         row:SetPoint("TOPLEFT", 0, -(i - 1) * 22)
         row:SetPoint("RIGHT", 0, 0)
 
-        local displayName = self:StripRealmName(entry.name)
-        row.nameText:SetText(displayName)
+        row.nameText:SetText(entry.name)
         row.nameText:SetTextColor(0.9, 0.9, 0.9)
         row.fullName = entry.name
 
