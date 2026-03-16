@@ -235,6 +235,38 @@ describe("Discovery", function()
     end)
 end)
 
+describe("ClearSessionState", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+    end)
+
+    it("should reset all session fields to defaults", function()
+        WHLSN.session.status = "completed"
+        WHLSN.session.host = "SomeHost"
+        WHLSN.session.players = { WHLSN.Player:New("P1", "tank") }
+        WHLSN.session.groups = { WHLSN.Group:New() }
+        WHLSN.session.algorithmSnapshot = { timestamp = 123 }
+        WHLSN.session.viewingHistory = true
+        WHLSN.session.hostEnded = true
+        WHLSN.session.isTest = true
+
+        WHLSN:ClearSessionState()
+
+        assert.is_nil(WHLSN.session.status)
+        assert.is_nil(WHLSN.session.host)
+        assert.same({}, WHLSN.session.players)
+        assert.same({}, WHLSN.session.groups)
+        assert.is_nil(WHLSN.session.algorithmSnapshot)
+        assert.is_false(WHLSN.session.viewingHistory)
+        assert.is_false(WHLSN.session.hostEnded)
+        assert.is_nil(WHLSN.session.isTest)
+    end)
+
+    it("should initialize hostEnded to false on startup", function()
+        assert.is_false(WHLSN.session.hostEnded)
+    end)
+end)
+
 describe("SpinGroups", function()
     before_each(function()
         WHLSN:OnInitialize()

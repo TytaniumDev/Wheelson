@@ -16,6 +16,7 @@ function WHLSN:OnInitialize()
         host = nil,      -- player name who started the session
         isTest = false,  -- true when running a test session (no guild comms)
         viewingHistory = false, -- true when displaying a past session
+        hostEnded = false, -- true when the host explicitly ended the session
     }
 
     -- Throttle timer for roster update events
@@ -170,15 +171,7 @@ function WHLSN:EndSession()
     local wasViewing = self.session.viewingHistory or false
     local wasTest = self.session.isTest or false
 
-    self:CancelSessionTimeout()
-
-    self.session.status = nil
-    self.session.host = nil
-    self.session.players = {}
-    self.session.groups = {}
-    self.session.viewingHistory = false
-    self.session.isTest = nil
-    self.session.algorithmSnapshot = nil
+    self:ClearSessionState()
 
     if not wasViewing and not wasTest then
         self:BroadcastSessionEnd()
@@ -394,6 +387,19 @@ end
 function WHLSN:TouchActivity()
     self.lastActivity = time()
     self:ResetSessionTimeout()
+end
+
+--- Clear all local session state (shared by host EndSession and non-host Finish).
+function WHLSN:ClearSessionState()
+    self:CancelSessionTimeout()
+    self.session.status = nil
+    self.session.host = nil
+    self.session.players = {}
+    self.session.groups = {}
+    self.session.algorithmSnapshot = nil
+    self.session.viewingHistory = false
+    self.session.hostEnded = false
+    self.session.isTest = nil
 end
 
 ---------------------------------------------------------------------------
