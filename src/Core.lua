@@ -502,6 +502,12 @@ function WHLSN:HandleSessionUpdate(data, sender)
     if self.session.host and sender ~= self.session.host then return end
 
     if data.host then
+        -- Notify on first lobby discovery (no active session, or previous session ended by host)
+        if data.status == "lobby"
+            and (self.session.status == nil or self.session.hostEnded) then
+            self:Print(data.host .. " started a group session! Type /wheelson to join.")
+        end
+
         self.session.status = data.status
         self.session.host = data.host
 

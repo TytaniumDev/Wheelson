@@ -549,6 +549,86 @@ describe("leftSessionHost", function()
     end)
 end)
 
+describe("Session start notification", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.printed = {}
+        WHLSN.Print = function(self, msg) self.printed[#self.printed + 1] = msg end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+        WHLSN.UpdateUI = function() end
+    end)
+
+    it("should print notification when discovering a new lobby session", function()
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "GuildLeader",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "GuildLeader")
+
+        assert.is_true(#WHLSN.printed > 0)
+        local found = false
+        for _, msg in ipairs(WHLSN.printed) do
+            if msg:find("GuildLeader") and msg:find("wheelson") then found = true end
+        end
+        assert.is_true(found)
+    end)
+
+    it("should not re-notify on subsequent lobby updates from same host", function()
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "GuildLeader",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "GuildLeader")
+        local firstCount = #WHLSN.printed
+
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "GuildLeader")
+        assert.equals(firstCount, #WHLSN.printed)
+    end)
+
+    it("should not notify if leftSessionHost matches sender", function()
+        WHLSN.leftSessionHost = "GuildLeader"
+
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "GuildLeader",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "GuildLeader")
+
+        assert.equals(0, #WHLSN.printed)
+    end)
+
+    it("should notify when hostEnded is true and new lobby arrives", function()
+        WHLSN.session.status = "completed"
+        WHLSN.session.hostEnded = true
+        WHLSN.session.host = nil
+
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "NewHost",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "NewHost")
+
+        local found = false
+        for _, msg in ipairs(WHLSN.printed) do
+            if msg:find("NewHost") then found = true end
+        end
+        assert.is_true(found)
+    end)
+end)
+
 describe("HandleSessionEnd", function()
     before_each(function()
         WHLSN:OnInitialize()
