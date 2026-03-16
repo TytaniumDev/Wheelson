@@ -40,6 +40,8 @@ _G.LibStub = function(name, silent)
     elseif name == "LibDBIcon-1.0" then
         return {
             Register = function() end,
+            Show = function() end,
+            Hide = function() end,
         }
     end
     if silent then return nil end
@@ -308,5 +310,95 @@ describe("SpinGroups", function()
         local snap = WHLSN.session.algorithmSnapshot
         assert.is_nil(getmetatable(snap.players[1]))
         assert.equals("Tank1", snap.players[1].name)
+    end)
+end)
+
+describe("ToggleMinimapIcon", function()
+    local ldbicon_shown, ldbicon_hidden
+    local printed_messages
+
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.db.profile.minimap = { hide = false }
+
+        ldbicon_shown = false
+        ldbicon_hidden = false
+        printed_messages = {}
+
+        -- Override ldbIcon with tracking mock
+        WHLSN.ldbIcon = {
+            Show = function(_, name) ldbicon_shown = true end,
+            Hide = function(_, name) ldbicon_hidden = true end,
+        }
+
+        WHLSN.Print = function(_, msg)
+            printed_messages[#printed_messages + 1] = msg
+        end
+    end)
+
+    it("should hide the icon when currently shown", function()
+        WHLSN.db.profile.minimap.hide = false
+
+        WHLSN:ToggleMinimapIcon()
+
+        assert.is_true(WHLSN.db.profile.minimap.hide)
+        assert.is_true(ldbicon_hidden)
+        assert.is_false(ldbicon_shown)
+    end)
+
+    it("should show the icon when currently hidden", function()
+        WHLSN.db.profile.minimap.hide = true
+
+        WHLSN:ToggleMinimapIcon()
+
+        assert.is_false(WHLSN.db.profile.minimap.hide)
+        assert.is_true(ldbicon_shown)
+        assert.is_false(ldbicon_hidden)
+    end)
+
+    it("should print restore hint when hiding", function()
+        WHLSN.db.profile.minimap.hide = false
+
+        WHLSN:ToggleMinimapIcon()
+
+        assert.equals(1, #printed_messages)
+        assert.truthy(printed_messages[1]:find("/wheelson minimap"))
+    end)
+
+    it("should print confirmation when showing", function()
+        WHLSN.db.profile.minimap.hide = true
+
+        WHLSN:ToggleMinimapIcon()
+
+        assert.equals(1, #printed_messages)
+        assert.truthy(printed_messages[1]:find("shown"))
+    end)
+end)
+
+describe("Slash command routing", function()
+    local toggled_main, toggled_minimap
+
+    before_each(function()
+        toggled_main = false
+        toggled_minimap = false
+        WHLSN.ToggleMainFrame = function() toggled_main = true end
+        WHLSN.ToggleMinimapIcon = function() toggled_minimap = true end
+    end)
+
+    it("should open main frame with no args", function()
+        SlashCmdList["WHEELSON"]("")
+        assert.is_true(toggled_main)
+        assert.is_false(toggled_minimap)
+    end)
+
+    it("should toggle minimap with 'minimap' arg", function()
+        SlashCmdList["WHEELSON"]("minimap")
+        assert.is_true(toggled_minimap)
+        assert.is_false(toggled_main)
+    end)
+
+    it("should handle extra whitespace", function()
+        SlashCmdList["WHEELSON"]("  minimap  ")
+        assert.is_true(toggled_minimap)
     end)
 end)

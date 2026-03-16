@@ -33,6 +33,19 @@ local options = {
     name = "Wheelson",
     type = "group",
     args = {
+        minimapIcon = {
+            order = 0,
+            type = "toggle",
+            name = "Show Minimap Icon",
+            desc = "Show or hide the Wheelson minimap button",
+            get = function() return not WHLSN.db.profile.minimap.hide end,
+            set = function(_, value)
+                local isVisible = not WHLSN.db.profile.minimap.hide
+                if value ~= isVisible then
+                    WHLSN:ToggleMinimapIcon()
+                end
+            end,
+        },
         discoveryHeader = {
             order = 1,
             type = "header",
