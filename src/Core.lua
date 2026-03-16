@@ -16,6 +16,7 @@ function WHLSN:OnInitialize()
         host = nil,      -- player name who started the session
         isTest = false,  -- true when running a test session (no guild comms)
         viewingHistory = false, -- true when displaying a past session
+        hostEnded = false, -- true when the host explicitly ended the session
     }
 
     -- Throttle timer for roster update events
@@ -123,7 +124,7 @@ function WHLSN:StartSession()
         return
     end
 
-    self.hasLeftSession = false
+    self.leftSessionHost = nil
     self.session.status = self.Status.LOBBY
     self.session.host = UnitName("player")
     self.session.players = {}
@@ -170,15 +171,7 @@ function WHLSN:EndSession()
     local wasViewing = self.session.viewingHistory or false
     local wasTest = self.session.isTest or false
 
-    self:CancelSessionTimeout()
-
-    self.session.status = nil
-    self.session.host = nil
-    self.session.players = {}
-    self.session.groups = {}
-    self.session.viewingHistory = false
-    self.session.isTest = nil
-    self.session.algorithmSnapshot = nil
+    self:ClearSessionState()
 
     if not wasViewing and not wasTest then
         self:BroadcastSessionEnd()
@@ -203,7 +196,8 @@ function WHLSN:LeaveSession()
         return
     end
 
-    -- Send leave notification to host
+    self.leftSessionHost = self.session.host
+
     local data = {
         type = "LEAVE_REQUEST",
         playerName = myName,
@@ -211,11 +205,7 @@ function WHLSN:LeaveSession()
     local serialized = self:Serialize(data)
     self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
 
-    self.session.status = nil
-    self.session.host = nil
-    self.session.players = {}
-    self.session.groups = {}
-    self.hasLeftSession = true
+    self:ClearSessionState()
     self:Print("You have left the session.")
 end
 
@@ -396,6 +386,19 @@ function WHLSN:TouchActivity()
     self:ResetSessionTimeout()
 end
 
+--- Clear all local session state (shared by host EndSession and non-host Finish).
+function WHLSN:ClearSessionState()
+    self:CancelSessionTimeout()
+    self.session.status = nil
+    self.session.host = nil
+    self.session.players = {}
+    self.session.groups = {}
+    self.session.algorithmSnapshot = nil
+    self.session.viewingHistory = false
+    self.session.hostEnded = false
+    self.session.isTest = nil
+end
+
 ---------------------------------------------------------------------------
 -- Addon Communication
 ---------------------------------------------------------------------------
@@ -492,15 +495,26 @@ function WHLSN:OnCommReceived(prefix, message, _distribution, sender)
 end
 
 function WHLSN:HandleSessionUpdate(data, sender)
-    -- Ignore updates after intentionally leaving a session
-    if self.hasLeftSession then return end
+    -- Suppress updates from the specific host we left (scoped, not global)
+    if self.leftSessionHost and sender == self.leftSessionHost then return end
 
-    -- Only accept updates from the session host
+    -- Only accept updates from the session host (or accept new sessions when no host set)
     if self.session.host and sender ~= self.session.host then return end
 
     if data.host then
+        -- Notify on first lobby discovery (no active session, or previous session ended by host)
+        if data.status == "lobby"
+            and (self.session.status == nil or self.session.hostEnded) then
+            self:Print(data.host .. " started a group session! Type /wheelson to join.")
+        end
+
         self.session.status = data.status
         self.session.host = data.host
+
+        -- Clear stale leftSessionHost when accepting a new session
+        self.leftSessionHost = nil
+        self.session.hostEnded = false
+
         -- Update full player list from host
         if data.players then
             self.session.players = {}
@@ -521,15 +535,14 @@ function WHLSN:HandleSessionUpdate(data, sender)
 end
 
 function WHLSN:HandleSessionEnd(sender)
-    -- Only accept end from the session host
-    if self.session.host and sender ~= self.session.host then return end
+    -- Only accept end from the session host; ignore if not in a session
+    if not self.session.host or self.session.host ~= sender then return end
 
-    self.session.status = nil
-    self.session.host = nil
-    self.session.players = {}
-    self.session.groups = {}
+    -- Non-host: preserve display state, mark session as host-ended
+    self.session.hostEnded = true
+    self.session.host = nil  -- allow new sessions through the host-match guard
     self.session.algorithmSnapshot = nil
-    self.session.viewingHistory = false
+
     self:UpdateUI()
 end
 

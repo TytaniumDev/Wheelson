@@ -82,6 +82,7 @@ dofile("src/Services/SpecService.lua")
 _G.random = math.random
 _G.wipe = function(t) for k in pairs(t) do t[k] = nil end end
 dofile("src/GroupCreator.lua")
+dofile("src/UI/Lobby.lua")
 
 local WHLSN = _G.Wheelson
 
@@ -232,6 +233,38 @@ describe("Discovery", function()
 
             assert.is_nil(WHLSN.addonUsersCache["SomePlayer"])
         end)
+    end)
+end)
+
+describe("ClearSessionState", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+    end)
+
+    it("should reset all session fields to defaults", function()
+        WHLSN.session.status = "completed"
+        WHLSN.session.host = "SomeHost"
+        WHLSN.session.players = { WHLSN.Player:New("P1", "tank") }
+        WHLSN.session.groups = { WHLSN.Group:New() }
+        WHLSN.session.algorithmSnapshot = { timestamp = 123 }
+        WHLSN.session.viewingHistory = true
+        WHLSN.session.hostEnded = true
+        WHLSN.session.isTest = true
+
+        WHLSN:ClearSessionState()
+
+        assert.is_nil(WHLSN.session.status)
+        assert.is_nil(WHLSN.session.host)
+        assert.same({}, WHLSN.session.players)
+        assert.same({}, WHLSN.session.groups)
+        assert.is_nil(WHLSN.session.algorithmSnapshot)
+        assert.is_false(WHLSN.session.viewingHistory)
+        assert.is_false(WHLSN.session.hostEnded)
+        assert.is_nil(WHLSN.session.isTest)
+    end)
+
+    it("should initialize hostEnded to false on startup", function()
+        assert.is_false(WHLSN.session.hostEnded)
     end)
 end)
 
@@ -400,5 +433,264 @@ describe("Slash command routing", function()
     it("should handle extra whitespace", function()
         SlashCmdList["WHEELSON"]("  minimap  ")
         assert.is_true(toggled_minimap)
+    end)
+
+    it("should fall back to main frame for unknown args", function()
+        SlashCmdList["WHEELSON"]("unknown")
+        assert.is_true(toggled_main)
+        assert.is_false(toggled_minimap)
+    end)
+end)
+
+describe("leftSessionHost", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.sent_messages = {}
+        WHLSN.SendCommMessage = function(self, prefix, msg, channel)
+            self.sent_messages[#self.sent_messages + 1] = { prefix = prefix, msg = msg, channel = channel }
+        end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+        WHLSN.UpdateUI = function() end
+        WHLSN.ShowMainFrame = function() end
+        WHLSN.DetectLocalPlayer = function()
+            return WHLSN.Player:New("TestPlayer", "tank", {}, {})
+        end
+    end)
+
+    it("should suppress updates from the host you left", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "HostA"
+        WHLSN:LeaveSession()
+
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostA",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostA")
+
+        assert.is_nil(WHLSN.session.status)
+    end)
+
+    it("should allow updates from a different host after leaving", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "HostA"
+        WHLSN:LeaveSession()
+
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostB",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostB")
+
+        assert.equals("lobby", WHLSN.session.status)
+        assert.equals("HostB", WHLSN.session.host)
+    end)
+
+    it("should clear leftSessionHost on StartSession", function()
+        WHLSN.leftSessionHost = "HostA"
+        WHLSN:StartSession()
+
+        assert.is_nil(WHLSN.leftSessionHost)
+    end)
+
+    it("should clear leftSessionHost on RequestJoin", function()
+        WHLSN.leftSessionHost = "HostA"
+        WHLSN.session.host = "HostB"
+
+        WHLSN:RequestJoin()
+
+        assert.is_nil(WHLSN.leftSessionHost)
+    end)
+
+    it("should block RequestJoin when hostEnded is true", function()
+        WHLSN.session.host = "HostA"
+        WHLSN.session.hostEnded = true
+
+        WHLSN:RequestJoin()
+
+        assert.equals(0, #WHLSN.sent_messages)
+    end)
+
+    it("LeaveSession should use ClearSessionState and set leftSessionHost", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "HostA"
+        WHLSN.session.hostEnded = true
+        WHLSN.session.algorithmSnapshot = { timestamp = 123 }
+
+        WHLSN:LeaveSession()
+
+        assert.equals("HostA", WHLSN.leftSessionHost)
+        assert.is_nil(WHLSN.session.status)
+        assert.is_nil(WHLSN.session.host)
+        assert.is_false(WHLSN.session.hostEnded)
+        assert.is_nil(WHLSN.session.algorithmSnapshot)
+    end)
+
+    it("should clear leftSessionHost when accepting a new session", function()
+        WHLSN.leftSessionHost = "HostA"
+
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostB",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostB")
+
+        assert.is_nil(WHLSN.leftSessionHost)
+    end)
+end)
+
+describe("Session start notification", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.printed = {}
+        WHLSN.Print = function(self, msg) self.printed[#self.printed + 1] = msg end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+        WHLSN.UpdateUI = function() end
+    end)
+
+    it("should print notification when discovering a new lobby session", function()
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "GuildLeader",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "GuildLeader")
+
+        assert.is_true(#WHLSN.printed > 0)
+        local found = false
+        for _, msg in ipairs(WHLSN.printed) do
+            if msg:find("GuildLeader") and msg:find("wheelson") then found = true end
+        end
+        assert.is_true(found)
+    end)
+
+    it("should not re-notify on subsequent lobby updates from same host", function()
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "GuildLeader",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "GuildLeader")
+        local firstCount = #WHLSN.printed
+
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "GuildLeader")
+        assert.equals(firstCount, #WHLSN.printed)
+    end)
+
+    it("should not notify if leftSessionHost matches sender", function()
+        WHLSN.leftSessionHost = "GuildLeader"
+
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "GuildLeader",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "GuildLeader")
+
+        assert.equals(0, #WHLSN.printed)
+    end)
+
+    it("should notify when hostEnded is true and new lobby arrives", function()
+        WHLSN.session.status = "completed"
+        WHLSN.session.hostEnded = true
+        WHLSN.session.host = nil
+
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "NewHost",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "NewHost")
+
+        local found = false
+        for _, msg in ipairs(WHLSN.printed) do
+            if msg:find("NewHost") then found = true end
+        end
+        assert.is_true(found)
+    end)
+end)
+
+describe("HandleSessionEnd", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+        WHLSN.UpdateUI = function() end
+    end)
+
+    it("should preserve groups and status for non-hosts", function()
+        WHLSN.session.status = "completed"
+        WHLSN.session.host = "HostPlayer"
+        WHLSN.session.groups = { WHLSN.Group:New(WHLSN.Player:New("T1", "tank"), nil, {}) }
+        WHLSN.session.players = { WHLSN.Player:New("TestPlayer", "tank") }
+
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX,
+            { type = "SESSION_END" }, "GUILD", "HostPlayer")
+
+        assert.equals("completed", WHLSN.session.status)
+        assert.equals(1, #WHLSN.session.groups)
+        assert.equals(1, #WHLSN.session.players)
+        assert.is_true(WHLSN.session.hostEnded)
+        assert.is_nil(WHLSN.session.host)
+    end)
+
+    it("should still reject SESSION_END from non-host sender", function()
+        WHLSN.session.status = "completed"
+        WHLSN.session.host = "HostPlayer"
+
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX,
+            { type = "SESSION_END" }, "GUILD", "RandomPlayer")
+
+        assert.equals("HostPlayer", WHLSN.session.host)
+        assert.is_false(WHLSN.session.hostEnded)
+    end)
+
+    it("should ignore SESSION_END when not in a session", function()
+        -- No active session (host is nil)
+        WHLSN.session.status = nil
+        WHLSN.session.host = nil
+
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX,
+            { type = "SESSION_END" }, "GUILD", "SomeHost")
+
+        assert.is_false(WHLSN.session.hostEnded)
+    end)
+
+    it("should allow new session after hostEnded", function()
+        WHLSN.session.status = "completed"
+        WHLSN.session.host = nil
+        WHLSN.session.hostEnded = true
+
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "NewHost",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "NewHost")
+
+        assert.equals("lobby", WHLSN.session.status)
+        assert.equals("NewHost", WHLSN.session.host)
+        assert.is_false(WHLSN.session.hostEnded)
     end)
 end)
