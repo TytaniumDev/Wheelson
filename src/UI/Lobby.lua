@@ -240,6 +240,7 @@ local function CreateCommunityPanel()
 
     panel.rosterRows = {}
 
+    panel:Hide()
     return panel
 end
 
@@ -281,8 +282,6 @@ function WHLSN:RefreshCommunityPanel()
         if not row then
             row = CreateFrame("Frame", nil, communityPanel.rosterContainer)
             row:SetHeight(20)
-            row:SetPoint("TOPLEFT", 0, -(i - 1) * 22)
-            row:SetPoint("RIGHT", 0, 0)
             row:EnableMouse(true)
 
             row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -295,6 +294,10 @@ function WHLSN:RefreshCommunityPanel()
 
             communityPanel.rosterRows[i] = row
         end
+
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", 0, -(i - 1) * 22)
+        row:SetPoint("RIGHT", 0, 0)
 
         local displayName = self:StripRealmName(entry.name)
         row.nameText:SetText(displayName)
