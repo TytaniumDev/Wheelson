@@ -104,6 +104,15 @@ function WHLSN:StripRealmName(name)
     return cached
 end
 
+--- Resolve a player's name using the comm sender, preserving realm for cross-realm players.
+---@param player WHLSNPlayer
+---@param sender string The addon comm sender (may include "-RealmName")
+function WHLSN:ResolvePlayerName(player, sender)
+    if sender:find("-") then
+        player.name = sender
+    end
+end
+
 --- Detect a guild member's likely role from guild roster info.
 --- Less accurate than DetectLocalPlayer since we can't see their spec directly.
 ---@param name string

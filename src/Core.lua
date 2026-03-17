@@ -723,6 +723,8 @@ function WHLSN:HandleJoinRequest(data, sender, distribution)
     end
 
     local player = WHLSN.Player.FromDict(data.player)
+    self:ResolvePlayerName(player, sender)
+
     -- Replace if already in list
     for i, p in ipairs(self.session.players) do
         if self:StripRealmName(p.name) == self:StripRealmName(player.name) then
@@ -775,6 +777,7 @@ function WHLSN:HandleSpecUpdate(data, sender, distribution)
     end
 
     local player = WHLSN.Player.FromDict(data.player)
+    self:ResolvePlayerName(player, sender)
 
     -- Find and replace existing player
     for i, p in ipairs(self.session.players) do
