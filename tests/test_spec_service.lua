@@ -300,6 +300,14 @@ describe("SpecService", function()
         it("should handle names with multiple hyphens", function()
             assert.equal("Player", WHLSN:StripRealmName("Player-Area-52"))
         end)
+
+        it("should handle apostrophe in realm name", function()
+            assert.equal("Player", WHLSN:StripRealmName("Player-Kel'Thuzad"))
+        end)
+
+        it("should handle apostrophe in both character name and realm", function()
+            assert.equal("O'Brien", WHLSN:StripRealmName("O'Brien-Kel'Thuzad"))
+        end)
     end)
 
     describe(":DetectGuildMember()", function()
