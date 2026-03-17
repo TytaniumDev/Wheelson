@@ -144,6 +144,9 @@ function WHLSN:StartSession()
     self.session.algorithmSnapshot = nil
     self.session.connectedCommunity = {}
     self.session.removedPlayers = {}
+    -- Wago Analytics
+    self.analytics:IncrementCounter("sessionsStarted")
+
     -- Auto-add the host as the first player
     local hostPlayer = self:DetectLocalPlayer()
     if hostPlayer then
@@ -265,6 +268,11 @@ function WHLSN:SpinGroups()
 
     self.session.groups = self:CreateMythicPlusGroups(activePlayers)
     self.session.status = self.Status.SPINNING
+
+    -- Wago Analytics
+    self.analytics:IncrementCounter("spins")
+    self.analytics:IncrementCounter("groupsFormed", #self.session.groups)
+    self.analytics:IncrementCounter("totalPlayersInLobbies", #activePlayers)
 
     -- Capture algorithm outputs
     local groupDicts = {}

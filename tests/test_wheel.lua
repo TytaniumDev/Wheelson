@@ -37,6 +37,9 @@ _G.LibStub = function(name, silent)
             RegisterOptionsTable = function() end,
             NotifyChange = function() end,
         }
+    elseif name == "WagoAnalytics" then
+        local noop = setmetatable({}, { __index = function() return function() end end })
+        return { Register = function(_, _id) return noop end }
     end
     if silent then return nil end
     return {}

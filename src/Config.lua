@@ -4,6 +4,9 @@ local WHLSN = LibStub("AceAddon-3.0"):NewAddon(
 )
 _G.Wheelson = WHLSN
 
+-- Wago Analytics (Shim guarantees WagoAnalytics is never nil)
+WHLSN.analytics = LibStub("WagoAnalytics"):Register("kGryLYKy")
+
 -- Addon communication prefix (max 16 chars)
 WHLSN.COMM_PREFIX = "WHLSN"
 

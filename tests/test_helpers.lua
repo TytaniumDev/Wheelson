@@ -16,6 +16,7 @@ _G.LibStub = function()
         return addon
     end
     addon.New = function(_, name, defaults) return { profile = defaults and defaults.profile or {} } end
+    addon.Register = function(_, _id) return setmetatable({}, { __index = function() return function() end end }) end
     return addon
 end
 
