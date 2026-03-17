@@ -13,7 +13,7 @@ if ! command -v busted &> /dev/null; then
       brew install luarocks
     fi
     echo "=== Installing busted via luarocks ==="
-    luarocks install --user busted
+    luarocks install busted
   else
     echo "ERROR: Unsupported OS for automatic installation. Please install 'busted' manually." >&2
     exit 1

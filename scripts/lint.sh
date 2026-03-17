@@ -13,7 +13,7 @@ if ! command -v luacheck &> /dev/null; then
       brew install luarocks
     fi
     echo "=== Installing luacheck via luarocks ==="
-    luarocks install --user luacheck
+    luarocks install luacheck
   else
     echo "ERROR: Unsupported OS for automatic installation. Please install 'luacheck' manually." >&2
     exit 1
