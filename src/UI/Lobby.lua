@@ -571,6 +571,7 @@ local function CreateSpecOverrideSection(parent)
                     btn:GetFontString():SetJustifyH("CENTER")
                     section.offButtons[idx] = btn
                 end
+                btn:ClearAllPoints()
                 btn:SetPoint("TOPLEFT", mainLabel, "TOPLEFT", 36 + (idx - 1) * 64, -18)
                 btn:SetText(role)
                 btn.role = role
