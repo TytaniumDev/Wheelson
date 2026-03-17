@@ -629,7 +629,10 @@ function WHLSN:HandleSessionUpdate(data, sender)
         end
 
         if data.community then
-            self.session.connectedCommunity = data.community
+            self.session.connectedCommunity = {}
+            for k, v in pairs(data.community) do
+                self.session.connectedCommunity[k] = v
+            end
         end
 
         self:UpdateUI()
