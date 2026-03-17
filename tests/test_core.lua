@@ -303,6 +303,7 @@ describe("HidePlayer and UnhidePlayer", function()
         }
         WHLSN.session.removedPlayers = {}
         WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.UpdateLobbyView = function() end
         WHLSN.Print = function() end
     end)
 
