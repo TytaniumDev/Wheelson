@@ -281,6 +281,14 @@ describe("ClearSessionState", function()
 
         assert.same({}, WHLSN.commQueue)
     end)
+
+    it("should clear removedPlayers", function()
+        WHLSN.session.removedPlayers = { ["SomePlayer"] = true }
+
+        WHLSN:ClearSessionState()
+
+        assert.same({}, WHLSN.session.removedPlayers)
+    end)
 end)
 
 describe("HidePlayer and UnhidePlayer", function()
