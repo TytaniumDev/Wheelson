@@ -769,7 +769,7 @@ local function PopulatePlayerRows(frame, players)
         row.lustIcon:SetShown(player:HasLust())
 
         row.kickButton:SetScript("OnClick", function()
-            WHLSN:KickPlayer(player.name)
+            WHLSN:HidePlayer(player.name)
         end)
         row.kickButton:Hide()
 

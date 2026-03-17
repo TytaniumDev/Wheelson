@@ -142,6 +142,7 @@ function WHLSN:StartSession()
     self.session.groups = {}
     self.session.algorithmSnapshot = nil
     self.session.connectedCommunity = {}
+    self.session.removedPlayers = {}
     -- Auto-add the host as the first player
     local hostPlayer = self:DetectLocalPlayer()
     if hostPlayer then
@@ -168,6 +169,7 @@ function WHLSN:StartTestSession()
     self.session.players = self:GetTestPlayers()
     self.session.groups = {}
     self.session.isTest = true
+    self.session.removedPlayers = {}
 
     self:ShowMainFrame()
     self:UpdateUI()
@@ -354,21 +356,37 @@ function WHLSN:ViewHistorySession(index)
     self:ShowMainFrame()
 end
 
---- Remove a player from the session (host only).
+--- Hide a player from the session (host only). Player stays in the list
+--- but is excluded from group formation and shown as dimmed/struck-through.
 ---@param playerName string
-function WHLSN:KickPlayer(playerName)
+function WHLSN:HidePlayer(playerName)
     if self.session.host ~= UnitName("player") then return end
     if self.session.status ~= self.Status.LOBBY then return end
 
-    for i, p in ipairs(self.session.players) do
-        if self:StripRealmName(p.name) == self:StripRealmName(playerName) then
-            table.remove(self.session.players, i)
-            self.session.connectedCommunity[self:StripRealmName(playerName)] = nil
+    local stripped = self:StripRealmName(playerName)
+    -- Don't allow hiding the host
+    if stripped == UnitName("player") then return end
+
+    for _, p in ipairs(self.session.players) do
+        if self:StripRealmName(p.name) == stripped then
+            self.session.removedPlayers[stripped] = true
             self:BroadcastSessionUpdate()
-            self:Print(playerName .. " removed from session.")
+            self:Print(playerName .. " hidden from session.")
             return
         end
     end
+end
+
+--- Unhide a previously hidden player (host only).
+---@param playerName string
+function WHLSN:UnhidePlayer(playerName)
+    if self.session.host ~= UnitName("player") then return end
+    if self.session.status ~= self.Status.LOBBY then return end
+
+    local stripped = self:StripRealmName(playerName)
+    self.session.removedPlayers[stripped] = nil
+    self:BroadcastSessionUpdate()
+    self:Print(playerName .. " restored to session.")
 end
 
 ---------------------------------------------------------------------------
@@ -418,6 +436,7 @@ function WHLSN:ClearSessionState()
     self.session.hostEnded = false
     self.session.isTest = nil
     self.session.connectedCommunity = {}
+    self.session.removedPlayers = {}
     self.session.commChannel = nil
     self.session.hostFullName = nil
     self.commQueue = {}

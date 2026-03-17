@@ -283,6 +283,77 @@ describe("ClearSessionState", function()
     end)
 end)
 
+describe("HidePlayer and UnhidePlayer", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer"
+        WHLSN.session.players = {
+            WHLSN.Player:New("TestPlayer", "tank", {}, {}),
+            WHLSN.Player:New("OtherPlayer", "healer", {}, {}),
+            WHLSN.Player:New("ThirdPlayer", "ranged", {}, {}),
+        }
+        WHLSN.session.removedPlayers = {}
+        WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.Print = function() end
+    end)
+
+    it("should mark a player as removed without removing from list", function()
+        WHLSN:HidePlayer("OtherPlayer")
+
+        assert.equals(3, #WHLSN.session.players)
+        assert.is_true(WHLSN.session.removedPlayers["OtherPlayer"])
+    end)
+
+    it("should not allow hiding the host", function()
+        WHLSN:HidePlayer("TestPlayer")
+
+        assert.is_nil(WHLSN.session.removedPlayers["TestPlayer"])
+    end)
+
+    it("should only work for the host", function()
+        WHLSN.session.host = "SomeoneElse"
+        WHLSN:HidePlayer("OtherPlayer")
+
+        assert.is_nil(WHLSN.session.removedPlayers["OtherPlayer"])
+    end)
+
+    it("should only work in lobby status", function()
+        WHLSN.session.status = "spinning"
+        WHLSN:HidePlayer("OtherPlayer")
+
+        assert.is_nil(WHLSN.session.removedPlayers["OtherPlayer"])
+    end)
+
+    it("should unhide a previously hidden player", function()
+        WHLSN:HidePlayer("OtherPlayer")
+        assert.is_true(WHLSN.session.removedPlayers["OtherPlayer"])
+
+        WHLSN:UnhidePlayer("OtherPlayer")
+        assert.is_nil(WHLSN.session.removedPlayers["OtherPlayer"])
+    end)
+
+    it("should handle realm-qualified names", function()
+        WHLSN:HidePlayer("OtherPlayer-Illidan")
+
+        assert.is_true(WHLSN.session.removedPlayers["OtherPlayer"])
+    end)
+
+    it("should be a no-op for a player not in the session", function()
+        WHLSN:HidePlayer("NonexistentPlayer")
+
+        assert.is_nil(WHLSN.session.removedPlayers["NonexistentPlayer"])
+    end)
+
+    it("should be idempotent when hiding an already-hidden player", function()
+        WHLSN:HidePlayer("OtherPlayer")
+        WHLSN:HidePlayer("OtherPlayer")
+
+        assert.is_true(WHLSN.session.removedPlayers["OtherPlayer"])
+        assert.equals(3, #WHLSN.session.players)
+    end)
+end)
+
 describe("SpinGroups", function()
     before_each(function()
         WHLSN:OnInitialize()
