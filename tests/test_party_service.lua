@@ -252,3 +252,40 @@ describe("HandleJoinRequest cross-realm", function()
         assert.equals("ranged", WHLSN.session.players[2].mainRole)
     end)
 end)
+
+describe("HandleSpecUpdate cross-realm", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer"
+        WHLSN.session.connectedCommunity = {}
+        WHLSN.Print = function() end
+        WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.IsCommunityRosterMember = function() return false end
+
+        -- Pre-populate a cross-realm player (as HandleJoinRequest would)
+        WHLSN.session.players = {
+            WHLSN.Player:New("TestPlayer", "tank"),
+            WHLSN.Player:New("CrossRealmPlayer-Stormrage", "healer", {}, {}, "PRIEST"),
+        }
+    end)
+
+    it("should preserve realm-qualified name on spec update", function()
+        local data = {
+            type = "SPEC_UPDATE",
+            player = {
+                name = "CrossRealmPlayer",
+                mainRole = "ranged",
+                offspecs = {},
+                utilities = { "lust" },
+                classToken = "MAGE",
+            },
+        }
+
+        WHLSN:HandleSpecUpdate(data, "CrossRealmPlayer-Stormrage", "GUILD")
+
+        assert.equals(2, #WHLSN.session.players)
+        assert.equals("CrossRealmPlayer-Stormrage", WHLSN.session.players[2].name)
+        assert.equals("ranged", WHLSN.session.players[2].mainRole)
+    end)
+end)

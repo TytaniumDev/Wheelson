@@ -723,11 +723,7 @@ function WHLSN:HandleJoinRequest(data, sender, distribution)
     end
 
     local player = WHLSN.Player.FromDict(data.player)
-
-    -- Preserve realm-qualified name from sender for cross-realm invites
-    if sender:find("-") then
-        player.name = sender
-    end
+    self:ResolvePlayerName(player, sender)
 
     -- Replace if already in list
     for i, p in ipairs(self.session.players) do
@@ -781,11 +777,7 @@ function WHLSN:HandleSpecUpdate(data, sender, distribution)
     end
 
     local player = WHLSN.Player.FromDict(data.player)
-
-    -- Preserve realm-qualified name from sender for cross-realm invites
-    if sender:find("-") then
-        player.name = sender
-    end
+    self:ResolvePlayerName(player, sender)
 
     -- Find and replace existing player
     for i, p in ipairs(self.session.players) do
