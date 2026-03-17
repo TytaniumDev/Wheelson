@@ -425,6 +425,14 @@ local function CreatePlayerRow(parent, index)
     row.lustIcon:SetPoint("RIGHT", -48, 0)
     row.lustIcon:SetTexture(WHLSN.LUST_ICON)
 
+    -- Strikethrough line (hidden by default)
+    row.strikethrough = row:CreateTexture(nil, "OVERLAY")
+    row.strikethrough:SetHeight(1)
+    row.strikethrough:SetPoint("LEFT", row.roleIcon, "LEFT", 0, 0)
+    row.strikethrough:SetPoint("RIGHT", row.lustIcon, "RIGHT", 0, 0)
+    row.strikethrough:SetColorTexture(0.5, 0.5, 0.5, 0.6)
+    row.strikethrough:Hide()
+
     -- Kick button (host only, shown on hover)
     row.kickButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
     row.kickButton:SetSize(40, 18)
@@ -768,9 +776,31 @@ local function PopulatePlayerRows(frame, players)
         row.brezIcon:SetShown(player:HasBrez())
         row.lustIcon:SetShown(player:HasLust())
 
-        row.kickButton:SetScript("OnClick", function()
-            WHLSN:HidePlayer(player.name)
-        end)
+        local stripped = WHLSN:StripRealmName(player.name)
+        local isRemoved = WHLSN.session.removedPlayers
+            and WHLSN.session.removedPlayers[stripped]
+
+        if isRemoved then
+            row.nameText:SetAlpha(0.35)
+            row.roleIcon:SetAlpha(0.35)
+            row.brezIcon:SetAlpha(0.35)
+            row.lustIcon:SetAlpha(0.35)
+            row.strikethrough:Show()
+            row.kickButton:SetText("+")
+            row.kickButton:SetScript("OnClick", function()
+                WHLSN:UnhidePlayer(player.name)
+            end)
+        else
+            row.nameText:SetAlpha(1)
+            row.roleIcon:SetAlpha(1)
+            row.brezIcon:SetAlpha(1)
+            row.lustIcon:SetAlpha(1)
+            row.strikethrough:Hide()
+            row.kickButton:SetText("X")
+            row.kickButton:SetScript("OnClick", function()
+                WHLSN:HidePlayer(player.name)
+            end)
+        end
         row.kickButton:Hide()
 
         row:Show()
@@ -822,10 +852,19 @@ function WHLSN:UpdateLobbyView()
 
     UpdateLobbyStatus(frame, self.session, hasSession)
 
-    frame.countText:SetText(#players .. " players")
+    -- Count only active (non-removed) players
+    local activePlayers = {}
+    for _, p in ipairs(players) do
+        if not self.session.removedPlayers
+            or not self.session.removedPlayers[self:StripRealmName(p.name)] then
+            activePlayers[#activePlayers + 1] = p
+        end
+    end
 
-    if #players > 0 then
-        frame.roleText:SetText(self:GetRoleCountSummary(players))
+    frame.countText:SetText(#activePlayers .. " players")
+
+    if #activePlayers > 0 then
+        frame.roleText:SetText(self:GetRoleCountSummary(activePlayers))
     else
         frame.roleText:SetText("")
     end
@@ -838,7 +877,7 @@ function WHLSN:UpdateLobbyView()
         end
     end
 
-    UpdateLobbyButtons(frame, isHost, hasSession, isInSession, #players)
+    UpdateLobbyButtons(frame, isHost, hasSession, isInSession, #activePlayers)
 
     -- Show spec override section only when local player is in an active lobby session
     local specSection = lobbyState.specSection
