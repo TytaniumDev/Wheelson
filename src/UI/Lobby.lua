@@ -19,7 +19,7 @@ local ROLE_ICONS = {
 local ROLE_TEXCOORDS = {
     tank = { 0.5, 0.75, 0, 1 },
     healer = { 0.75, 1, 0, 1 },
-    ranged = { 0.25, 0.5, 0, 1 },
+    ranged = { 0, 0.25, 0, 1 },   -- matches melee (sword)
     melee = { 0, 0.25, 0, 1 },
 }
 
