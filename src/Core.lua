@@ -524,6 +524,7 @@ function WHLSN:SendSessionUpdate()
         playerCount = #self.session.players,
         players = playerList,
         community = self.session.connectedCommunity,
+        removedPlayers = self.session.removedPlayers,
     }
 
     if self.session.status == self.Status.SPINNING or
@@ -653,6 +654,13 @@ function WHLSN:HandleSessionUpdate(data, sender)
             self.session.connectedCommunity = {}
             for k, v in pairs(data.community) do
                 self.session.connectedCommunity[k] = v
+            end
+        end
+
+        if data.removedPlayers then
+            self.session.removedPlayers = {}
+            for k, v in pairs(data.removedPlayers) do
+                self.session.removedPlayers[k] = v
             end
         end
 

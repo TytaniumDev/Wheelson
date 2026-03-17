@@ -1227,3 +1227,64 @@ describe("HandleSpecUpdate", function()
         assert.equals("ranged", updated.mainRole)
     end)
 end)
+
+describe("SendSessionUpdate removedPlayers", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer"
+        WHLSN.session.players = { WHLSN.Player:New("TestPlayer", "tank", {}, {}) }
+        WHLSN.session.removedPlayers = { ["HiddenGuy"] = true }
+        WHLSN.session.connectedCommunity = {}
+        WHLSN.sent_messages = {}
+        WHLSN.SendCommMessage = function(self, prefix, msg, channel, target)
+            self.sent_messages[#self.sent_messages + 1] = { channel = channel, data = msg }
+        end
+        WHLSN.Serialize = function(self, data) return data end
+    end)
+
+    it("should include removedPlayers in SESSION_UPDATE payload", function()
+        WHLSN:SendSessionUpdate()
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_not_nil(sentData.removedPlayers)
+        assert.same({ ["HiddenGuy"] = true }, sentData.removedPlayers)
+    end)
+end)
+
+describe("HandleSessionUpdate removedPlayers", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.UpdateUI = function() end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+    end)
+
+    it("should populate removedPlayers from data", function()
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {},
+            removedPlayers = { ["SomeGuy"] = true },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        assert.same({ ["SomeGuy"] = true }, WHLSN.session.removedPlayers)
+    end)
+
+    it("should leave removedPlayers unchanged when field is absent", function()
+        WHLSN.session.removedPlayers = { ["Existing"] = true }
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        assert.same({ ["Existing"] = true }, WHLSN.session.removedPlayers)
+    end)
+end)
