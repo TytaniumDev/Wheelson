@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Installing luacheck ==="
-sudo apt-get update -qq && sudo apt-get install -y -qq luarocks >/dev/null
-sudo luarocks install luacheck >/dev/null
+# Ensure luacheck is installed
+"$(dirname "$0")/install-luarocks-dep.sh" luacheck
+
+# Ensure local luarocks bin is in PATH if luarocks is available
+if command -v luarocks &> /dev/null; then
+  eval "$(luarocks path --bin)"
+fi
 
 echo "=== Running luacheck ==="
 luacheck src/ tests/
