@@ -504,6 +504,7 @@ function WHLSN:SendSessionUpdate()
         host = self.session.host,
         playerCount = #self.session.players,
         players = playerList,
+        community = self.session.connectedCommunity,
     }
 
     if self.session.status == self.Status.SPINNING or
@@ -624,6 +625,13 @@ function WHLSN:HandleSessionUpdate(data, sender)
             self.session.groups = {}
             for _, gd in ipairs(data.groups) do
                 self.session.groups[#self.session.groups + 1] = WHLSN.Group.FromDict(gd)
+            end
+        end
+
+        if data.community then
+            self.session.connectedCommunity = {}
+            for k, v in pairs(data.community) do
+                self.session.connectedCommunity[k] = v
             end
         end
 

@@ -297,7 +297,7 @@ function WHLSN:InviteMyGroup()
     local myName = UnitName("player")
     for _, group in ipairs(self.session.groups) do
         for _, player in ipairs(group:GetPlayers()) do
-            if player.name == myName then
+            if self:StripRealmName(player.name) == myName then
                 self:InvitePlayers(group:GetPlayers())
                 return
             end

@@ -74,6 +74,7 @@ _G.Settings = {
     RegisterCanvasLayoutCategory = function(_, name) return { ID = name } end,
     RegisterAddOnCategory = function() end,
 }
+_G.C_PartyInfo = { InviteUnit = function() end }
 
 _G.GetNormalizedRealmName = function() return "Illidan" end
 
@@ -87,6 +88,8 @@ _G.wipe = function(t) for k in pairs(t) do t[k] = nil end end
 dofile("src/GroupCreator.lua")
 dofile("src/Services/CommunityService.lua")
 dofile("src/UI/Lobby.lua")
+dofile("src/Services/PartyService.lua")
+dofile("src/UI/GroupDisplay.lua")
 
 local WHLSN = _G.Wheelson
 
@@ -707,6 +710,43 @@ describe("HandleSessionEnd", function()
     end)
 end)
 
+describe("HandleSessionUpdate community broadcast", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.UpdateUI = function() end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+    end)
+
+    it("should populate connectedCommunity from data.community", function()
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {},
+            community = { ["Tyler"] = "Tyler-Kel'Thuzad" },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        assert.same({ ["Tyler"] = "Tyler-Kel'Thuzad" }, WHLSN.session.connectedCommunity)
+    end)
+
+    it("should leave connectedCommunity unchanged when community field absent", function()
+        WHLSN.session.connectedCommunity = { ["Existing"] = "Existing-Realm" }
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        assert.same({ ["Existing"] = "Existing-Realm" }, WHLSN.session.connectedCommunity)
+    end)
+end)
+
 describe("HandleSessionPing", function()
     before_each(function()
         WHLSN:OnInitialize()
@@ -821,6 +861,20 @@ describe("SendSessionUpdate with community", function()
         assert.equals("GUILD", WHLSN.sent_messages[1].channel)
         assert.equals("WHISPER", WHLSN.sent_messages[2].channel)
         assert.equals("CommunityGuy-Stormrage", WHLSN.sent_messages[2].target)
+    end)
+
+    it("should include community map in SESSION_UPDATE payload", function()
+        local sentData
+        WHLSN.SendCommMessage = function(self, prefix, msg, channel, target)
+            if channel == "GUILD" then sentData = msg end
+        end
+        WHLSN.Serialize = function(self, data) return data end
+
+        WHLSN:SendSessionUpdate()
+
+        assert.is_not_nil(sentData)
+        assert.is_not_nil(sentData.community)
+        assert.same({ ["CommunityGuy"] = "CommunityGuy-Stormrage" }, sentData.community)
     end)
 end)
 
@@ -955,5 +1009,70 @@ describe("CommRestriction", function()
 
         assert.equals(1, #sent_messages)
         assert.equals(0, #WHLSN.commQueue)
+    end)
+end)
+
+describe("InviteMyGroup", function()
+    local invited, printed
+
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.isTest = false
+        WHLSN.session.connectedCommunity = {}
+        invited = {}
+        printed = {}
+        _G.C_PartyInfo.InviteUnit = function(name) invited[#invited + 1] = name end
+        WHLSN.Print = function(_, msg) printed[#printed + 1] = msg end
+        _G.UnitName = function() return "TestPlayer" end
+    end)
+
+    it("should invite the other 4 members of the local player's group", function()
+        WHLSN.session.groups = {
+            WHLSN.Group:New(
+                WHLSN.Player:New("TestPlayer", "tank"),
+                WHLSN.Player:New("Healer1", "healer"),
+                {
+                    WHLSN.Player:New("DPS1", "ranged"),
+                    WHLSN.Player:New("DPS2", "melee"),
+                    WHLSN.Player:New("DPS3", "ranged"),
+                }
+            ),
+        }
+        WHLSN:InviteMyGroup()
+        assert.equals(4, #invited)
+    end)
+
+    it("should find local player when name has realm suffix (StripRealmName fix)", function()
+        WHLSN.session.groups = {
+            WHLSN.Group:New(
+                WHLSN.Player:New("TestPlayer-Illidan", "tank"),
+                WHLSN.Player:New("Healer1", "healer"),
+                {
+                    WHLSN.Player:New("DPS1", "ranged"),
+                    WHLSN.Player:New("DPS2", "melee"),
+                    WHLSN.Player:New("DPS3", "ranged"),
+                }
+            ),
+        }
+        WHLSN:InviteMyGroup()
+        -- StripRealmName("TestPlayer-Illidan") == "TestPlayer" so group is found
+        assert.equals(4, #invited)
+    end)
+
+    it("should print error when local player not in any group", function()
+        WHLSN.session.groups = {
+            WHLSN.Group:New(
+                WHLSN.Player:New("Tank1", "tank"),
+                WHLSN.Player:New("Healer1", "healer"),
+                {
+                    WHLSN.Player:New("DPS1", "ranged"),
+                    WHLSN.Player:New("DPS2", "melee"),
+                    WHLSN.Player:New("DPS3", "ranged"),
+                }
+            ),
+        }
+        WHLSN:InviteMyGroup()
+        assert.equals(1, #printed)
+        assert.truthy(printed[1]:find("Could not find"))
     end)
 end)
