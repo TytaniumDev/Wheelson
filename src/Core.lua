@@ -18,6 +18,7 @@ function WHLSN:OnInitialize()
         viewingHistory = false, -- true when displaying a past session
         hostEnded = false, -- true when the host explicitly ended the session
         connectedCommunity = {},  -- bare name -> realm-qualified name (host only)
+        removedPlayers = {},      -- stripped name -> true (hidden from group formation)
         commChannel = nil,        -- "GUILD" or "WHISPER" (community clients only)
         hostFullName = nil,       -- realm-qualified host name (community clients only)
     }
@@ -142,6 +143,7 @@ function WHLSN:StartSession()
     self.session.groups = {}
     self.session.algorithmSnapshot = nil
     self.session.connectedCommunity = {}
+    self.session.removedPlayers = {}
     -- Auto-add the host as the first player
     local hostPlayer = self:DetectLocalPlayer()
     if hostPlayer then
@@ -168,6 +170,7 @@ function WHLSN:StartTestSession()
     self.session.players = self:GetTestPlayers()
     self.session.groups = {}
     self.session.isTest = true
+    self.session.removedPlayers = {}
 
     self:ShowMainFrame()
     self:UpdateUI()
@@ -235,14 +238,22 @@ function WHLSN:SpinGroups()
         return
     end
 
-    if #self.session.players < 5 then
+    -- Filter out removed/hidden players
+    local activePlayers = {}
+    for _, p in ipairs(self.session.players) do
+        if not self.session.removedPlayers[self:StripRealmName(p.name)] then
+            activePlayers[#activePlayers + 1] = p
+        end
+    end
+
+    if #activePlayers < 5 then
         self:Print("Need at least 5 players to form a group.")
         return
     end
 
     -- Capture algorithm inputs before running
     local playerDicts = {}
-    for _, p in ipairs(self.session.players) do
+    for _, p in ipairs(activePlayers) do
         playerDicts[#playerDicts + 1] = p:ToDict()
     end
 
@@ -252,7 +263,7 @@ function WHLSN:SpinGroups()
         lastGroupDicts[#lastGroupDicts + 1] = g:ToDict()
     end
 
-    self.session.groups = self:CreateMythicPlusGroups(self.session.players)
+    self.session.groups = self:CreateMythicPlusGroups(activePlayers)
     self.session.status = self.Status.SPINNING
 
     -- Capture algorithm outputs
@@ -267,7 +278,7 @@ function WHLSN:SpinGroups()
         groups = groupDicts,
         timestamp = time(),
         host = self.session.host,
-        playerCount = #self.session.players,
+        playerCount = #activePlayers,
     }
 
     self.lastActivity = time()
@@ -292,10 +303,11 @@ function WHLSN:SaveSessionResults()
         groupData[#groupData + 1] = g:ToDict()
     end
 
+    local snap = self.session.algorithmSnapshot
     local sessionRecord = {
         groups = groupData,
         host = self.session.host,
-        playerCount = #self.session.players,
+        playerCount = snap and snap.playerCount or #self.session.players,
         timestamp = time(),
     }
 
@@ -354,21 +366,39 @@ function WHLSN:ViewHistorySession(index)
     self:ShowMainFrame()
 end
 
---- Remove a player from the session (host only).
+--- Hide a player from the session (host only). Player stays in the list
+--- but is excluded from group formation and shown as dimmed/struck-through.
 ---@param playerName string
-function WHLSN:KickPlayer(playerName)
+function WHLSN:HidePlayer(playerName)
     if self.session.host ~= UnitName("player") then return end
     if self.session.status ~= self.Status.LOBBY then return end
 
-    for i, p in ipairs(self.session.players) do
-        if self:StripRealmName(p.name) == self:StripRealmName(playerName) then
-            table.remove(self.session.players, i)
-            self.session.connectedCommunity[self:StripRealmName(playerName)] = nil
+    local stripped = self:StripRealmName(playerName)
+    -- Don't allow hiding the host
+    if stripped == UnitName("player") then return end
+
+    for _, p in ipairs(self.session.players) do
+        if self:StripRealmName(p.name) == stripped then
+            self.session.removedPlayers[stripped] = true
             self:BroadcastSessionUpdate()
-            self:Print(playerName .. " removed from session.")
+            self:UpdateLobbyView()
+            self:Print(playerName .. " hidden from session.")
             return
         end
     end
+end
+
+--- Unhide a previously hidden player (host only).
+---@param playerName string
+function WHLSN:UnhidePlayer(playerName)
+    if self.session.host ~= UnitName("player") then return end
+    if self.session.status ~= self.Status.LOBBY then return end
+
+    local stripped = self:StripRealmName(playerName)
+    self.session.removedPlayers[stripped] = nil
+    self:BroadcastSessionUpdate()
+    self:UpdateLobbyView()
+    self:Print(playerName .. " restored to session.")
 end
 
 ---------------------------------------------------------------------------
@@ -418,6 +448,7 @@ function WHLSN:ClearSessionState()
     self.session.hostEnded = false
     self.session.isTest = nil
     self.session.connectedCommunity = {}
+    self.session.removedPlayers = {}
     self.session.commChannel = nil
     self.session.hostFullName = nil
     self.commQueue = {}
@@ -505,6 +536,7 @@ function WHLSN:SendSessionUpdate()
         playerCount = #self.session.players,
         players = playerList,
         community = self.session.connectedCommunity,
+        removedPlayers = self.session.removedPlayers,
     }
 
     if self.session.status == self.Status.SPINNING or
@@ -637,6 +669,13 @@ function WHLSN:HandleSessionUpdate(data, sender)
             end
         end
 
+        if data.removedPlayers then
+            self.session.removedPlayers = {}
+            for k, v in pairs(data.removedPlayers) do
+                self.session.removedPlayers[k] = v
+            end
+        end
+
         self:UpdateUI()
     end
 end
@@ -700,6 +739,7 @@ function WHLSN:HandleLeaveRequest(data, sender)
         if self:StripRealmName(p.name) == self:StripRealmName(sender) then
             table.remove(self.session.players, i)
             self.session.connectedCommunity[self:StripRealmName(sender)] = nil
+            self.session.removedPlayers[self:StripRealmName(sender)] = nil
             self:BroadcastSessionUpdate()
             return
         end

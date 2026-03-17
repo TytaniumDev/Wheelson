@@ -281,6 +281,86 @@ describe("ClearSessionState", function()
 
         assert.same({}, WHLSN.commQueue)
     end)
+
+    it("should clear removedPlayers", function()
+        WHLSN.session.removedPlayers = { ["SomePlayer"] = true }
+
+        WHLSN:ClearSessionState()
+
+        assert.same({}, WHLSN.session.removedPlayers)
+    end)
+end)
+
+describe("HidePlayer and UnhidePlayer", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer"
+        WHLSN.session.players = {
+            WHLSN.Player:New("TestPlayer", "tank", {}, {}),
+            WHLSN.Player:New("OtherPlayer", "healer", {}, {}),
+            WHLSN.Player:New("ThirdPlayer", "ranged", {}, {}),
+        }
+        WHLSN.session.removedPlayers = {}
+        WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.UpdateLobbyView = function() end
+        WHLSN.Print = function() end
+    end)
+
+    it("should mark a player as removed without removing from list", function()
+        WHLSN:HidePlayer("OtherPlayer")
+
+        assert.equals(3, #WHLSN.session.players)
+        assert.is_true(WHLSN.session.removedPlayers["OtherPlayer"])
+    end)
+
+    it("should not allow hiding the host", function()
+        WHLSN:HidePlayer("TestPlayer")
+
+        assert.is_nil(WHLSN.session.removedPlayers["TestPlayer"])
+    end)
+
+    it("should only work for the host", function()
+        WHLSN.session.host = "SomeoneElse"
+        WHLSN:HidePlayer("OtherPlayer")
+
+        assert.is_nil(WHLSN.session.removedPlayers["OtherPlayer"])
+    end)
+
+    it("should only work in lobby status", function()
+        WHLSN.session.status = "spinning"
+        WHLSN:HidePlayer("OtherPlayer")
+
+        assert.is_nil(WHLSN.session.removedPlayers["OtherPlayer"])
+    end)
+
+    it("should unhide a previously hidden player", function()
+        WHLSN:HidePlayer("OtherPlayer")
+        assert.is_true(WHLSN.session.removedPlayers["OtherPlayer"])
+
+        WHLSN:UnhidePlayer("OtherPlayer")
+        assert.is_nil(WHLSN.session.removedPlayers["OtherPlayer"])
+    end)
+
+    it("should handle realm-qualified names", function()
+        WHLSN:HidePlayer("OtherPlayer-Illidan")
+
+        assert.is_true(WHLSN.session.removedPlayers["OtherPlayer"])
+    end)
+
+    it("should be a no-op for a player not in the session", function()
+        WHLSN:HidePlayer("NonexistentPlayer")
+
+        assert.is_nil(WHLSN.session.removedPlayers["NonexistentPlayer"])
+    end)
+
+    it("should be idempotent when hiding an already-hidden player", function()
+        WHLSN:HidePlayer("OtherPlayer")
+        WHLSN:HidePlayer("OtherPlayer")
+
+        assert.is_true(WHLSN.session.removedPlayers["OtherPlayer"])
+        assert.equals(3, #WHLSN.session.players)
+    end)
 end)
 
 describe("SpinGroups", function()
@@ -288,6 +368,7 @@ describe("SpinGroups", function()
         WHLSN:OnInitialize()
         WHLSN.session.status = WHLSN.Status.LOBBY
         WHLSN.session.host = "TestPlayer"
+        WHLSN.session.removedPlayers = {}
         WHLSN.BroadcastSessionUpdate = function() end
         WHLSN.UpdateUI = function() end
         WHLSN.TouchActivity = function() end
@@ -358,6 +439,55 @@ describe("SpinGroups", function()
         local snap = WHLSN.session.algorithmSnapshot
         assert.is_nil(getmetatable(snap.players[1]))
         assert.equals("Tank1", snap.players[1].name)
+    end)
+
+    it("should exclude removed players from group formation", function()
+        local Player = WHLSN.Player
+        WHLSN.session.players = {
+            Player:New("Tank1", "tank", {}, {"brez"}),
+            Player:New("Healer1", "healer", {}, {}),
+            Player:New("DPS1", "ranged", {}, {"lust"}),
+            Player:New("DPS2", "melee", {}, {}),
+            Player:New("DPS3", "ranged", {}, {}),
+            Player:New("HiddenDPS", "melee", {}, {}),
+        }
+        WHLSN.session.removedPlayers = { ["HiddenDPS"] = true }
+
+        WHLSN:SpinGroups()
+
+        -- HiddenDPS should not appear in any group
+        for _, group in ipairs(WHLSN.session.groups) do
+            for _, p in ipairs(group:GetPlayers()) do
+                assert.is_not.equals("HiddenDPS", p.name)
+            end
+        end
+    end)
+
+    it("should use active (non-removed) count for minimum player check", function()
+        local Player = WHLSN.Player
+        WHLSN.session.players = {
+            Player:New("Tank1", "tank", {}, {}),
+            Player:New("Healer1", "healer", {}, {}),
+            Player:New("DPS1", "ranged", {}, {}),
+            Player:New("DPS2", "melee", {}, {}),
+            Player:New("DPS3", "ranged", {}, {}),
+            Player:New("Hidden1", "melee", {}, {}),
+        }
+        WHLSN.session.removedPlayers = {
+            ["Hidden1"] = true,
+            ["DPS3"] = true,
+        }
+
+        -- Only 4 active players — should not spin
+        WHLSN.printed = {}
+        WHLSN.Print = function(self, msg)
+            self.printed[#self.printed + 1] = msg
+        end
+
+        WHLSN:SpinGroups()
+
+        assert.is_nil(WHLSN.session.algorithmSnapshot)
+        assert.is_true(#WHLSN.printed > 0)
     end)
 end)
 
@@ -1146,5 +1276,66 @@ describe("HandleSpecUpdate", function()
 
         local updated = WHLSN.session.players[2]
         assert.equals("ranged", updated.mainRole)
+    end)
+end)
+
+describe("SendSessionUpdate removedPlayers", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer"
+        WHLSN.session.players = { WHLSN.Player:New("TestPlayer", "tank", {}, {}) }
+        WHLSN.session.removedPlayers = { ["HiddenGuy"] = true }
+        WHLSN.session.connectedCommunity = {}
+        WHLSN.sent_messages = {}
+        WHLSN.SendCommMessage = function(self, prefix, msg, channel, target)
+            self.sent_messages[#self.sent_messages + 1] = { channel = channel, data = msg }
+        end
+        WHLSN.Serialize = function(self, data) return data end
+    end)
+
+    it("should include removedPlayers in SESSION_UPDATE payload", function()
+        WHLSN:SendSessionUpdate()
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_not_nil(sentData.removedPlayers)
+        assert.same({ ["HiddenGuy"] = true }, sentData.removedPlayers)
+    end)
+end)
+
+describe("HandleSessionUpdate removedPlayers", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.UpdateUI = function() end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+    end)
+
+    it("should populate removedPlayers from data", function()
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {},
+            removedPlayers = { ["SomeGuy"] = true },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        assert.same({ ["SomeGuy"] = true }, WHLSN.session.removedPlayers)
+    end)
+
+    it("should leave removedPlayers unchanged when field is absent", function()
+        WHLSN.session.removedPlayers = { ["Existing"] = true }
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        assert.same({ ["Existing"] = true }, WHLSN.session.removedPlayers)
     end)
 end)
