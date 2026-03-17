@@ -1076,3 +1076,75 @@ describe("InviteMyGroup", function()
         assert.truthy(printed[1]:find("Could not find"))
     end)
 end)
+
+describe("HandleSpecUpdate", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer"
+        WHLSN.session.players = {
+            WHLSN.Player:New("TestPlayer", "tank", {}, {}),
+            WHLSN.Player:New("OtherPlayer", "healer", { "ranged" }, { "brez" }),
+        }
+        WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+    end)
+
+    it("should update existing player's spec data", function()
+        local data = {
+            type = "SPEC_UPDATE",
+            player = { name = "OtherPlayer", mainRole = "tank", offspecs = { "healer" }, utilities = { "brez" } },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "OtherPlayer")
+
+        local updated = WHLSN.session.players[2]
+        assert.equals("tank", updated.mainRole)
+        assert.same({ "healer" }, updated.offspecs)
+    end)
+
+    it("should reject SPEC_UPDATE when sender does not match player name", function()
+        local data = {
+            type = "SPEC_UPDATE",
+            player = { name = "OtherPlayer", mainRole = "tank", offspecs = {}, utilities = {} },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "Impersonator")
+
+        local unchanged = WHLSN.session.players[2]
+        assert.equals("healer", unchanged.mainRole)
+    end)
+
+    it("should ignore SPEC_UPDATE for player not in session", function()
+        local data = {
+            type = "SPEC_UPDATE",
+            player = { name = "Stranger", mainRole = "tank", offspecs = {}, utilities = {} },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "Stranger")
+
+        assert.equals(2, #WHLSN.session.players)
+    end)
+
+    it("should only process on host", function()
+        WHLSN.session.host = "SomeoneElse"
+
+        local data = {
+            type = "SPEC_UPDATE",
+            player = { name = "OtherPlayer", mainRole = "tank", offspecs = {}, utilities = {} },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "OtherPlayer")
+
+        local unchanged = WHLSN.session.players[2]
+        assert.equals("healer", unchanged.mainRole)
+    end)
+
+    it("should handle realm-qualified sender", function()
+        local data = {
+            type = "SPEC_UPDATE",
+            player = { name = "OtherPlayer", mainRole = "ranged", offspecs = {}, utilities = { "brez" } },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "OtherPlayer-Illidan")
+
+        local updated = WHLSN.session.players[2]
+        assert.equals("ranged", updated.mainRole)
+    end)
+end)
