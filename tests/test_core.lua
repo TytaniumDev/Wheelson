@@ -270,6 +270,14 @@ describe("ClearSessionState", function()
     it("should initialize hostEnded to false on startup", function()
         assert.is_false(WHLSN.session.hostEnded)
     end)
+
+    it("should clear commQueue to prevent stale messages from flushing after session ends", function()
+        WHLSN.commQueue = { { prefix = "WHLSN", message = "stale", distribution = "GUILD" } }
+
+        WHLSN:ClearSessionState()
+
+        assert.same({}, WHLSN.commQueue)
+    end)
 end)
 
 describe("SpinGroups", function()

@@ -420,6 +420,7 @@ function WHLSN:ClearSessionState()
     self.session.connectedCommunity = {}
     self.session.commChannel = nil
     self.session.hostFullName = nil
+    self.commQueue = {}
 end
 
 ---------------------------------------------------------------------------
@@ -428,10 +429,10 @@ end
 
 --- Return true when WoW 12.0 restricts addon comms (boss encounter, M+ run, or PvP match).
 function WHLSN:IsCommRestricted()
-    if IsEncounterInProgress and IsEncounterInProgress() then return true end
-    if C_MythicPlus and C_MythicPlus.IsRunActive and C_MythicPlus.IsRunActive() then return true end
-    if C_PvP and C_PvP.IsActiveBattlefield and C_PvP.IsActiveBattlefield() then return true end
-    return false
+    return (IsEncounterInProgress and IsEncounterInProgress())
+        or (C_MythicPlus and C_MythicPlus.IsRunActive and C_MythicPlus.IsRunActive())
+        or (C_PvP and C_PvP.IsActiveBattlefield and C_PvP.IsActiveBattlefield())
+        or false
 end
 
 --- Send an addon message, queuing it if communication is currently restricted.
