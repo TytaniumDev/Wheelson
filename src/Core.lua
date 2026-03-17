@@ -98,6 +98,9 @@ function WHLSN:OnEnable()
     self:RegisterEvent("GROUP_ROSTER_UPDATE")
     self:RegisterEvent("GUILD_ROSTER_UPDATE")
     self:RegisterEvent("ENCOUNTER_END")
+    self:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+    self:RegisterEvent("CHALLENGE_MODE_RESET")
+    self:RegisterEvent("BATTLEGROUND_EXITED")
 end
 
 function WHLSN:OnDisable()
@@ -452,12 +455,17 @@ function WHLSN:FlushCommQueue()
     end
 end
 
---- Flush the comm queue when an encounter ends (delayed 1s to let state settle).
-function WHLSN:ENCOUNTER_END()
+--- Flush the comm queue when a restriction lifts (delayed 1s to let state settle).
+local function flushAfterDelay()
     C_Timer.After(1, function()
         WHLSN:FlushCommQueue()
     end)
 end
+
+function WHLSN:ENCOUNTER_END()        flushAfterDelay() end
+function WHLSN:CHALLENGE_MODE_COMPLETED() flushAfterDelay() end
+function WHLSN:CHALLENGE_MODE_RESET()     flushAfterDelay() end
+function WHLSN:BATTLEGROUND_EXITED()      flushAfterDelay() end
 
 --- Broadcast session state to the guild (throttled).
 function WHLSN:BroadcastSessionUpdate()

@@ -929,4 +929,23 @@ describe("CommRestriction", function()
 
         assert.is_false(WHLSN:IsCommRestricted())
     end)
+
+    it("ENCOUNTER_END handler flushes the queue once restriction lifts", function()
+        -- Queue a message during an encounter
+        _G.IsEncounterInProgress = function() return true end
+        WHLSN:SafeSendCommMessage("WHLSN", "msg", "GUILD")
+        assert.equals(1, #WHLSN.commQueue)
+
+        -- Simulate encounter ending; make C_Timer.After invoke synchronously
+        _G.IsEncounterInProgress = function() return false end
+        local original_after = _G.C_Timer.After
+        _G.C_Timer.After = function(_, cb) cb() end
+
+        WHLSN:ENCOUNTER_END()
+
+        _G.C_Timer.After = original_after
+
+        assert.equals(1, #sent_messages)
+        assert.equals(0, #WHLSN.commQueue)
+    end)
 end)
