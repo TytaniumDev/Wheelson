@@ -293,4 +293,47 @@ describe("CommunityService", function()
             assert.equals("Tyler-Stormrage", sent[1].target)
         end)
     end)
+
+    describe("with apostrophe realm names", function()
+        before_each(function()
+            WHLSN:OnInitialize()
+            WHLSN.db.profile.communityRoster = {}
+        end)
+
+        it("NormalizeCommunityName appends realm to bare name with apostrophe", function()
+            assert.equals("O'Brien-Illidan", WHLSN:NormalizeCommunityName("O'Brien"))
+        end)
+
+        it("NormalizeCommunityName leaves apostrophe-realm qualified name unchanged", function()
+            assert.equals("Tyler-Kel'Thuzad", WHLSN:NormalizeCommunityName("Tyler-Kel'Thuzad"))
+        end)
+
+        it("AddCommunityPlayer stores apostrophe realm name correctly", function()
+            local ok = WHLSN:AddCommunityPlayer("Tyler-Kel'Thuzad")
+            assert.is_true(ok)
+            assert.equals("Tyler-Kel'Thuzad", WHLSN.db.profile.communityRoster[1].name)
+        end)
+
+        it("IsCommunityRosterMember returns true by full name with apostrophe realm", function()
+            WHLSN:AddCommunityPlayer("Tyler-Kel'Thuzad")
+            assert.is_true(WHLSN:IsCommunityRosterMember("Tyler-Kel'Thuzad"))
+        end)
+
+        it("IsCommunityRosterMember returns true by bare name after apostrophe-realm add", function()
+            WHLSN:AddCommunityPlayer("Tyler-Kel'Thuzad")
+            assert.is_true(WHLSN:IsCommunityRosterMember("Tyler"))
+        end)
+
+        it("RemoveCommunityPlayer removes apostrophe-realm entry", function()
+            WHLSN:AddCommunityPlayer("Tyler-Kel'Thuzad")
+            local ok = WHLSN:RemoveCommunityPlayer("Tyler-Kel'Thuzad")
+            assert.is_true(ok)
+            assert.equals(0, #WHLSN.db.profile.communityRoster)
+        end)
+
+        it("GetCommunityPlayerFullName returns apostrophe-realm qualified name by bare name", function()
+            WHLSN:AddCommunityPlayer("Tyler-Kel'Thuzad")
+            assert.equals("Tyler-Kel'Thuzad", WHLSN:GetCommunityPlayerFullName("Tyler"))
+        end)
+    end)
 end)
