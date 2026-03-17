@@ -381,6 +381,7 @@ function WHLSN:HidePlayer(playerName)
         if self:StripRealmName(p.name) == stripped then
             self.session.removedPlayers[stripped] = true
             self:BroadcastSessionUpdate()
+            self:UpdateLobbyView()
             self:Print(playerName .. " hidden from session.")
             return
         end
@@ -396,6 +397,7 @@ function WHLSN:UnhidePlayer(playerName)
     local stripped = self:StripRealmName(playerName)
     self.session.removedPlayers[stripped] = nil
     self:BroadcastSessionUpdate()
+    self:UpdateLobbyView()
     self:Print(playerName .. " restored to session.")
 end
 
