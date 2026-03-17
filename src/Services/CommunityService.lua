@@ -118,7 +118,7 @@ function WHLSN:SendCommunityPings()
     local myName = UnitName("player")
     for _, entry in ipairs(self.db.profile.communityRoster) do
         if self:StripRealmName(entry.name) ~= myName then
-            self:SendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", entry.name)
+            self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", entry.name)
         end
     end
 end
@@ -132,7 +132,7 @@ function WHLSN:WhisperCommunityPlayers(serialized, communityList)
 
     for bareName, fullName in pairs(list) do
         if bareName ~= myName then
-            self:SendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", fullName)
+            self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", fullName)
         end
     end
 end

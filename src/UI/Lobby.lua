@@ -258,7 +258,7 @@ local function CreateCommunityPanel()
                         version = WHLSN.VERSION,
                     }
                     local serialized = WHLSN:Serialize(pingData)
-                    WHLSN:SendCommMessage(WHLSN.COMM_PREFIX, serialized, "WHISPER", normalized)
+                    WHLSN:SafeSendCommMessage(WHLSN.COMM_PREFIX, serialized, "WHISPER", normalized)
                 end
                 WHLSN:RefreshCommunityPanel()
                 WHLSN:UpdateLobbyView()
@@ -667,9 +667,9 @@ function WHLSN:RequestJoin()
     local serialized = self:Serialize(data)
 
     if self.session.commChannel == "WHISPER" and self.session.hostFullName then
-        self:SendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", self.session.hostFullName)
+        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", self.session.hostFullName)
     else
-        self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
+        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
     end
 
     self:Print("Join request sent.")

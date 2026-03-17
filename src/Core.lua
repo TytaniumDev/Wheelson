@@ -34,6 +34,9 @@ function WHLSN:OnInitialize()
     self.commThrottleTimer = nil
     self.commPendingUpdate = false
 
+    -- Queue for messages that could not be sent due to encounter restrictions
+    self.commQueue = {}
+
     -- Addon user discovery cache (ephemeral, not saved)
     self.addonUsersCache = {}
     self.isScanning = false
@@ -94,6 +97,10 @@ end
 function WHLSN:OnEnable()
     self:RegisterEvent("GROUP_ROSTER_UPDATE")
     self:RegisterEvent("GUILD_ROSTER_UPDATE")
+    self:RegisterEvent("ENCOUNTER_END")
+    self:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+    self:RegisterEvent("CHALLENGE_MODE_RESET")
+    self:RegisterEvent("BATTLEGROUND_EXITED")
 end
 
 function WHLSN:OnDisable()
@@ -212,9 +219,9 @@ function WHLSN:LeaveSession()
     local serialized = self:Serialize(data)
 
     if self.session.commChannel == "WHISPER" and self.session.hostFullName then
-        self:SendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", self.session.hostFullName)
+        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", self.session.hostFullName)
     else
-        self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
+        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
     end
 
     self:ClearSessionState()
@@ -413,11 +420,53 @@ function WHLSN:ClearSessionState()
     self.session.connectedCommunity = {}
     self.session.commChannel = nil
     self.session.hostFullName = nil
+    self.commQueue = {}
 end
 
 ---------------------------------------------------------------------------
 -- Addon Communication
 ---------------------------------------------------------------------------
+
+--- Return true when WoW 12.0 restricts addon comms (boss encounter, M+ run, or PvP match).
+function WHLSN:IsCommRestricted()
+    return (IsEncounterInProgress and IsEncounterInProgress())
+        or (C_MythicPlus and C_MythicPlus.IsRunActive and C_MythicPlus.IsRunActive())
+        or (C_PvP and C_PvP.IsActiveBattlefield and C_PvP.IsActiveBattlefield())
+        or false
+end
+
+--- Send an addon message, queuing it if communication is currently restricted.
+function WHLSN:SafeSendCommMessage(prefix, message, distribution, target)
+    if self:IsCommRestricted() then
+        self.commQueue[#self.commQueue + 1] = {
+            prefix = prefix, message = message, distribution = distribution, target = target,
+        }
+        return
+    end
+    self:SendCommMessage(prefix, message, distribution, target)
+end
+
+--- Flush all queued addon messages once communication is no longer restricted.
+function WHLSN:FlushCommQueue()
+    if self:IsCommRestricted() then return end
+    local queue = self.commQueue
+    self.commQueue = {}
+    for _, msg in ipairs(queue) do
+        self:SendCommMessage(msg.prefix, msg.message, msg.distribution, msg.target)
+    end
+end
+
+--- Flush the comm queue when a restriction lifts (delayed 1s to let state settle).
+local function flushAfterDelay()
+    C_Timer.After(1, function()
+        WHLSN:FlushCommQueue()
+    end)
+end
+
+function WHLSN:ENCOUNTER_END()        flushAfterDelay() end
+function WHLSN:CHALLENGE_MODE_COMPLETED() flushAfterDelay() end
+function WHLSN:CHALLENGE_MODE_RESET()     flushAfterDelay() end
+function WHLSN:BATTLEGROUND_EXITED()      flushAfterDelay() end
 
 --- Broadcast session state to the guild (throttled).
 function WHLSN:BroadcastSessionUpdate()
@@ -467,7 +516,7 @@ function WHLSN:SendSessionUpdate()
     end
 
     local serialized = self:Serialize(data)
-    self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
+    self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
 
     -- Also whisper connected community players
     self:WhisperCommunityPlayers(serialized)
@@ -478,7 +527,7 @@ end
 function WHLSN:BroadcastSessionEnd(communityList)
     if self.session.isTest then return end
     local serialized = self:Serialize({ type = "SESSION_END" })
-    self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
+    self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
 
     if communityList then
         self:WhisperCommunityPlayers(serialized, communityList)
@@ -659,7 +708,7 @@ function WHLSN:HandleAddonPing(_sender)
         version = self.VERSION,
     }
     local serialized = self:Serialize(data)
-    self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
+    self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
 end
 
 function WHLSN:HandleAddonPong(data, sender)
@@ -689,7 +738,7 @@ function WHLSN:SendAddonPing()
 
     local data = { type = "ADDON_PING" }
     local serialized = self:Serialize(data)
-    self:SendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
+    self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
 
     self.isScanning = true
     C_Timer.After(self.DISCOVERY_SCAN_DURATION, function()
