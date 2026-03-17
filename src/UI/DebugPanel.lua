@@ -4,7 +4,7 @@ local WHLSN = _G.Wheelson
 ---------------------------------------------------------------------------
 -- Debug Panel
 -- Right-click minimap icon to toggle.
--- Three tabs: State, Comm Log, WoW API
+-- Unified log view for comm events and invite actions.
 ---------------------------------------------------------------------------
 
 local debugFrame = nil
@@ -77,8 +77,8 @@ local function AddLogEntry(entry)
         table.remove(WHLSN.debugLog, 1)
     end
 
-    -- Auto-refresh if comm tab is visible
-    if debugFrame and debugFrame:IsShown() and currentTab == "comm" then
+    -- Auto-refresh if debug panel is visible
+    if debugFrame and debugFrame:IsShown() then
         debugFrame.editBox:SetText(GenerateCommLogText())
         -- Auto-scroll to bottom
         debugFrame.scrollFrame:SetVerticalScroll(
@@ -88,7 +88,7 @@ local function AddLogEntry(entry)
 end
 
 local function SetupCommHooks()
-    hooksecurefunc(WHLSN, "InvitePlayers", function(self, players)
+    hooksecurefunc(WHLSN, "InvitePlayers", function(_, players)
         local names = {}
         for _, p in ipairs(players) do
             names[#names + 1] = p.name
