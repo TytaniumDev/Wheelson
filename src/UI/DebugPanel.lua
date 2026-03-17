@@ -24,7 +24,7 @@ local MAX_HEIGHT = 600
 
 local function GenerateCommLogText()
     if #WHLSN.debugLog == 0 then
-        return "(No comm messages logged yet)\n\nMessages will appear here as they are sent/received."
+        return "=== Wheelson v" .. tostring(WHLSN.VERSION) .. " ===\n\n(No events logged yet)"
     end
 
     local lines = {}
@@ -88,6 +88,15 @@ local function AddLogEntry(entry)
 end
 
 local function SetupCommHooks()
+    hooksecurefunc(WHLSN, "InvitePlayers", function(self, players)
+        local names = {}
+        for _, p in ipairs(players) do
+            names[#names + 1] = p.name
+        end
+        local entry = string.format("[%s] ACTION | INVITE_PLAYERS | %s",
+            date("%H:%M:%S"), table.concat(names, ", "))
+        AddLogEntry(entry)
+    end)
     hooksecurefunc(WHLSN, "OnCommReceived", function(_, prefix, message, _, sender)
         if prefix ~= WHLSN.COMM_PREFIX then return end
         local success, data = WHLSN:Deserialize(message)
