@@ -333,7 +333,7 @@ local function getClipboardFrame(self)
     return self.clipboardFrame
 end
 
-local function showClipboardPopup(self, title, text)
+function WHLSN:ShowClipboardPopup(title, text)
     local frame = getClipboardFrame(self)
     frame.titleText:SetText("|cFFFFD100" .. title .. "|r")
     frame:Show()
@@ -345,5 +345,5 @@ end
 --- Copy a bug report to the clipboard and show instructions.
 ---@param snapshot table  algorithmSnapshot from session
 function WHLSN:CopyReportToClipboard(snapshot)
-    showClipboardPopup(self, "Copy Bug Report", self:FormatBugReport(snapshot))
+    self:ShowClipboardPopup("Copy Bug Report", self:FormatBugReport(snapshot))
 end

@@ -19,7 +19,7 @@ local MAX_WIDTH = 800
 local MAX_HEIGHT = 600
 
 ---------------------------------------------------------------------------
--- GenerateStateText — decomposed into section generators
+-- Log text generation
 ---------------------------------------------------------------------------
 
 local function GenerateCommLogText()
@@ -248,7 +248,7 @@ end
 -- Public API
 ---------------------------------------------------------------------------
 
---- Refresh the debug panel content for the current tab.
+--- Refresh the debug panel content.
 function WHLSN:RefreshDebugPanel()
     if not debugFrame or not debugFrame:IsShown() then return end
 
