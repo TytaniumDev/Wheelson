@@ -418,7 +418,7 @@ local function CreatePlayerRow(parent, index)
     row.brezIcon = row:CreateTexture(nil, "ARTWORK")
     row.brezIcon:SetSize(16, 16)
     row.brezIcon:SetPoint("RIGHT", -48, 0)
-    row.brezIcon:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
+    row.brezIcon:SetTexture(WHLSN.BREZ_ICON)
 
     row.lustIcon = row:CreateTexture(nil, "ARTWORK")
     row.lustIcon:SetSize(16, 16)
