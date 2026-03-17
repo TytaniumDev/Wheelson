@@ -561,6 +561,8 @@ function WHLSN:OnCommReceived(prefix, message, distribution, sender)
         self:HandleJoinRequest(data, sender, distribution)
     elseif data.type == "LEAVE_REQUEST" then
         self:HandleLeaveRequest(data, sender)
+    elseif data.type == "SPEC_UPDATE" then
+        self:HandleSpecUpdate(data, sender, distribution)
     elseif data.type == "SESSION_PING" then
         self:HandleSessionPing(data, sender)
     elseif data.type == "ADDON_PING" then
@@ -702,6 +704,34 @@ function WHLSN:HandleLeaveRequest(data, sender)
             return
         end
     end
+end
+
+function WHLSN:HandleSpecUpdate(data, sender, distribution)
+    -- Only the host processes spec updates
+    if self.session.host ~= UnitName("player") then return end
+    if self.session.status ~= self.Status.LOBBY then return end
+
+    -- Validate sender matches the player data
+    if not data.player then return end
+    if self:StripRealmName(data.player.name) ~= self:StripRealmName(sender) then return end
+
+    -- Only accept over expected channels
+    if distribution ~= "GUILD" and distribution ~= "WHISPER" then return end
+    if distribution == "WHISPER" then
+        if not self:IsCommunityRosterMember(sender) then return end
+    end
+
+    local player = WHLSN.Player.FromDict(data.player)
+
+    -- Find and replace existing player
+    for i, p in ipairs(self.session.players) do
+        if self:StripRealmName(p.name) == self:StripRealmName(player.name) then
+            self.session.players[i] = player
+            self:BroadcastSessionUpdate()
+            return
+        end
+    end
+    -- If player not found in session, ignore (they must join first)
 end
 
 ---------------------------------------------------------------------------
