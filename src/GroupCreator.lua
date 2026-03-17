@@ -8,25 +8,49 @@ local Group = WHLSN.Group
 -- Direct port of packages/shared/src/parallelGroupCreator.ts
 ---------------------------------------------------------------------------
 
-local lastGroups = {}
+--- Fallback cache when SavedVariables are unavailable (e.g. in tests).
+local lastGroupsCache = {}
+
+local function getLastGroupsStore()
+    if WHLSN.db and WHLSN.db.profile then
+        return WHLSN.db.profile.lastGroups
+    end
+    return lastGroupsCache
+end
 
 --- Clear stored last-groups history.
 function WHLSN:ClearLastGroups()
-    wipe(lastGroups)
+    wipe(getLastGroupsStore())
 end
 
 --- Store groups for the next run's duplicate-avoidance.
 ---@param groups WHLSNGroup[]
 ---@param guildId? string
 function WHLSN:SetLastGroups(groups, guildId)
-    lastGroups[guildId or "default"] = groups
+    local store = getLastGroupsStore()
+    local serialized = {}
+    for _, g in ipairs(groups) do
+        serialized[#serialized + 1] = g:ToDict()
+    end
+    store[guildId or "default"] = serialized
 end
 
 --- Get stored last groups for a guild.
 ---@param guildId? string
 ---@return WHLSNGroup[]
 function WHLSN:GetLastGroups(guildId)
-    return lastGroups[guildId or "default"] or {}
+    local store = getLastGroupsStore()
+    local data = store[guildId or "default"]
+    if not data then return {} end
+    local groups = {}
+    for _, gd in ipairs(data) do
+        if type(gd) == "table" and gd.dps ~= nil then
+            groups[#groups + 1] = WHLSN.Group.FromDict(gd)
+        else
+            groups[#groups + 1] = gd
+        end
+    end
+    return groups
 end
 
 --- Fisher-Yates shuffle (in-place).
@@ -75,12 +99,13 @@ local function BuildLastGroupsDict(previousGroups)
     for _, group in ipairs(previousGroups) do
         local members = group:GetPlayers()
         for _, member in ipairs(members) do
-            if not dict[member.name] then
-                dict[member.name] = {}
+            local memberKey = WHLSN:StripRealmName(member.name)
+            if not dict[memberKey] then
+                dict[memberKey] = {}
             end
             for _, m in ipairs(members) do
                 if not m:Equals(member) then
-                    dict[member.name][m.name] = true
+                    dict[memberKey][WHLSN:StripRealmName(m.name)] = true
                 end
             end
         end
@@ -137,7 +162,7 @@ end
 --- Remove a player from all applicable pools.
 local function removePlayer(ctx, player)
     if player == nil then return end
-    ctx.usedPlayers[player.name] = true
+    ctx.usedPlayers[WHLSN:StripRealmName(player.name)] = true
 
     if player:IsTankMain() then
         removeFromList(ctx.mainTanks, player)
@@ -174,7 +199,7 @@ local function grabNextAvailablePlayer(ctx, availablePlayers, group)
 
     local ineligible = {}
     for _, teammate in ipairs(teammates) do
-        local prev = ctx.lastGroupsDict[teammate.name]
+        local prev = ctx.lastGroupsDict[WHLSN:StripRealmName(teammate.name)]
         if prev then
             for name in pairs(prev) do
                 ineligible[name] = true
@@ -183,14 +208,15 @@ local function grabNextAvailablePlayer(ctx, availablePlayers, group)
     end
 
     for _, p in ipairs(availablePlayers) do
-        if not ineligible[p.name] and not ctx.usedPlayers[p.name] then
+        local stripped = WHLSN:StripRealmName(p.name)
+        if not ineligible[stripped] and not ctx.usedPlayers[stripped] then
             removePlayer(ctx, p)
             return p
         end
     end
 
     for _, p in ipairs(availablePlayers) do
-        if not ctx.usedPlayers[p.name] then
+        if not ctx.usedPlayers[WHLSN:StripRealmName(p.name)] then
             removePlayer(ctx, p)
             return p
         end
@@ -223,7 +249,7 @@ local function AssignLust(ctx)
                 if lustPlayer:IsHealerMain() or (ctx.offhealersToGrab > 0 and lustPlayer:IsOffhealer()) then
                     currentGroup.healer = lustPlayer
                     if lustPlayer:IsOffhealer() then ctx.offhealersToGrab = ctx.offhealersToGrab - 1 end
-                elseif lustPlayer:IsDpsMain() then
+                else
                     currentGroup.dps[#currentGroup.dps + 1] = lustPlayer
                 end
             end
@@ -257,7 +283,7 @@ local function AssignBrez(ctx)
                 if brezPlayer:IsHealerMain() or (ctx.offhealersToGrab > 0 and brezPlayer:IsOffhealer()) then
                     currentGroup.healer = brezPlayer
                     if brezPlayer:IsOffhealer() then ctx.offhealersToGrab = ctx.offhealersToGrab - 1 end
-                elseif brezPlayer:IsDpsMain() then
+                else
                     currentGroup.dps[#currentGroup.dps + 1] = brezPlayer
                 end
             end
@@ -316,7 +342,7 @@ local function HandleRemainderPlayers(ctx)
         while totalUsed < #ctx.players do
             local remaining = {}
             for _, p in ipairs(ctx.players) do
-                if not ctx.usedPlayers[p.name] then
+                if not ctx.usedPlayers[WHLSN:StripRealmName(p.name)] then
                     remaining[#remaining + 1] = p
                 end
             end
@@ -324,32 +350,22 @@ local function HandleRemainderPlayers(ctx)
             if player then
                 added = true
                 totalUsed = totalUsed + 1
-                local placed = false
 
                 if player:IsTankMain() and not remainderGroup.tank then
                     remainderGroup.tank = player
-                    placed = true
                 elseif player:IsHealerMain() and not remainderGroup.healer then
                     remainderGroup.healer = player
-                    placed = true
                 elseif player:IsDpsMain() and #remainderGroup.dps < 3 then
                     remainderGroup.dps[#remainderGroup.dps + 1] = player
-                    placed = true
                 elseif player:IsOfftank() and not remainderGroup.tank then
                     remainderGroup.tank = player
-                    placed = true
                 elseif player:IsOffhealer() and not remainderGroup.healer then
                     remainderGroup.healer = player
-                    placed = true
                 elseif player:IsOffdps() and #remainderGroup.dps < 3 then
                     remainderGroup.dps[#remainderGroup.dps + 1] = player
-                    placed = true
-                end
-
-                if not placed then
-                    ctx.usedPlayers[player.name] = nil
-                    totalUsed = totalUsed - 1
-                    break
+                else
+                    -- Player has no matching role slot; place as overflow DPS
+                    remainderGroup.dps[#remainderGroup.dps + 1] = player
                 end
             else
                 break
@@ -379,7 +395,7 @@ function WHLSN:CreateMythicPlusGroups(players, guildId)
         players         = copyList(players),
         usedPlayers     = {},
         groups          = {},
-        lastGroupsDict  = BuildLastGroupsDict(lastGroups[guildId] or {}),
+        lastGroupsDict  = BuildLastGroupsDict(self:GetLastGroups(guildId)),
         mainTanks       = {},
         offTanks        = {},
         offTanksWithHeal = {},
@@ -411,6 +427,6 @@ function WHLSN:CreateMythicPlusGroups(players, guildId)
     FillRemainingDps(ctx)
     HandleRemainderPlayers(ctx)
 
-    lastGroups[guildId] = ctx.groups
+    self:SetLastGroups(ctx.groups, guildId)
     return ctx.groups
 end

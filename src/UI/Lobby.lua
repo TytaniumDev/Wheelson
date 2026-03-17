@@ -9,12 +9,7 @@ local WHLSN = _G.Wheelson
 local lobbyState = { frame = nil, playerRows = {}, historyRows = {}, specSection = nil }
 local communityPanel = nil
 
-local ROLE_ICONS = {
-    tank = "Interface\\LFGFrame\\LFGRole_BW",
-    healer = "Interface\\LFGFrame\\LFGRole_BW",
-    ranged = "Interface\\LFGFrame\\LFGRole_BW",
-    melee = "Interface\\LFGFrame\\LFGRole_BW",
-}
+local ROLE_ICON_TEXTURE = "Interface\\LFGFrame\\LFGRole_BW"
 
 local ROLE_TEXCOORDS = {
     tank = { 0.5, 0.75, 0, 1 },
@@ -440,31 +435,31 @@ local function CreatePlayerRow(parent, index)
     row.kickButton:SetText("X")
     row.kickButton:Hide()
 
-    local function ShowHover(self)
-        if self.playerData then
-            WHLSN:ShowPlayerTooltip(self, self.playerData)
+    local function ShowHover(rowFrame)
+        if rowFrame.playerData then
+            WHLSN:ShowPlayerTooltip(rowFrame, rowFrame.playerData)
         end
 
         -- Show kick button if host
-        if WHLSN.session.host == UnitName("player") and self.playerData then
-            if self.playerData.name ~= UnitName("player") then
-                self.kickButton:Show()
+        if WHLSN.session.host == UnitName("player") and rowFrame.playerData then
+            if rowFrame.playerData.name ~= UnitName("player") then
+                rowFrame.kickButton:Show()
             end
         end
     end
 
-    local function HideHover(self)
-        if not self:IsMouseOver() then
+    local function HideHover(rowFrame)
+        if not rowFrame:IsMouseOver() then
             GameTooltip:Hide()
-            self.kickButton:Hide()
+            rowFrame.kickButton:Hide()
         end
     end
 
-    row.kickButton:SetScript("OnEnter", function(self)
-        ShowHover(self:GetParent())
+    row.kickButton:SetScript("OnEnter", function(btn)
+        ShowHover(btn:GetParent())
     end)
-    row.kickButton:SetScript("OnLeave", function(self)
-        HideHover(self:GetParent())
+    row.kickButton:SetScript("OnLeave", function(btn)
+        HideHover(btn:GetParent())
     end)
 
     -- Tooltip for utility details + kick button hover
@@ -760,7 +755,7 @@ local function PopulatePlayerRows(frame, players)
 
         local role = player.mainRole
         if role and ROLE_TEXCOORDS[role] then
-            row.roleIcon:SetTexture(ROLE_ICONS[role])
+            row.roleIcon:SetTexture(ROLE_ICON_TEXTURE)
             local tc = ROLE_TEXCOORDS[role]
             row.roleIcon:SetTexCoord(tc[1], tc[2], tc[3], tc[4])
             row.roleIcon:Show()

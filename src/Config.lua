@@ -143,6 +143,7 @@ WHLSN.defaults = {
         },
         lastSession = nil,
         sessionHistory = {},
+        lastGroups = {},
         framePosition = nil,
         animationSpeed = 1.0,
         soundEnabled = true,

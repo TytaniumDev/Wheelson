@@ -447,6 +447,11 @@ end
 --- Clear all local session state (shared by host EndSession and non-host Finish).
 function WHLSN:ClearSessionState()
     self:CancelSessionTimeout()
+    if self.commThrottleTimer then
+        self.commThrottleTimer:Cancel()
+        self.commThrottleTimer = nil
+    end
+    self.commPendingUpdate = false
     self.session.status = nil
     self.session.host = nil
     self.session.players = {}
@@ -468,7 +473,8 @@ end
 
 --- Return true when WoW 12.0 restricts addon comms (boss encounter, M+ run, or PvP match).
 function WHLSN:IsCommRestricted()
-    return (IsEncounterInProgress and IsEncounterInProgress())
+    return (C_InstanceEncounter and C_InstanceEncounter.IsEncounterInProgress
+                and C_InstanceEncounter.IsEncounterInProgress())
         or (C_MythicPlus and C_MythicPlus.IsRunActive and C_MythicPlus.IsRunActive())
         or (C_PvP and C_PvP.IsActiveBattlefield and C_PvP.IsActiveBattlefield())
         or false
@@ -566,7 +572,6 @@ end
 --- Broadcast session end to the guild (and community players).
 ---@param communityList table|nil Optional community list captured before session cleanup
 function WHLSN:BroadcastSessionEnd(communityList)
-    if self.session.isTest then return end
     local serialized = self:Serialize({ type = "SESSION_END" })
     self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
 
