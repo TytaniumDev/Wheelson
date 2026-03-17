@@ -456,10 +456,22 @@ local function CreatePlayerRow(parent, index)
     end
 
     row.kickButton:SetScript("OnEnter", function(btn)
-        ShowHover(btn:GetParent())
+        -- Don't call ShowHover since it resets tooltip and shows player info.
+        -- We only want to show the specific button tooltip.
+        if btn.tooltipText then
+            GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+            GameTooltip:SetText(btn.tooltipText, 1, 1, 1)
+            GameTooltip:Show()
+        end
     end)
     row.kickButton:SetScript("OnLeave", function(btn)
-        HideHover(btn:GetParent())
+        -- When leaving the button, we should show the player tooltip again
+        -- if we are still hovering the row.
+        if btn:GetParent():IsMouseOver() then
+            ShowHover(btn:GetParent())
+        else
+            HideHover(btn:GetParent())
+        end
     end)
 
     -- Tooltip for utility details + kick button hover
@@ -782,6 +794,7 @@ local function PopulatePlayerRows(frame, players)
             row.lustIcon:SetAlpha(0.35)
             row.strikethrough:Show()
             row.kickButton:SetText("+")
+            row.kickButton.tooltipText = "Include in session"
             row.kickButton:SetScript("OnClick", function()
                 WHLSN:UnhidePlayer(player.name)
             end)
@@ -792,6 +805,7 @@ local function PopulatePlayerRows(frame, players)
             row.lustIcon:SetAlpha(1)
             row.strikethrough:Hide()
             row.kickButton:SetText("X")
+            row.kickButton.tooltipText = "Remove from session"
             row.kickButton:SetScript("OnClick", function()
                 WHLSN:HidePlayer(player.name)
             end)
