@@ -115,6 +115,11 @@ describe("CommunityService", function()
             assert.is_true(ok)
         end)
 
+        it("should accept realm names with apostrophes", function()
+            local ok = WHLSN:ValidateCommunityName("Tyler-Kel'Thuzad")
+            assert.is_true(ok)
+        end)
+
         it("should treat first hyphen as realm separator", function()
             -- "My-Name-Realm" → character "My" on realm "Name-Realm"
             local ok = WHLSN:ValidateCommunityName("My-NameRealm")
