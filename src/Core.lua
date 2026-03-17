@@ -18,6 +18,7 @@ function WHLSN:OnInitialize()
         viewingHistory = false, -- true when displaying a past session
         hostEnded = false, -- true when the host explicitly ended the session
         connectedCommunity = {},  -- bare name -> realm-qualified name (host only)
+        removedPlayers = {},      -- stripped name -> true (hidden from group formation)
         commChannel = nil,        -- "GUILD" or "WHISPER" (community clients only)
         hostFullName = nil,       -- realm-qualified host name (community clients only)
     }
@@ -302,10 +303,11 @@ function WHLSN:SaveSessionResults()
         groupData[#groupData + 1] = g:ToDict()
     end
 
+    local snap = self.session.algorithmSnapshot
     local sessionRecord = {
         groups = groupData,
         host = self.session.host,
-        playerCount = #self.session.players,
+        playerCount = snap and snap.playerCount or #self.session.players,
         timestamp = time(),
     }
 
@@ -735,6 +737,7 @@ function WHLSN:HandleLeaveRequest(data, sender)
         if self:StripRealmName(p.name) == self:StripRealmName(sender) then
             table.remove(self.session.players, i)
             self.session.connectedCommunity[self:StripRealmName(sender)] = nil
+            self.session.removedPlayers[self:StripRealmName(sender)] = nil
             self:BroadcastSessionUpdate()
             return
         end
