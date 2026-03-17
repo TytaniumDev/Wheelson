@@ -432,23 +432,7 @@ local function CreatePlayerRow(parent, index)
     row.kickButton:SetText("X")
     row.kickButton:Hide()
 
-    row.kickButton:SetScript("OnEnter", function(self)
-        local parent = self:GetParent()
-        if parent.playerData then
-            WHLSN:ShowPlayerTooltip(parent, parent.playerData)
-        end
-        parent.kickButton:Show()
-    end)
-    row.kickButton:SetScript("OnLeave", function(self)
-        local parent = self:GetParent()
-        if not parent:IsMouseOver() then
-            GameTooltip:Hide()
-            parent.kickButton:Hide()
-        end
-    end)
-
-    -- Tooltip for utility details + kick button hover
-    row:SetScript("OnEnter", function(self)
+    local function ShowHover(self)
         if self.playerData then
             WHLSN:ShowPlayerTooltip(self, self.playerData)
         end
@@ -459,14 +443,25 @@ local function CreatePlayerRow(parent, index)
                 self.kickButton:Show()
             end
         end
-    end)
+    end
 
-    row:SetScript("OnLeave", function(self)
+    local function HideHover(self)
         if not self:IsMouseOver() then
             GameTooltip:Hide()
             self.kickButton:Hide()
         end
+    end
+
+    row.kickButton:SetScript("OnEnter", function(self)
+        ShowHover(self:GetParent())
     end)
+    row.kickButton:SetScript("OnLeave", function(self)
+        HideHover(self:GetParent())
+    end)
+
+    -- Tooltip for utility details + kick button hover
+    row:SetScript("OnEnter", ShowHover)
+    row:SetScript("OnLeave", HideHover)
 
     return row
 end
