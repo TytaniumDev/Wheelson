@@ -417,12 +417,12 @@ local function CreatePlayerRow(parent, index)
     -- Utility icons
     row.brezIcon = row:CreateTexture(nil, "ARTWORK")
     row.brezIcon:SetSize(16, 16)
-    row.brezIcon:SetPoint("RIGHT", -48, 0)
+    row.brezIcon:SetPoint("RIGHT", -68, 0)
     row.brezIcon:SetTexture(WHLSN.BREZ_ICON)
 
     row.lustIcon = row:CreateTexture(nil, "ARTWORK")
     row.lustIcon:SetSize(16, 16)
-    row.lustIcon:SetPoint("RIGHT", -28, 0)
+    row.lustIcon:SetPoint("RIGHT", -48, 0)
     row.lustIcon:SetTexture(WHLSN.LUST_ICON)
 
     -- Kick button (host only, shown on hover)
