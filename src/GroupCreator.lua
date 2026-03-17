@@ -44,11 +44,7 @@ function WHLSN:GetLastGroups(guildId)
     if not data then return {} end
     local groups = {}
     for _, gd in ipairs(data) do
-        if type(gd) == "table" and gd.dps ~= nil then
-            groups[#groups + 1] = WHLSN.Group.FromDict(gd)
-        else
-            groups[#groups + 1] = gd
-        end
+        groups[#groups + 1] = WHLSN.Group.FromDict(gd)
     end
     return groups
 end
@@ -364,7 +360,8 @@ local function HandleRemainderPlayers(ctx)
                 elseif player:IsOffdps() and #remainderGroup.dps < 3 then
                     remainderGroup.dps[#remainderGroup.dps + 1] = player
                 else
-                    -- Player has no matching role slot; place as overflow DPS
+                    -- Player has no matching role slot (e.g. roleless from guild roster
+                    -- detection); place as overflow DPS. Remainder groups may exceed 5.
                     remainderGroup.dps[#remainderGroup.dps + 1] = player
                 end
             else
