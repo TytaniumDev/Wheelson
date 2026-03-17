@@ -531,6 +531,39 @@ local function UpdateLobbyButtons(frame, isHost, hasSession, isInSession, player
     end
 end
 
+--- Build a WoW color-escaped string showing the player's name, main role, and offspecs.
+---@param player WHLSNPlayer
+---@param classColor table|nil  { r, g, b, hex }
+---@return string
+local function FormatPlayerLabel(player, classColor)
+    local hex = classColor and classColor.hex or "FFFFFF"
+    local parts = { "|cFF" .. hex .. player.name .. "|r" }
+
+    if player.mainRole then
+        local rc = WHLSN.RoleColors[player.mainRole]
+        if rc then
+            parts[#parts + 1] = " |cFF" .. rc.hex .. player.mainRole .. "|r"
+        end
+    end
+
+    if #player.offspecs > 0 then
+        parts[#parts + 1] = " |cFF808080| off:|r "
+        for i, spec in ipairs(player.offspecs) do
+            if i > 1 then
+                parts[#parts + 1] = "|cFF808080, |r"
+            end
+            local rc = WHLSN.RoleColors[spec]
+            if rc then
+                parts[#parts + 1] = "|cFF" .. rc.hex .. spec .. "|r"
+            else
+                parts[#parts + 1] = spec
+            end
+        end
+    end
+
+    return table.concat(parts)
+end
+
 local function PopulatePlayerRows(frame, players)
     local rows = lobbyState.playerRows
     for i, player in ipairs(players) do
@@ -540,7 +573,6 @@ local function PopulatePlayerRows(frame, players)
 
         local row = rows[i]
         row.playerData = player
-        row.nameText:SetText(player.name)
 
         local role = player.mainRole
         if role and ROLE_TEXCOORDS[role] then
@@ -553,11 +585,8 @@ local function PopulatePlayerRows(frame, players)
         end
 
         local cc = player.classToken and WHLSN.CLASS_COLORS[player.classToken]
-        if cc then
-            row.nameText:SetTextColor(cc.r, cc.g, cc.b)
-        else
-            row.nameText:SetTextColor(1, 1, 1)
-        end
+        row.nameText:SetText(FormatPlayerLabel(player, cc))
+        row.nameText:SetTextColor(1, 1, 1)  -- color is in the escape sequences now
 
         row.classIcon:Hide()
         row.brezIcon:SetShown(player:HasBrez())
