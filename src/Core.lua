@@ -100,7 +100,7 @@ function WHLSN:OnEnable()
     self:RegisterEvent("ENCOUNTER_END")
     self:RegisterEvent("CHALLENGE_MODE_COMPLETED")
     self:RegisterEvent("CHALLENGE_MODE_RESET")
-    self:RegisterEvent("BATTLEGROUND_EXITED")
+    self:RegisterEvent("PVP_MATCH_COMPLETE")
 end
 
 function WHLSN:OnDisable()
@@ -466,7 +466,7 @@ end
 function WHLSN:ENCOUNTER_END()        flushAfterDelay() end
 function WHLSN:CHALLENGE_MODE_COMPLETED() flushAfterDelay() end
 function WHLSN:CHALLENGE_MODE_RESET()     flushAfterDelay() end
-function WHLSN:BATTLEGROUND_EXITED()      flushAfterDelay() end
+function WHLSN:PVP_MATCH_COMPLETE()       flushAfterDelay() end
 
 --- Broadcast session state to the guild (throttled).
 function WHLSN:BroadcastSessionUpdate()
