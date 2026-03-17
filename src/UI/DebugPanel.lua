@@ -8,7 +8,6 @@ local WHLSN = _G.Wheelson
 ---------------------------------------------------------------------------
 
 local debugFrame = nil
-local currentTab = "state" -- "state" | "comm" | "api"
 
 -- Comm log storage (populated by hooks, capped at 200 entries)
 WHLSN.debugLog = {}
@@ -23,110 +22,6 @@ local MAX_HEIGHT = 600
 -- GenerateStateText — decomposed into section generators
 ---------------------------------------------------------------------------
 
-local function AppendAddonInfo(lines)
-    lines[#lines + 1] = "=== Addon Info ==="
-    lines[#lines + 1] = "version: " .. tostring(WHLSN.VERSION)
-    lines[#lines + 1] = "commPrefix: " .. tostring(WHLSN.COMM_PREFIX)
-    lines[#lines + 1] = ""
-end
-
-local function AppendSessionState(lines)
-    lines[#lines + 1] = "=== Session State ==="
-    lines[#lines + 1] = "status: " .. tostring(WHLSN.session.status or "(none)")
-    lines[#lines + 1] = "host: " .. tostring(WHLSN.session.host or "(none)")
-    lines[#lines + 1] = "playerCount: " .. #WHLSN.session.players
-    lines[#lines + 1] = ""
-
-    if #WHLSN.session.players > 0 then
-        lines[#lines + 1] = "=== Players ==="
-        for i, p in ipairs(WHLSN.session.players) do
-            lines[#lines + 1] = "  " .. i .. ". " .. p.name
-            lines[#lines + 1] = "     mainRole: " .. tostring(p.mainRole or "(none)")
-            local offspecs = #p.offspecs > 0 and table.concat(p.offspecs, ", ") or "(none)"
-            lines[#lines + 1] = "     offspecs: " .. offspecs
-            local utils = #p.utilities > 0 and table.concat(p.utilities, ", ") or "(none)"
-            lines[#lines + 1] = "     utilities: " .. utils
-        end
-        lines[#lines + 1] = ""
-    end
-end
-
-local function AppendGroupsState(lines)
-    if #WHLSN.session.groups == 0 then return end
-
-    lines[#lines + 1] = "=== Groups ==="
-    for i, g in ipairs(WHLSN.session.groups) do
-        lines[#lines + 1] = "  Group " .. i .. ":"
-        lines[#lines + 1] = "    tank: " .. (g.tank and g.tank.name or "(none)")
-        lines[#lines + 1] = "    healer: " .. (g.healer and g.healer.name or "(none)")
-        local dpsNames = {}
-        for _, d in ipairs(g.dps) do dpsNames[#dpsNames + 1] = d.name end
-        lines[#lines + 1] = "    dps: " .. (#dpsNames > 0 and table.concat(dpsNames, ", ") or "(none)")
-        lines[#lines + 1] = "    hasBrez: " .. tostring(g:HasBrez())
-        lines[#lines + 1] = "    hasLust: " .. tostring(g:HasLust())
-        lines[#lines + 1] = "    isComplete: " .. tostring(g:IsComplete())
-    end
-    lines[#lines + 1] = ""
-end
-
-local function AppendSavedVars(lines)
-    lines[#lines + 1] = "=== SavedVariables ==="
-    if WHLSN.db and WHLSN.db.profile then
-        local prof = WHLSN.db.profile
-        lines[#lines + 1] = "minimap.hide: " .. tostring(prof.minimap and prof.minimap.hide or false)
-        lines[#lines + 1] = "animationSpeed: " .. tostring(prof.animationSpeed)
-        lines[#lines + 1] = "soundEnabled: " .. tostring(prof.soundEnabled)
-        if prof.framePosition then
-            local fp = prof.framePosition
-            lines[#lines + 1] = "framePosition: " .. tostring(fp.point)
-                .. " (" .. tostring(fp.x) .. ", " .. tostring(fp.y) .. ")"
-        else
-            lines[#lines + 1] = "framePosition: (none)"
-        end
-        if prof.lastSession then
-            local ts = prof.lastSession.timestamp
-                and date("%Y-%m-%d %H:%M:%S", prof.lastSession.timestamp) or "unknown"
-            local gc = prof.lastSession.groups and #prof.lastSession.groups or 0
-            lines[#lines + 1] = "lastSession: " .. ts .. " (" .. gc .. " groups)"
-        else
-            lines[#lines + 1] = "lastSession: (none)"
-        end
-        local histLen = prof.sessionHistory and #prof.sessionHistory or 0
-        lines[#lines + 1] = "sessionHistory: " .. histLen .. " entries"
-    else
-        lines[#lines + 1] = "db: (not initialized)"
-    end
-    lines[#lines + 1] = ""
-end
-
-local function AppendTimers(lines)
-    lines[#lines + 1] = "=== Timers ==="
-    if WHLSN.lastActivity and WHLSN.lastActivity > 0 then
-        lines[#lines + 1] = "lastActivity: " .. date("%H:%M:%S", WHLSN.lastActivity)
-        local remaining = (WHLSN.lastActivity + WHLSN.SESSION_TIMEOUT) - time()
-        if WHLSN.session.status and remaining > 0 then
-            lines[#lines + 1] = "timeoutRemaining: " .. math.floor(remaining) .. "s"
-        else
-            lines[#lines + 1] = "timeoutRemaining: (inactive)"
-        end
-    else
-        lines[#lines + 1] = "lastActivity: (none)"
-        lines[#lines + 1] = "timeoutRemaining: (inactive)"
-    end
-    lines[#lines + 1] = "rosterUpdatePending: " .. tostring(WHLSN.rosterUpdatePending or false)
-    lines[#lines + 1] = "commPendingUpdate: " .. tostring(WHLSN.commPendingUpdate or false)
-end
-
-local function GenerateStateText()
-    local lines = {}
-    AppendAddonInfo(lines)
-    AppendSessionState(lines)
-    AppendGroupsState(lines)
-    AppendSavedVars(lines)
-    AppendTimers(lines)
-    return table.concat(lines, "\n")
-end
-
 local function GenerateCommLogText()
     if #WHLSN.debugLog == 0 then
         return "(No comm messages logged yet)\n\nMessages will appear here as they are sent/received."
@@ -139,78 +34,25 @@ local function GenerateCommLogText()
     return table.concat(lines, "\n")
 end
 
-local function GenerateAPIText()
-    local lines = {}
-
-    lines[#lines + 1] = "=== Player Identity ==="
-    lines[#lines + 1] = "UnitName: " .. tostring(UnitName("player"))
-    local localizedClass, classToken = UnitClass("player")
-    lines[#lines + 1] = "UnitClass: " .. tostring(localizedClass)
-        .. " (" .. tostring(classToken) .. ")"
-    lines[#lines + 1] = "UnitLevel: " .. tostring(UnitLevel("player"))
-    lines[#lines + 1] = "Realm: " .. tostring(GetNormalizedRealmName())
-    lines[#lines + 1] = ""
-
-    lines[#lines + 1] = "=== Specialization ==="
-    local specIndex = C_SpecializationInfo.GetSpecialization()
-    lines[#lines + 1] = "C_SpecializationInfo.GetSpecialization(): " .. tostring(specIndex)
-    if specIndex then
-        local specID, specName = C_SpecializationInfo.GetSpecializationInfo(specIndex)
-        lines[#lines + 1] = "specID: " .. tostring(specID)
-        lines[#lines + 1] = "specName: " .. tostring(specName)
-        if specID then
-            lines[#lines + 1] = "mappedRole: " .. tostring(WHLSN.SpecRoles[specID] or "(unmapped)")
-        end
-    end
-    local allOffspecs = WHLSN:DetectAllOffspecs()
-    lines[#lines + 1] = "allOffspecs: "
-        .. (#allOffspecs > 0 and table.concat(allOffspecs, ", ") or "(none)")
-    local detectedUtils = {}
-    if classToken and WHLSN.BrezClasses[classToken] then
-        detectedUtils[#detectedUtils + 1] = "brez"
-    end
-    if classToken and WHLSN.LustClasses[classToken] then
-        detectedUtils[#detectedUtils + 1] = "lust"
-    end
-    lines[#lines + 1] = "detectedUtilities: "
-        .. (#detectedUtils > 0 and table.concat(detectedUtils, ", ") or "(none)")
-    lines[#lines + 1] = ""
-
-    lines[#lines + 1] = "=== Guild ==="
-    lines[#lines + 1] = "IsInGuild: " .. tostring(IsInGuild())
-    lines[#lines + 1] = "GuildInfo: " .. tostring(GetGuildInfo("player"))
-    local numTotal = GetNumGuildMembers()
-    lines[#lines + 1] = "GetNumGuildMembers: " .. tostring(numTotal)
-    local onlineMembers = WHLSN:GetOnlineGuildMembers()
-    lines[#lines + 1] = "onlineMaxLevel: " .. #onlineMembers
-    lines[#lines + 1] = ""
-
-    lines[#lines + 1] = "=== Party ==="
-    lines[#lines + 1] = "IsInGroup: " .. tostring(IsInGroup())
-    lines[#lines + 1] = "UnitIsGroupLeader: " .. tostring(UnitIsGroupLeader("player"))
-    lines[#lines + 1] = "GetNumGroupMembers: " .. tostring(GetNumGroupMembers())
-    lines[#lines + 1] = "CanInvite: " .. tostring(WHLSN:CanInvite())
-    lines[#lines + 1] = ""
-
-    lines[#lines + 1] = "=== DetectLocalPlayer() ==="
-    local player = WHLSN:DetectLocalPlayer()
-    if player then
-        lines[#lines + 1] = "name: " .. player.name
-        lines[#lines + 1] = "mainRole: " .. tostring(player.mainRole or "(none)")
-        local os_ = #player.offspecs > 0 and table.concat(player.offspecs, ", ") or "(none)"
-        lines[#lines + 1] = "offspecs: " .. os_
-        local ut = #player.utilities > 0 and table.concat(player.utilities, ", ") or "(none)"
-        lines[#lines + 1] = "utilities: " .. ut
-    else
-        lines[#lines + 1] = "(returned nil -- no spec active?)"
-    end
-
-    return table.concat(lines, "\n")
-end
 
 ---------------------------------------------------------------------------
 -- Comm Log Hooks
 ---------------------------------------------------------------------------
+
+local function FormatLogAsMarkdown()
+    local lines = {}
+    lines[#lines + 1] = "## Wheelson Debug Log"
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "**Version:** " .. tostring(WHLSN.VERSION)
+    lines[#lines + 1] = "**Date:** " .. date("%Y-%m-%d %H:%M:%S")
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "```text"
+    for _, entry in ipairs(WHLSN.debugLog) do
+        lines[#lines + 1] = entry
+    end
+    lines[#lines + 1] = "```"
+    return table.concat(lines, "\n")
+end
 
 local function FormatLogPayload(data)
     if type(data) ~= "table" then return tostring(data) end
@@ -286,34 +128,13 @@ end
 -- Frame Creation — decomposed
 ---------------------------------------------------------------------------
 
-local function CreateTabButton(parent, label, tabKey, xOffset)
-    local btn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    btn:SetSize(90, 22)
-    btn:SetPoint("TOPLEFT", parent, "TOPLEFT", xOffset, -28)
-    btn:SetText(label)
-    btn:SetScript("OnClick", function()
-        currentTab = tabKey
-        WHLSN:RefreshDebugPanel()
-    end)
-    return btn
-end
 
-local function UpdateTabHighlights(frame)
-    local tabs = { state = frame.tabState, comm = frame.tabComm, api = frame.tabAPI }
-    for key, btn in pairs(tabs) do
-        if key == currentTab then
-            btn:SetEnabled(false)
-        else
-            btn:SetEnabled(true)
-        end
-    end
-end
 
 local function CreateDebugScrollContent(frame)
     local scrollFrame = CreateFrame(
         "ScrollFrame", "WHLSNDebugScrollFrame", frame, "UIPanelScrollFrameTemplate"
     )
-    scrollFrame:SetPoint("TOPLEFT", 8, -54)
+    scrollFrame:SetPoint("TOPLEFT", 8, -28)
     scrollFrame:SetPoint("BOTTOMRIGHT", -30, 40)
     frame.scrollFrame = scrollFrame
 
@@ -354,9 +175,7 @@ local function CreateDebugBottomButtons(frame)
     frame.copyAllBtn:SetPoint("BOTTOMRIGHT", -8, 8)
     frame.copyAllBtn:SetText("Copy All")
     frame.copyAllBtn:SetScript("OnClick", function()
-        frame.editBox:HighlightText()
-        frame.editBox:SetFocus()
-        WHLSN:Print("Text selected. Press Ctrl+C to copy.")
+        WHLSN:ShowClipboardPopup("Copy Debug Log", FormatLogAsMarkdown())
     end)
 
     frame.refreshBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
@@ -408,9 +227,6 @@ local function CreateDebugFrame()
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -2, -2)
 
-    frame.tabState = CreateTabButton(frame, "State", "state", 8)
-    frame.tabComm = CreateTabButton(frame, "Comm Log", "comm", 102)
-    frame.tabAPI = CreateTabButton(frame, "WoW API", "api", 196)
 
     CreateDebugScrollContent(frame)
     CreateDebugResizeHandle(frame)
@@ -427,22 +243,12 @@ end
 function WHLSN:RefreshDebugPanel()
     if not debugFrame or not debugFrame:IsShown() then return end
 
-    UpdateTabHighlights(debugFrame)
 
-    local text
-    if currentTab == "state" then
-        text = GenerateStateText()
-    elseif currentTab == "comm" then
-        text = GenerateCommLogText()
-    elseif currentTab == "api" then
-        text = GenerateAPIText()
-    end
-
+    local text = GenerateCommLogText()
     debugFrame.editBox.lastText = text
     debugFrame.editBox:SetText(text)
     debugFrame.editBox:SetCursorPosition(0)
-
-    debugFrame.clearBtn:SetShown(currentTab == "comm")
+    debugFrame.clearBtn:SetShown(true)
 end
 
 --- Toggle debug frame visibility. Overrides stub in Core.lua.
