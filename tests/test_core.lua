@@ -7,6 +7,7 @@ local mock_db = {
         minimap = { hide = false },
         lastSession = nil,
         sessionHistory = {},
+        lastGroups = {},
         communityRoster = {},
     },
 }
@@ -44,6 +45,9 @@ _G.LibStub = function(name, silent)
             Show = function() end,
             Hide = function() end,
         }
+    elseif name == "WagoAnalytics" then
+        local noop = setmetatable({}, { __index = function() return function() end end })
+        return { Register = function(_, _id) return noop end }
     end
     if silent then return nil end
     return {}
@@ -281,6 +285,86 @@ describe("ClearSessionState", function()
 
         assert.same({}, WHLSN.commQueue)
     end)
+
+    it("should clear removedPlayers", function()
+        WHLSN.session.removedPlayers = { ["SomePlayer"] = true }
+
+        WHLSN:ClearSessionState()
+
+        assert.same({}, WHLSN.session.removedPlayers)
+    end)
+end)
+
+describe("HidePlayer and UnhidePlayer", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer"
+        WHLSN.session.players = {
+            WHLSN.Player:New("TestPlayer", "tank", {}, {}),
+            WHLSN.Player:New("OtherPlayer", "healer", {}, {}),
+            WHLSN.Player:New("ThirdPlayer", "ranged", {}, {}),
+        }
+        WHLSN.session.removedPlayers = {}
+        WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.UpdateLobbyView = function() end
+        WHLSN.Print = function() end
+    end)
+
+    it("should mark a player as removed without removing from list", function()
+        WHLSN:HidePlayer("OtherPlayer")
+
+        assert.equals(3, #WHLSN.session.players)
+        assert.is_true(WHLSN.session.removedPlayers["OtherPlayer"])
+    end)
+
+    it("should not allow hiding the host", function()
+        WHLSN:HidePlayer("TestPlayer")
+
+        assert.is_nil(WHLSN.session.removedPlayers["TestPlayer"])
+    end)
+
+    it("should only work for the host", function()
+        WHLSN.session.host = "SomeoneElse"
+        WHLSN:HidePlayer("OtherPlayer")
+
+        assert.is_nil(WHLSN.session.removedPlayers["OtherPlayer"])
+    end)
+
+    it("should only work in lobby status", function()
+        WHLSN.session.status = "spinning"
+        WHLSN:HidePlayer("OtherPlayer")
+
+        assert.is_nil(WHLSN.session.removedPlayers["OtherPlayer"])
+    end)
+
+    it("should unhide a previously hidden player", function()
+        WHLSN:HidePlayer("OtherPlayer")
+        assert.is_true(WHLSN.session.removedPlayers["OtherPlayer"])
+
+        WHLSN:UnhidePlayer("OtherPlayer")
+        assert.is_nil(WHLSN.session.removedPlayers["OtherPlayer"])
+    end)
+
+    it("should handle realm-qualified names", function()
+        WHLSN:HidePlayer("OtherPlayer-Illidan")
+
+        assert.is_true(WHLSN.session.removedPlayers["OtherPlayer"])
+    end)
+
+    it("should be a no-op for a player not in the session", function()
+        WHLSN:HidePlayer("NonexistentPlayer")
+
+        assert.is_nil(WHLSN.session.removedPlayers["NonexistentPlayer"])
+    end)
+
+    it("should be idempotent when hiding an already-hidden player", function()
+        WHLSN:HidePlayer("OtherPlayer")
+        WHLSN:HidePlayer("OtherPlayer")
+
+        assert.is_true(WHLSN.session.removedPlayers["OtherPlayer"])
+        assert.equals(3, #WHLSN.session.players)
+    end)
 end)
 
 describe("SpinGroups", function()
@@ -288,6 +372,7 @@ describe("SpinGroups", function()
         WHLSN:OnInitialize()
         WHLSN.session.status = WHLSN.Status.LOBBY
         WHLSN.session.host = "TestPlayer"
+        WHLSN.session.removedPlayers = {}
         WHLSN.BroadcastSessionUpdate = function() end
         WHLSN.UpdateUI = function() end
         WHLSN.TouchActivity = function() end
@@ -358,6 +443,55 @@ describe("SpinGroups", function()
         local snap = WHLSN.session.algorithmSnapshot
         assert.is_nil(getmetatable(snap.players[1]))
         assert.equals("Tank1", snap.players[1].name)
+    end)
+
+    it("should exclude removed players from group formation", function()
+        local Player = WHLSN.Player
+        WHLSN.session.players = {
+            Player:New("Tank1", "tank", {}, {"brez"}),
+            Player:New("Healer1", "healer", {}, {}),
+            Player:New("DPS1", "ranged", {}, {"lust"}),
+            Player:New("DPS2", "melee", {}, {}),
+            Player:New("DPS3", "ranged", {}, {}),
+            Player:New("HiddenDPS", "melee", {}, {}),
+        }
+        WHLSN.session.removedPlayers = { ["HiddenDPS"] = true }
+
+        WHLSN:SpinGroups()
+
+        -- HiddenDPS should not appear in any group
+        for _, group in ipairs(WHLSN.session.groups) do
+            for _, p in ipairs(group:GetPlayers()) do
+                assert.is_not.equals("HiddenDPS", p.name)
+            end
+        end
+    end)
+
+    it("should use active (non-removed) count for minimum player check", function()
+        local Player = WHLSN.Player
+        WHLSN.session.players = {
+            Player:New("Tank1", "tank", {}, {}),
+            Player:New("Healer1", "healer", {}, {}),
+            Player:New("DPS1", "ranged", {}, {}),
+            Player:New("DPS2", "melee", {}, {}),
+            Player:New("DPS3", "ranged", {}, {}),
+            Player:New("Hidden1", "melee", {}, {}),
+        }
+        WHLSN.session.removedPlayers = {
+            ["Hidden1"] = true,
+            ["DPS3"] = true,
+        }
+
+        -- Only 4 active players — should not spin
+        WHLSN.printed = {}
+        WHLSN.Print = function(self, msg)
+            self.printed[#self.printed + 1] = msg
+        end
+
+        WHLSN:SpinGroups()
+
+        assert.is_nil(WHLSN.session.algorithmSnapshot)
+        assert.is_true(#WHLSN.printed > 0)
     end)
 end)
 
@@ -894,11 +1028,23 @@ describe("ClearSessionState community fields", function()
         assert.is_nil(WHLSN.session.commChannel)
         assert.is_nil(WHLSN.session.hostFullName)
     end)
+
+    it("should cancel commThrottleTimer and clear commPendingUpdate", function()
+        local cancelled = false
+        WHLSN.commThrottleTimer = { Cancel = function() cancelled = true end }
+        WHLSN.commPendingUpdate = true
+
+        WHLSN:ClearSessionState()
+
+        assert.is_true(cancelled)
+        assert.is_nil(WHLSN.commThrottleTimer)
+        assert.is_false(WHLSN.commPendingUpdate)
+    end)
 end)
 
 describe("CommRestriction", function()
     local sent_messages
-    local original_IsEncounterInProgress
+    local original_C_InstanceEncounter
     local original_C_MythicPlus
     local original_C_PvP
 
@@ -908,19 +1054,19 @@ describe("CommRestriction", function()
         WHLSN.SendCommMessage = function(self, prefix, msg, channel, target)
             sent_messages[#sent_messages + 1] = { prefix = prefix, msg = msg, channel = channel, target = target }
         end
-        original_IsEncounterInProgress = _G.IsEncounterInProgress
+        original_C_InstanceEncounter = _G.C_InstanceEncounter
         original_C_MythicPlus = _G.C_MythicPlus
         original_C_PvP = _G.C_PvP
     end)
 
     after_each(function()
-        _G.IsEncounterInProgress = original_IsEncounterInProgress
+        _G.C_InstanceEncounter = original_C_InstanceEncounter
         _G.C_MythicPlus = original_C_MythicPlus
         _G.C_PvP = original_C_PvP
     end)
 
     it("should send immediately when not restricted", function()
-        _G.IsEncounterInProgress = function() return false end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return false end }
 
         WHLSN:SafeSendCommMessage("WHLSN", "msg", "GUILD")
 
@@ -928,8 +1074,8 @@ describe("CommRestriction", function()
         assert.equals("GUILD", sent_messages[1].channel)
     end)
 
-    it("should queue message when IsEncounterInProgress is true", function()
-        _G.IsEncounterInProgress = function() return true end
+    it("should queue message when C_InstanceEncounter reports active encounter", function()
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return true end }
 
         WHLSN:SafeSendCommMessage("WHLSN", "msg", "GUILD")
 
@@ -939,7 +1085,7 @@ describe("CommRestriction", function()
     end)
 
     it("should queue message when C_MythicPlus run is active", function()
-        _G.IsEncounterInProgress = function() return false end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return false end }
         _G.C_MythicPlus = { IsRunActive = function() return true end }
 
         WHLSN:SafeSendCommMessage("WHLSN", "msg", "GUILD")
@@ -949,7 +1095,7 @@ describe("CommRestriction", function()
     end)
 
     it("should queue message when PvP match is active", function()
-        _G.IsEncounterInProgress = function() return false end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return false end }
         _G.C_PvP = { IsActiveBattlefield = function() return true end }
 
         WHLSN:SafeSendCommMessage("WHLSN", "msg", "GUILD")
@@ -959,12 +1105,12 @@ describe("CommRestriction", function()
     end)
 
     it("should flush queued messages on FlushCommQueue when no longer restricted", function()
-        _G.IsEncounterInProgress = function() return true end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return true end }
         WHLSN:SafeSendCommMessage("WHLSN", "msg1", "GUILD")
         WHLSN:SafeSendCommMessage("WHLSN", "msg2", "WHISPER", "Player-Realm")
         assert.equals(2, #WHLSN.commQueue)
 
-        _G.IsEncounterInProgress = function() return false end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return false end }
         WHLSN:FlushCommQueue()
 
         assert.equals(2, #sent_messages)
@@ -975,7 +1121,7 @@ describe("CommRestriction", function()
     end)
 
     it("should not flush if still restricted", function()
-        _G.IsEncounterInProgress = function() return true end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return true end }
         WHLSN:SafeSendCommMessage("WHLSN", "msg", "GUILD")
 
         WHLSN:FlushCommQueue()
@@ -985,7 +1131,7 @@ describe("CommRestriction", function()
     end)
 
     it("IsCommRestricted should return false when no restriction APIs are present", function()
-        _G.IsEncounterInProgress = nil
+        _G.C_InstanceEncounter = nil
         _G.C_MythicPlus = nil
         _G.C_PvP = nil
 
@@ -994,12 +1140,12 @@ describe("CommRestriction", function()
 
     it("ENCOUNTER_END handler flushes the queue once restriction lifts", function()
         -- Queue a message during an encounter
-        _G.IsEncounterInProgress = function() return true end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return true end }
         WHLSN:SafeSendCommMessage("WHLSN", "msg", "GUILD")
         assert.equals(1, #WHLSN.commQueue)
 
         -- Simulate encounter ending; make C_Timer.After invoke synchronously
-        _G.IsEncounterInProgress = function() return false end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return false end }
         local original_after = _G.C_Timer.After
         _G.C_Timer.After = function(_, cb) cb() end
 
@@ -1146,5 +1292,66 @@ describe("HandleSpecUpdate", function()
 
         local updated = WHLSN.session.players[2]
         assert.equals("ranged", updated.mainRole)
+    end)
+end)
+
+describe("SendSessionUpdate removedPlayers", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer"
+        WHLSN.session.players = { WHLSN.Player:New("TestPlayer", "tank", {}, {}) }
+        WHLSN.session.removedPlayers = { ["HiddenGuy"] = true }
+        WHLSN.session.connectedCommunity = {}
+        WHLSN.sent_messages = {}
+        WHLSN.SendCommMessage = function(self, prefix, msg, channel, target)
+            self.sent_messages[#self.sent_messages + 1] = { channel = channel, data = msg }
+        end
+        WHLSN.Serialize = function(self, data) return data end
+    end)
+
+    it("should include removedPlayers in SESSION_UPDATE payload", function()
+        WHLSN:SendSessionUpdate()
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_not_nil(sentData.removedPlayers)
+        assert.same({ ["HiddenGuy"] = true }, sentData.removedPlayers)
+    end)
+end)
+
+describe("HandleSessionUpdate removedPlayers", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.UpdateUI = function() end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+    end)
+
+    it("should populate removedPlayers from data", function()
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {},
+            removedPlayers = { ["SomeGuy"] = true },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        assert.same({ ["SomeGuy"] = true }, WHLSN.session.removedPlayers)
+    end)
+
+    it("should leave removedPlayers unchanged when field is absent", function()
+        WHLSN.session.removedPlayers = { ["Existing"] = true }
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        assert.same({ ["Existing"] = true }, WHLSN.session.removedPlayers)
     end)
 end)

@@ -7,6 +7,7 @@
 ## IconTexture: Interface/AddOns/Wheelson/textures/minimap-icon
 ## X-Curse-Project-ID: 1484744
 ## X-Wago-ID: kGryLYKy
+## OptionalDependencies: WagoAnalytics
 
 # Embedded Libraries
 # Lua files listed explicitly to avoid upstream Ace3 XML backslash path issues on macOS.
@@ -52,6 +53,7 @@ libs/AceConfig-3.0/AceConfigDialog-3.0/AceConfigDialog-3.0.lua
 libs/AceConfig-3.0/AceConfig-3.0.lua
 libs/LibDataBroker-1.1/LibDataBroker-1.1.lua
 libs/LibDBIcon-1.0/LibDBIcon-1.0.lua
+libs/WagoAnalytics/Shim.lua
 
 # Core
 src/Config.lua

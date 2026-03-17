@@ -43,6 +43,9 @@ docs/superpowers/
 # Superpowers brainstorm sessions
 .superpowers/
 
+# Gemini agent config
+.agent/
+
 # Git worktrees
 .worktrees/
 

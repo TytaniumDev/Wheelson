@@ -6,20 +6,15 @@ local WHLSN = _G.Wheelson
 -- Shows player list and "Spin" button (mirrors activity lobby UI)
 ---------------------------------------------------------------------------
 
-local lobbyState = { frame = nil, playerRows = {}, historyRows = {} }
+local lobbyState = { frame = nil, playerRows = {}, historyRows = {}, specSection = nil }
 local communityPanel = nil
 
-local ROLE_ICONS = {
-    tank = "Interface\\LFGFrame\\LFGRole_BW",
-    healer = "Interface\\LFGFrame\\LFGRole_BW",
-    ranged = "Interface\\LFGFrame\\LFGRole_BW",
-    melee = "Interface\\LFGFrame\\LFGRole_BW",
-}
+local ROLE_ICON_TEXTURE = "Interface\\LFGFrame\\LFGRole_BW"
 
 local ROLE_TEXCOORDS = {
     tank = { 0.5, 0.75, 0, 1 },
     healer = { 0.75, 1, 0, 1 },
-    ranged = { 0.25, 0.5, 0, 1 },
+    ranged = { 0, 0.25, 0, 1 },   -- matches melee (sword)
     melee = { 0, 0.25, 0, 1 },
 }
 
@@ -46,7 +41,7 @@ local function CreateLobbyFrame(parent)
     -- Scroll frame for player list
     frame.scrollFrame = CreateFrame("ScrollFrame", "WHLSNLobbyScrollFrame", frame, "UIPanelScrollFrameTemplate")
     frame.scrollFrame:SetPoint("TOPLEFT", 4, -32)
-    frame.scrollFrame:SetPoint("BOTTOMRIGHT", -28, 48)
+    frame.scrollFrame:SetPoint("BOTTOMRIGHT", -28, 110)
 
     frame.scrollChild = CreateFrame("Frame", nil, frame.scrollFrame)
     frame.scrollChild:SetWidth(frame.scrollFrame:GetWidth())
@@ -417,13 +412,21 @@ local function CreatePlayerRow(parent, index)
     -- Utility icons
     row.brezIcon = row:CreateTexture(nil, "ARTWORK")
     row.brezIcon:SetSize(16, 16)
-    row.brezIcon:SetPoint("RIGHT", -48, 0)
-    row.brezIcon:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
+    row.brezIcon:SetPoint("RIGHT", -68, 0)
+    row.brezIcon:SetTexture(WHLSN.BREZ_ICON)
 
     row.lustIcon = row:CreateTexture(nil, "ARTWORK")
     row.lustIcon:SetSize(16, 16)
-    row.lustIcon:SetPoint("RIGHT", -28, 0)
+    row.lustIcon:SetPoint("RIGHT", -48, 0)
     row.lustIcon:SetTexture(WHLSN.LUST_ICON)
+
+    -- Strikethrough line (hidden by default)
+    row.strikethrough = row:CreateTexture(nil, "OVERLAY")
+    row.strikethrough:SetHeight(1)
+    row.strikethrough:SetPoint("LEFT", row.roleIcon, "LEFT", 0, 0)
+    row.strikethrough:SetPoint("RIGHT", row.lustIcon, "RIGHT", 0, 0)
+    row.strikethrough:SetColorTexture(0.5, 0.5, 0.5, 0.6)
+    row.strikethrough:Hide()
 
     -- Kick button (host only, shown on hover)
     row.kickButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
@@ -432,31 +435,43 @@ local function CreatePlayerRow(parent, index)
     row.kickButton:SetText("X")
     row.kickButton:Hide()
 
-    local function ShowHover(self)
-        if self.playerData then
-            WHLSN:ShowPlayerTooltip(self, self.playerData)
+    local function ShowHover(rowFrame)
+        if rowFrame.playerData then
+            WHLSN:ShowPlayerTooltip(rowFrame, rowFrame.playerData)
         end
 
         -- Show kick button if host
-        if WHLSN.session.host == UnitName("player") and self.playerData then
-            if self.playerData.name ~= UnitName("player") then
-                self.kickButton:Show()
+        if WHLSN.session.host == UnitName("player") and rowFrame.playerData then
+            if rowFrame.playerData.name ~= UnitName("player") then
+                rowFrame.kickButton:Show()
             end
         end
     end
 
-    local function HideHover(self)
-        if not self:IsMouseOver() then
+    local function HideHover(rowFrame)
+        if not rowFrame:IsMouseOver() then
             GameTooltip:Hide()
-            self.kickButton:Hide()
+            rowFrame.kickButton:Hide()
         end
     end
 
-    row.kickButton:SetScript("OnEnter", function(self)
-        ShowHover(self:GetParent())
+    row.kickButton:SetScript("OnEnter", function(btn)
+        -- Don't call ShowHover since it resets tooltip and shows player info.
+        -- We only want to show the specific button tooltip.
+        if btn.tooltipText then
+            GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+            GameTooltip:SetText(btn.tooltipText, 1, 1, 1)
+            GameTooltip:Show()
+        end
     end)
-    row.kickButton:SetScript("OnLeave", function(self)
-        HideHover(self:GetParent())
+    row.kickButton:SetScript("OnLeave", function(btn)
+        -- When leaving the button, we should show the player tooltip again
+        -- if we are still hovering the row.
+        if btn:GetParent():IsMouseOver() then
+            ShowHover(btn:GetParent())
+        else
+            HideHover(btn:GetParent())
+        end
     end)
 
     -- Tooltip for utility details + kick button hover
@@ -464,6 +479,181 @@ local function CreatePlayerRow(parent, index)
     row:SetScript("OnLeave", HideHover)
 
     return row
+end
+
+--- Create the "Your Specs" override section.
+---@param parent Frame  the lobby frame
+---@return Frame
+local function CreateSpecOverrideSection(parent)
+    local section = CreateFrame("Frame", nil, parent)
+    section:SetHeight(62)
+    section:SetPoint("BOTTOMLEFT", 8, 44)
+    section:SetPoint("BOTTOMRIGHT", -8, 44)
+
+    -- Divider line at top
+    local divider = section:CreateTexture(nil, "ARTWORK")
+    divider:SetHeight(1)
+    divider:SetPoint("TOPLEFT", 0, 0)
+    divider:SetPoint("TOPRIGHT", 0, 0)
+    divider:SetColorTexture(0.3, 0.3, 0.3, 0.8)
+
+    -- Title
+    local title = section:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    title:SetPoint("TOPLEFT", 0, -6)
+    title:SetText("|cFFFFD100Your Specs|r")
+
+    -- Main spec label
+    local mainLabel = section:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    mainLabel:SetPoint("TOPLEFT", 0, -22)
+    mainLabel:SetText("Main:")
+    mainLabel:SetTextColor(0.6, 0.6, 0.6)
+
+    -- Offspec label
+    local offLabel = section:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    offLabel:SetPoint("TOPLEFT", 0, -40)
+    offLabel:SetText("Off:")
+    offLabel:SetTextColor(0.6, 0.6, 0.6)
+
+    section.mainButtons = {}
+    section.offButtons = {}
+    section.selectedMain = nil
+    section.selectedOffs = {}
+
+    local allRoles = { "tank", "healer", "ranged", "melee" }
+
+    -- Style a role button based on selection state
+    local function StyleButton(btn, role, selected)
+        local rc = WHLSN.RoleColors[role]
+        if selected then
+            btn:GetFontString():SetTextColor(rc.r, rc.g, rc.b)
+        else
+            btn:GetFontString():SetTextColor(0.4, 0.4, 0.4)
+        end
+    end
+
+    local function SendSpecUpdate()
+        local selectedOffspecs = {}
+        for role, enabled in pairs(section.selectedOffs) do
+            if enabled then
+                selectedOffspecs[role] = true
+            end
+        end
+
+        local playerData = WHLSN:DetectLocalPlayer(selectedOffspecs, section.selectedMain)
+        if not playerData then return end
+
+        -- Update local player in session
+        local myName = UnitName("player")
+        for i, p in ipairs(WHLSN.session.players) do
+            if WHLSN:StripRealmName(p.name) == myName then
+                WHLSN.session.players[i] = playerData
+                break
+            end
+        end
+
+        -- Send to host (unless we are the host — already updated locally)
+        if WHLSN.session.host ~= myName then
+            local data = {
+                type = "SPEC_UPDATE",
+                player = playerData:ToDict(),
+            }
+            local serialized = WHLSN:Serialize(data)
+            if WHLSN.session.commChannel == "WHISPER" and WHLSN.session.hostFullName then
+                WHLSN:SafeSendCommMessage(WHLSN.COMM_PREFIX, serialized, "WHISPER", WHLSN.session.hostFullName)
+            else
+                WHLSN:SafeSendCommMessage(WHLSN.COMM_PREFIX, serialized, "GUILD")
+            end
+        else
+            WHLSN:BroadcastSessionUpdate()
+        end
+
+        WHLSN:UpdateLobbyView()
+    end
+
+    local function RefreshOffButtons()
+        for _, btn in ipairs(section.offButtons) do
+            btn:Hide()
+        end
+
+        local idx = 0
+        for _, role in ipairs(allRoles) do
+            if role ~= section.selectedMain then
+                idx = idx + 1
+                local btn = section.offButtons[idx]
+                if not btn then
+                    btn = CreateFrame("Button", nil, section, "UIPanelButtonTemplate")
+                    btn:SetSize(60, 18)
+                    btn:GetFontString():SetJustifyH("CENTER")
+                    section.offButtons[idx] = btn
+                end
+                btn:ClearAllPoints()
+                btn:SetPoint("TOPLEFT", mainLabel, "TOPLEFT", 36 + (idx - 1) * 64, -18)
+                btn:SetText(role)
+                btn.role = role
+
+                local selected = section.selectedOffs[role] or false
+                StyleButton(btn, role, selected)
+
+                btn:SetScript("OnClick", function()
+                    section.selectedOffs[role] = not section.selectedOffs[role]
+                    StyleButton(btn, role, section.selectedOffs[role])
+                    SendSpecUpdate()
+                end)
+                btn:Show()
+            end
+        end
+    end
+
+    -- Create main spec buttons
+    for i, role in ipairs(allRoles) do
+        local btn = CreateFrame("Button", nil, section, "UIPanelButtonTemplate")
+        btn:SetSize(60, 18)
+        btn:SetPoint("TOPLEFT", mainLabel, "TOPLEFT", 36 + (i - 1) * 64, 0)
+        btn:SetText(role)
+        btn:GetFontString():SetJustifyH("CENTER")
+        btn.role = role
+
+        btn:SetScript("OnClick", function()
+            if section.selectedMain == role then return end
+            -- Deselect old main from offspecs if it was selected
+            section.selectedOffs[role] = nil
+            -- Update main
+            section.selectedMain = role
+            -- Style all main buttons
+            for _, mb in ipairs(section.mainButtons) do
+                StyleButton(mb, mb.role, mb.role == role)
+            end
+            RefreshOffButtons()
+            SendSpecUpdate()
+        end)
+
+        section.mainButtons[i] = btn
+    end
+
+    --- Initialize the section from the local player's detected spec data.
+    function section:Initialize()
+        local specIndex = C_SpecializationInfo.GetSpecialization()
+        if not specIndex then return end
+        local specID = C_SpecializationInfo.GetSpecializationInfo(specIndex)
+        if not specID then return end
+
+        self.selectedMain = WHLSN.SpecRoles[specID]
+        self.selectedOffs = {}
+
+        local allOffspecs = WHLSN:DetectAllOffspecs()
+        for _, offRole in ipairs(allOffspecs) do
+            self.selectedOffs[offRole] = true
+        end
+
+        -- Style main buttons
+        for _, btn in ipairs(self.mainButtons) do
+            StyleButton(btn, btn.role, btn.role == self.selectedMain)
+        end
+
+        RefreshOffButtons()
+    end
+
+    return section
 end
 
 local function CreateHistoryRow(parent, index)
@@ -499,6 +689,7 @@ end
 function WHLSN:ShowLobbyView(parent)
     if not lobbyState.frame then
         lobbyState.frame = CreateLobbyFrame(parent)
+        lobbyState.specSection = CreateSpecOverrideSection(lobbyState.frame)
     end
     lobbyState.frame:SetParent(parent)
     lobbyState.frame:SetAllPoints()
@@ -531,6 +722,39 @@ local function UpdateLobbyButtons(frame, isHost, hasSession, isInSession, player
     end
 end
 
+--- Build a WoW color-escaped string showing the player's name, main role, and offspecs.
+---@param player WHLSNPlayer
+---@param classColor table|nil  { r, g, b, hex }
+---@return string
+local function FormatPlayerLabel(player, classColor)
+    local hex = classColor and classColor.hex or "FFFFFF"
+    local parts = { "|cFF" .. hex .. player.name .. "|r" }
+
+    if player.mainRole then
+        local rc = WHLSN.RoleColors[player.mainRole]
+        if rc then
+            parts[#parts + 1] = " |cFF" .. rc.hex .. player.mainRole .. "|r"
+        end
+    end
+
+    if #player.offspecs > 0 then
+        parts[#parts + 1] = " |cFF808080| off:|r "
+        for i, spec in ipairs(player.offspecs) do
+            if i > 1 then
+                parts[#parts + 1] = "|cFF808080, |r"
+            end
+            local rc = WHLSN.RoleColors[spec]
+            if rc then
+                parts[#parts + 1] = "|cFF" .. rc.hex .. spec .. "|r"
+            else
+                parts[#parts + 1] = spec
+            end
+        end
+    end
+
+    return table.concat(parts)
+end
+
 local function PopulatePlayerRows(frame, players)
     local rows = lobbyState.playerRows
     for i, player in ipairs(players) do
@@ -540,11 +764,10 @@ local function PopulatePlayerRows(frame, players)
 
         local row = rows[i]
         row.playerData = player
-        row.nameText:SetText(player.name)
 
         local role = player.mainRole
         if role and ROLE_TEXCOORDS[role] then
-            row.roleIcon:SetTexture(ROLE_ICONS[role])
+            row.roleIcon:SetTexture(ROLE_ICON_TEXTURE)
             local tc = ROLE_TEXCOORDS[role]
             row.roleIcon:SetTexCoord(tc[1], tc[2], tc[3], tc[4])
             row.roleIcon:Show()
@@ -553,19 +776,40 @@ local function PopulatePlayerRows(frame, players)
         end
 
         local cc = player.classToken and WHLSN.CLASS_COLORS[player.classToken]
-        if cc then
-            row.nameText:SetTextColor(cc.r, cc.g, cc.b)
-        else
-            row.nameText:SetTextColor(1, 1, 1)
-        end
+        row.nameText:SetText(FormatPlayerLabel(player, cc))
+        row.nameText:SetTextColor(1, 1, 1)  -- color is in the escape sequences now
 
         row.classIcon:Hide()
         row.brezIcon:SetShown(player:HasBrez())
         row.lustIcon:SetShown(player:HasLust())
 
-        row.kickButton:SetScript("OnClick", function()
-            WHLSN:KickPlayer(player.name)
-        end)
+        local stripped = WHLSN:StripRealmName(player.name)
+        local isRemoved = WHLSN.session.removedPlayers
+            and WHLSN.session.removedPlayers[stripped]
+
+        if isRemoved then
+            row.nameText:SetAlpha(0.35)
+            row.roleIcon:SetAlpha(0.35)
+            row.brezIcon:SetAlpha(0.35)
+            row.lustIcon:SetAlpha(0.35)
+            row.strikethrough:Show()
+            row.kickButton:SetText("+")
+            row.kickButton.tooltipText = "Include in session"
+            row.kickButton:SetScript("OnClick", function()
+                WHLSN:UnhidePlayer(player.name)
+            end)
+        else
+            row.nameText:SetAlpha(1)
+            row.roleIcon:SetAlpha(1)
+            row.brezIcon:SetAlpha(1)
+            row.lustIcon:SetAlpha(1)
+            row.strikethrough:Hide()
+            row.kickButton:SetText("X")
+            row.kickButton.tooltipText = "Remove from session"
+            row.kickButton:SetScript("OnClick", function()
+                WHLSN:HidePlayer(player.name)
+            end)
+        end
         row.kickButton:Hide()
 
         row:Show()
@@ -617,10 +861,19 @@ function WHLSN:UpdateLobbyView()
 
     UpdateLobbyStatus(frame, self.session, hasSession)
 
-    frame.countText:SetText(#players .. " players")
+    -- Count only active (non-removed) players
+    local activePlayers = {}
+    for _, p in ipairs(players) do
+        if not self.session.removedPlayers
+            or not self.session.removedPlayers[self:StripRealmName(p.name)] then
+            activePlayers[#activePlayers + 1] = p
+        end
+    end
 
-    if #players > 0 then
-        frame.roleText:SetText(self:GetRoleCountSummary(players))
+    frame.countText:SetText(#activePlayers .. " players")
+
+    if #activePlayers > 0 then
+        frame.roleText:SetText(self:GetRoleCountSummary(activePlayers))
     else
         frame.roleText:SetText("")
     end
@@ -633,7 +886,18 @@ function WHLSN:UpdateLobbyView()
         end
     end
 
-    UpdateLobbyButtons(frame, isHost, hasSession, isInSession, #players)
+    UpdateLobbyButtons(frame, isHost, hasSession, isInSession, #activePlayers)
+
+    -- Show spec override section only when local player is in an active lobby session
+    local specSection = lobbyState.specSection
+    if specSection then
+        local showSpec = hasSession and isInSession
+        specSection:SetShown(showSpec)
+        if showSpec and not specSection.initialized then
+            specSection:Initialize()
+            specSection.initialized = true
+        end
+    end
 
     -- Hide all dynamic rows before repopulating
     for _, row in ipairs(lobbyState.playerRows) do row:Hide() end
@@ -642,6 +906,9 @@ function WHLSN:UpdateLobbyView()
     if hasSession then
         PopulatePlayerRows(frame, players)
     else
+        if specSection then
+            specSection.initialized = false
+        end
         local history = self.db and self.db.profile.sessionHistory
         if history and #history > 0 then
             PopulateHistoryRows(frame, history)

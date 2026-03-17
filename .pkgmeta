@@ -26,6 +26,9 @@ externals:
     url: https://repos.curseforge.com/wow/ace3/trunk/CallbackHandler-1.0
   libs/LibDataBroker-1.1:
     url: https://github.com/tekkub/libdatabroker-1-1
+  libs/WagoAnalytics:
+    url: https://github.com/wagoio/WagoAnalyticsShim.git
+    branch: main
 
 ignore:
   - tests

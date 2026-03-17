@@ -7,6 +7,7 @@ local mock_db = {
         minimap = { hide = false },
         lastSession = nil,
         sessionHistory = {},
+        lastGroups = {},
         communityRoster = {},
     },
 }
@@ -42,6 +43,9 @@ _G.LibStub = function(name, silent)
         return {
             Register = function() end,
         }
+    elseif name == "WagoAnalytics" then
+        local noop = setmetatable({}, { __index = function() return function() end end })
+        return { Register = function(_, _id) return noop end }
     end
     if silent then return nil end
     return {}
@@ -149,7 +153,7 @@ describe("Test Mode", function()
             WHLSN.SendCommMessage = function() commSent = true end
 
             WHLSN:StartTestSession()
-            WHLSN:BroadcastSessionEnd()
+            WHLSN:EndSession()
 
             assert.is_false(commSent)
         end)

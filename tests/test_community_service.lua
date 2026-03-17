@@ -30,6 +30,9 @@ _G.LibStub = function(name, silent)
         return { NewDataObject = function(_, _name, obj) return obj end }
     elseif name == "LibDBIcon-1.0" then
         return { Register = function() end, Show = function() end, Hide = function() end }
+    elseif name == "WagoAnalytics" then
+        local noop = setmetatable({}, { __index = function() return function() end end })
+        return { Register = function(_, _id) return noop end }
     end
     if silent then return nil end
     return {}

@@ -16,6 +16,7 @@ _G.LibStub = function()
         return addon
     end
     addon.New = function(_, name, defaults) return { profile = defaults and defaults.profile or {} } end
+    addon.Register = function(_, _id) return setmetatable({}, { __index = function() return function() end end }) end
     return addon
 end
 
@@ -294,7 +295,7 @@ describe("SpecService", function()
         end)
 
         it("should handle nil input", function()
-            assert.is_nil(WHLSN:StripRealmName(nil))
+            assert.equal("", WHLSN:StripRealmName(nil))
         end)
 
         it("should handle names with multiple hyphens", function()
