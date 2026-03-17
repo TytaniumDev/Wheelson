@@ -86,12 +86,22 @@ function WHLSN:DetectLocalPlayer(selectedOffspecs, overrideRole)
     return WHLSN.Player:New(name, mainRole, offspecs, utilities, classToken)
 end
 
+local realmNameCache = {}
+
 --- Strip realm name from a character name.
 ---@param name string
 ---@return string
 function WHLSN:StripRealmName(name)
     if not name then return "" end
-    return name:match("^([^%-]+)") or name
+
+    -- ⚡ Bolt: Cache string match results since player names don't change
+    -- Reduces regex overhead significantly during repeated lookups in loops
+    local cached = realmNameCache[name]
+    if cached then return cached end
+
+    cached = name:match("^([^%-]+)") or name
+    realmNameCache[name] = cached
+    return cached
 end
 
 --- Detect a guild member's likely role from guild roster info.
