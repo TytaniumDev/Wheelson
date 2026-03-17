@@ -7,6 +7,7 @@ local mock_db = {
         minimap = { hide = false },
         lastSession = nil,
         sessionHistory = {},
+        lastGroups = {},
         communityRoster = {},
     },
 }
@@ -152,7 +153,7 @@ describe("Test Mode", function()
             WHLSN.SendCommMessage = function() commSent = true end
 
             WHLSN:StartTestSession()
-            WHLSN:BroadcastSessionEnd()
+            WHLSN:EndSession()
 
             assert.is_false(commSent)
         end)

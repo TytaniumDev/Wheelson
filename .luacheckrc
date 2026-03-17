@@ -52,7 +52,7 @@ read_globals = {
     C_PartyInfo = { other_fields = true },
     C_PvP = { other_fields = true },
     C_SpecializationInfo = { other_fields = true },
-    "IsEncounterInProgress",
+    C_InstanceEncounter = { other_fields = true },
     "UnitClass",
     "UnitIsGroupLeader",
     "UnitLevel",

@@ -90,7 +90,7 @@ end
 ---@param name string
 ---@return string
 function WHLSN:StripRealmName(name)
-    if not name then return name end
+    if not name then return "" end
     return name:match("^([^%-]+)") or name
 end
 

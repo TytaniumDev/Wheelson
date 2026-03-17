@@ -7,6 +7,7 @@ local mock_db = {
         minimap = { hide = false },
         lastSession = nil,
         sessionHistory = {},
+        lastGroups = {},
         communityRoster = {},
     },
 }
@@ -1027,11 +1028,23 @@ describe("ClearSessionState community fields", function()
         assert.is_nil(WHLSN.session.commChannel)
         assert.is_nil(WHLSN.session.hostFullName)
     end)
+
+    it("should cancel commThrottleTimer and clear commPendingUpdate", function()
+        local cancelled = false
+        WHLSN.commThrottleTimer = { Cancel = function() cancelled = true end }
+        WHLSN.commPendingUpdate = true
+
+        WHLSN:ClearSessionState()
+
+        assert.is_true(cancelled)
+        assert.is_nil(WHLSN.commThrottleTimer)
+        assert.is_false(WHLSN.commPendingUpdate)
+    end)
 end)
 
 describe("CommRestriction", function()
     local sent_messages
-    local original_IsEncounterInProgress
+    local original_C_InstanceEncounter
     local original_C_MythicPlus
     local original_C_PvP
 
@@ -1041,19 +1054,19 @@ describe("CommRestriction", function()
         WHLSN.SendCommMessage = function(self, prefix, msg, channel, target)
             sent_messages[#sent_messages + 1] = { prefix = prefix, msg = msg, channel = channel, target = target }
         end
-        original_IsEncounterInProgress = _G.IsEncounterInProgress
+        original_C_InstanceEncounter = _G.C_InstanceEncounter
         original_C_MythicPlus = _G.C_MythicPlus
         original_C_PvP = _G.C_PvP
     end)
 
     after_each(function()
-        _G.IsEncounterInProgress = original_IsEncounterInProgress
+        _G.C_InstanceEncounter = original_C_InstanceEncounter
         _G.C_MythicPlus = original_C_MythicPlus
         _G.C_PvP = original_C_PvP
     end)
 
     it("should send immediately when not restricted", function()
-        _G.IsEncounterInProgress = function() return false end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return false end }
 
         WHLSN:SafeSendCommMessage("WHLSN", "msg", "GUILD")
 
@@ -1061,8 +1074,8 @@ describe("CommRestriction", function()
         assert.equals("GUILD", sent_messages[1].channel)
     end)
 
-    it("should queue message when IsEncounterInProgress is true", function()
-        _G.IsEncounterInProgress = function() return true end
+    it("should queue message when C_InstanceEncounter reports active encounter", function()
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return true end }
 
         WHLSN:SafeSendCommMessage("WHLSN", "msg", "GUILD")
 
@@ -1072,7 +1085,7 @@ describe("CommRestriction", function()
     end)
 
     it("should queue message when C_MythicPlus run is active", function()
-        _G.IsEncounterInProgress = function() return false end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return false end }
         _G.C_MythicPlus = { IsRunActive = function() return true end }
 
         WHLSN:SafeSendCommMessage("WHLSN", "msg", "GUILD")
@@ -1082,7 +1095,7 @@ describe("CommRestriction", function()
     end)
 
     it("should queue message when PvP match is active", function()
-        _G.IsEncounterInProgress = function() return false end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return false end }
         _G.C_PvP = { IsActiveBattlefield = function() return true end }
 
         WHLSN:SafeSendCommMessage("WHLSN", "msg", "GUILD")
@@ -1092,12 +1105,12 @@ describe("CommRestriction", function()
     end)
 
     it("should flush queued messages on FlushCommQueue when no longer restricted", function()
-        _G.IsEncounterInProgress = function() return true end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return true end }
         WHLSN:SafeSendCommMessage("WHLSN", "msg1", "GUILD")
         WHLSN:SafeSendCommMessage("WHLSN", "msg2", "WHISPER", "Player-Realm")
         assert.equals(2, #WHLSN.commQueue)
 
-        _G.IsEncounterInProgress = function() return false end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return false end }
         WHLSN:FlushCommQueue()
 
         assert.equals(2, #sent_messages)
@@ -1108,7 +1121,7 @@ describe("CommRestriction", function()
     end)
 
     it("should not flush if still restricted", function()
-        _G.IsEncounterInProgress = function() return true end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return true end }
         WHLSN:SafeSendCommMessage("WHLSN", "msg", "GUILD")
 
         WHLSN:FlushCommQueue()
@@ -1118,7 +1131,7 @@ describe("CommRestriction", function()
     end)
 
     it("IsCommRestricted should return false when no restriction APIs are present", function()
-        _G.IsEncounterInProgress = nil
+        _G.C_InstanceEncounter = nil
         _G.C_MythicPlus = nil
         _G.C_PvP = nil
 
@@ -1127,12 +1140,12 @@ describe("CommRestriction", function()
 
     it("ENCOUNTER_END handler flushes the queue once restriction lifts", function()
         -- Queue a message during an encounter
-        _G.IsEncounterInProgress = function() return true end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return true end }
         WHLSN:SafeSendCommMessage("WHLSN", "msg", "GUILD")
         assert.equals(1, #WHLSN.commQueue)
 
         -- Simulate encounter ending; make C_Timer.After invoke synchronously
-        _G.IsEncounterInProgress = function() return false end
+        _G.C_InstanceEncounter = { IsEncounterInProgress = function() return false end }
         local original_after = _G.C_Timer.After
         _G.C_Timer.After = function(_, cb) cb() end
 

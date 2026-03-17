@@ -295,7 +295,7 @@ describe("SpecService", function()
         end)
 
         it("should handle nil input", function()
-            assert.is_nil(WHLSN:StripRealmName(nil))
+            assert.equal("", WHLSN:StripRealmName(nil))
         end)
 
         it("should handle names with multiple hyphens", function()
