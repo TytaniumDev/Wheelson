@@ -367,6 +367,7 @@ describe("SpinGroups", function()
         WHLSN:OnInitialize()
         WHLSN.session.status = WHLSN.Status.LOBBY
         WHLSN.session.host = "TestPlayer"
+        WHLSN.session.removedPlayers = {}
         WHLSN.BroadcastSessionUpdate = function() end
         WHLSN.UpdateUI = function() end
         WHLSN.TouchActivity = function() end
@@ -437,6 +438,55 @@ describe("SpinGroups", function()
         local snap = WHLSN.session.algorithmSnapshot
         assert.is_nil(getmetatable(snap.players[1]))
         assert.equals("Tank1", snap.players[1].name)
+    end)
+
+    it("should exclude removed players from group formation", function()
+        local Player = WHLSN.Player
+        WHLSN.session.players = {
+            Player:New("Tank1", "tank", {}, {"brez"}),
+            Player:New("Healer1", "healer", {}, {}),
+            Player:New("DPS1", "ranged", {}, {"lust"}),
+            Player:New("DPS2", "melee", {}, {}),
+            Player:New("DPS3", "ranged", {}, {}),
+            Player:New("HiddenDPS", "melee", {}, {}),
+        }
+        WHLSN.session.removedPlayers = { ["HiddenDPS"] = true }
+
+        WHLSN:SpinGroups()
+
+        -- HiddenDPS should not appear in any group
+        for _, group in ipairs(WHLSN.session.groups) do
+            for _, p in ipairs(group:GetPlayers()) do
+                assert.is_not.equals("HiddenDPS", p.name)
+            end
+        end
+    end)
+
+    it("should use active (non-removed) count for minimum player check", function()
+        local Player = WHLSN.Player
+        WHLSN.session.players = {
+            Player:New("Tank1", "tank", {}, {}),
+            Player:New("Healer1", "healer", {}, {}),
+            Player:New("DPS1", "ranged", {}, {}),
+            Player:New("DPS2", "melee", {}, {}),
+            Player:New("DPS3", "ranged", {}, {}),
+            Player:New("Hidden1", "melee", {}, {}),
+        }
+        WHLSN.session.removedPlayers = {
+            ["Hidden1"] = true,
+            ["DPS3"] = true,
+        }
+
+        -- Only 4 active players — should not spin
+        WHLSN.printed = {}
+        WHLSN.Print = function(self, msg)
+            self.printed[#self.printed + 1] = msg
+        end
+
+        WHLSN:SpinGroups()
+
+        assert.is_nil(WHLSN.session.algorithmSnapshot)
+        assert.is_true(#WHLSN.printed > 0)
     end)
 end)
 

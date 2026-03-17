@@ -237,14 +237,22 @@ function WHLSN:SpinGroups()
         return
     end
 
-    if #self.session.players < 5 then
+    -- Filter out removed/hidden players
+    local activePlayers = {}
+    for _, p in ipairs(self.session.players) do
+        if not self.session.removedPlayers[self:StripRealmName(p.name)] then
+            activePlayers[#activePlayers + 1] = p
+        end
+    end
+
+    if #activePlayers < 5 then
         self:Print("Need at least 5 players to form a group.")
         return
     end
 
     -- Capture algorithm inputs before running
     local playerDicts = {}
-    for _, p in ipairs(self.session.players) do
+    for _, p in ipairs(activePlayers) do
         playerDicts[#playerDicts + 1] = p:ToDict()
     end
 
@@ -254,7 +262,7 @@ function WHLSN:SpinGroups()
         lastGroupDicts[#lastGroupDicts + 1] = g:ToDict()
     end
 
-    self.session.groups = self:CreateMythicPlusGroups(self.session.players)
+    self.session.groups = self:CreateMythicPlusGroups(activePlayers)
     self.session.status = self.Status.SPINNING
 
     -- Capture algorithm outputs
@@ -269,7 +277,7 @@ function WHLSN:SpinGroups()
         groups = groupDicts,
         timestamp = time(),
         host = self.session.host,
-        playerCount = #self.session.players,
+        playerCount = #activePlayers,
     }
 
     self.lastActivity = time()
