@@ -707,6 +707,43 @@ describe("HandleSessionEnd", function()
     end)
 end)
 
+describe("HandleSessionUpdate community broadcast", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.UpdateUI = function() end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+    end)
+
+    it("should populate connectedCommunity from data.community", function()
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {},
+            community = { ["Tyler"] = "Tyler-Kel'Thuzad" },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        assert.same({ ["Tyler"] = "Tyler-Kel'Thuzad" }, WHLSN.session.connectedCommunity)
+    end)
+
+    it("should leave connectedCommunity unchanged when community field absent", function()
+        WHLSN.session.connectedCommunity = { ["Existing"] = "Existing-Realm" }
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {},
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        assert.same({ ["Existing"] = "Existing-Realm" }, WHLSN.session.connectedCommunity)
+    end)
+end)
+
 describe("HandleSessionPing", function()
     before_each(function()
         WHLSN:OnInitialize()

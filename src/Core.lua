@@ -628,6 +628,10 @@ function WHLSN:HandleSessionUpdate(data, sender)
             end
         end
 
+        if data.community then
+            self.session.connectedCommunity = data.community
+        end
+
         self:UpdateUI()
     end
 end
