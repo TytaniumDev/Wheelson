@@ -116,6 +116,17 @@ describe("InvitePlayers", function()
         assert.equals("Tyler-Kel'Thuzad", invited[1])
     end)
 
+    it("should use realm-qualified name set by HandleJoinRequest for cross-realm guild members", function()
+        -- Simulate a cross-realm guild member joining: HandleJoinRequest sets
+        -- player.name to the realm-qualified sender when sender contains "-"
+        local players = { WHLSN.Player:New("Healer1-Stormrage", "healer") }
+
+        WHLSN:InvitePlayers(players)
+
+        assert.equals(1, #invited)
+        assert.equals("Healer1-Stormrage", invited[1])
+    end)
+
     it("should fall back to bare name for guild-only players", function()
         local players = { WHLSN.Player:New("GuildTank", "tank") }
 
@@ -167,5 +178,77 @@ describe("InvitePlayers", function()
         assert.equals(0, #invited)
         assert.equals(1, #printed)
         assert.equals("No players to invite.", printed[1])
+    end)
+end)
+
+describe("HandleJoinRequest cross-realm", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer"
+        WHLSN.session.players = { WHLSN.Player:New("TestPlayer", "tank") }
+        WHLSN.session.connectedCommunity = {}
+        WHLSN.Print = function() end
+        WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.IsCommunityRosterMember = function() return false end
+    end)
+
+    it("should preserve realm-qualified name for cross-realm guild members", function()
+        local data = {
+            type = "JOIN_REQUEST",
+            player = {
+                name = "CrossRealmPlayer",
+                mainRole = "healer",
+                offspecs = {},
+                utilities = {},
+                classToken = "PRIEST",
+            },
+        }
+
+        WHLSN:HandleJoinRequest(data, "CrossRealmPlayer-Stormrage", "GUILD")
+
+        assert.equals(2, #WHLSN.session.players)
+        assert.equals("CrossRealmPlayer-Stormrage", WHLSN.session.players[2].name)
+    end)
+
+    it("should keep bare name for same-realm guild members", function()
+        local data = {
+            type = "JOIN_REQUEST",
+            player = {
+                name = "SameRealmPlayer",
+                mainRole = "melee",
+                offspecs = {},
+                utilities = {},
+                classToken = "ROGUE",
+            },
+        }
+
+        WHLSN:HandleJoinRequest(data, "SameRealmPlayer", "GUILD")
+
+        assert.equals(2, #WHLSN.session.players)
+        assert.equals("SameRealmPlayer", WHLSN.session.players[2].name)
+    end)
+
+    it("should update realm-qualified name on re-join", function()
+        -- First join
+        local data = {
+            type = "JOIN_REQUEST",
+            player = {
+                name = "CrossRealmPlayer",
+                mainRole = "healer",
+                offspecs = {},
+                utilities = {},
+                classToken = "PRIEST",
+            },
+        }
+        WHLSN:HandleJoinRequest(data, "CrossRealmPlayer-Stormrage", "GUILD")
+
+        -- Re-join with updated spec
+        data.player.mainRole = "ranged"
+        WHLSN:HandleJoinRequest(data, "CrossRealmPlayer-Stormrage", "GUILD")
+
+        assert.equals(2, #WHLSN.session.players)
+        assert.equals("CrossRealmPlayer-Stormrage", WHLSN.session.players[2].name)
+        assert.equals("ranged", WHLSN.session.players[2].mainRole)
     end)
 end)
