@@ -504,6 +504,7 @@ function WHLSN:SendSessionUpdate()
         host = self.session.host,
         playerCount = #self.session.players,
         players = playerList,
+        community = self.session.connectedCommunity,
     }
 
     if self.session.status == self.Status.SPINNING or

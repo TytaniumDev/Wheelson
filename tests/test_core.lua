@@ -822,6 +822,20 @@ describe("SendSessionUpdate with community", function()
         assert.equals("WHISPER", WHLSN.sent_messages[2].channel)
         assert.equals("CommunityGuy-Stormrage", WHLSN.sent_messages[2].target)
     end)
+
+    it("should include community map in SESSION_UPDATE payload", function()
+        local sentData
+        WHLSN.SendCommMessage = function(self, prefix, msg, channel, target)
+            if channel == "GUILD" then sentData = msg end
+        end
+        WHLSN.Serialize = function(self, data) return data end
+
+        WHLSN:SendSessionUpdate()
+
+        assert.is_not_nil(sentData)
+        assert.is_not_nil(sentData.community)
+        assert.same({ ["CommunityGuy"] = "CommunityGuy-Stormrage" }, sentData.community)
+    end)
 end)
 
 describe("ClearSessionState community fields", function()
