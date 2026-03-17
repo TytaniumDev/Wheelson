@@ -39,6 +39,21 @@ end
 -- Comm Log Hooks
 ---------------------------------------------------------------------------
 
+local function FormatLogAsMarkdown()
+    local lines = {}
+    lines[#lines + 1] = "## Wheelson Debug Log"
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "**Version:** " .. tostring(WHLSN.VERSION)
+    lines[#lines + 1] = "**Date:** " .. date("%Y-%m-%d %H:%M:%S")
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "```text"
+    for _, entry in ipairs(WHLSN.debugLog) do
+        lines[#lines + 1] = entry
+    end
+    lines[#lines + 1] = "```"
+    return table.concat(lines, "\n")
+end
+
 local function FormatLogPayload(data)
     if type(data) ~= "table" then return tostring(data) end
     local parts = {}
@@ -160,9 +175,7 @@ local function CreateDebugBottomButtons(frame)
     frame.copyAllBtn:SetPoint("BOTTOMRIGHT", -8, 8)
     frame.copyAllBtn:SetText("Copy All")
     frame.copyAllBtn:SetScript("OnClick", function()
-        frame.editBox:HighlightText()
-        frame.editBox:SetFocus()
-        WHLSN:Print("Text selected. Press Ctrl+C to copy.")
+        WHLSN:ShowClipboardPopup("Copy Debug Log", FormatLogAsMarkdown())
     end)
 
     frame.refreshBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
