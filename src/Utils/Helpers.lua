@@ -190,7 +190,7 @@ local function FormatBugReportMarkdown(self, snapshot, groups, lines)
         end
         lines[#lines + 1] = self:FormatGroupSummary(prevGroups)
     else
-        lines[#lines + 1] = "None - first session"
+        lines[#lines + 1] = "None - first lobby"
     end
     lines[#lines + 1] = ""
 end

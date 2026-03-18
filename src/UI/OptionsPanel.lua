@@ -71,7 +71,7 @@ local options = {
         communityDesc = {
             order = 21,
             type = "description",
-            name = "Add non-guild players who have Wheelson installed. They'll be whispered when you start a session.",
+            name = "Add non-guild players who have Wheelson installed. They'll be whispered when you create a lobby.",
             fontSize = "medium",
         },
         communityAddName = {

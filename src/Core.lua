@@ -361,13 +361,13 @@ function WHLSN:ViewHistorySession(index)
 
     local history = self.db and self.db.profile.sessionHistory
     if not history or not history[index] then
-        self:Print("Session not found.")
+        self:Print("Lobby not found.")
         return
     end
 
     local record = history[index]
     if not record.groups or #record.groups == 0 then
-        self:Print("No group data for that session.")
+        self:Print("No group data for that lobby.")
         return
     end
 
@@ -397,7 +397,7 @@ function WHLSN:HidePlayer(playerName)
         if self:NamesMatch(p.name, playerName) then
             self.session.removedPlayers[p.name] = true
             self:NotifySessionChange()
-            self:Print(self:StripRealmName(playerName) .. " hidden from session.")
+            self:Print(self:StripRealmName(playerName) .. " hidden from lobby.")
             return
         end
     end
@@ -413,7 +413,7 @@ function WHLSN:UnhidePlayer(playerName)
         if self:NamesMatch(p.name, playerName) then
             self.session.removedPlayers[p.name] = nil
             self:NotifySessionChange()
-            self:Print(self:StripRealmName(playerName) .. " restored to session.")
+            self:Print(self:StripRealmName(playerName) .. " restored to lobby.")
             return
         end
     end
@@ -554,7 +554,7 @@ function WHLSN:RestoreSessionState()
         self:SendSessionQuery()
         self.sessionRestoreTimer = C_Timer.NewTimer(10, function()
             if WHLSN.session.status and #WHLSN.session.players == 0 then
-                WHLSN:Print("Previous session is no longer active.")
+                WHLSN:Print("Previous lobby is no longer active.")
                 WHLSN:ClearSessionState()
                 WHLSN:UpdateUI()
             end
