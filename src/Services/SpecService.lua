@@ -47,8 +47,8 @@ end
 ---@param overrideRole? string Optional role override from the UI dropdown
 ---@return WHLSNPlayer|nil
 function WHLSN:DetectLocalPlayer(selectedOffspecs, overrideRole)
-    local name = UnitName("player")
-    if not name then return nil end
+    local name = self:GetMyFullName()
+    if not name or name == "" then return nil end
 
     local specIndex = C_SpecializationInfo.GetSpecialization()
     if not specIndex then return nil end
