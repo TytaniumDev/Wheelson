@@ -1410,3 +1410,91 @@ describe("Realm-qualified identity", function()
         assert.is_nil(WHLSN.session.removedPlayers["Other"])
     end)
 end)
+
+describe("JoinAck", function()
+    local sent_messages
+
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer-Illidan"
+        WHLSN.session.players = { WHLSN.Player:New("TestPlayer-Illidan", "tank", {}, {}) }
+        WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.UpdateLobbyView = function() end
+        sent_messages = {}
+        WHLSN.SendCommMessage = function(self, prefix, msg, channel, target)
+            sent_messages[#sent_messages + 1] = { msg = msg, channel = channel, target = target }
+        end
+        WHLSN.Serialize = function(self, data) return data end
+    end)
+
+    it("HandleJoinRequest should send JOIN_ACK to GUILD joiner", function()
+        local data = {
+            type = "JOIN_REQUEST",
+            player = { name = "Joiner", mainRole = "healer", offspecs = {}, utilities = {} },
+        }
+        WHLSN:HandleJoinRequest(data, "Joiner-Illidan", "GUILD")
+
+        local ack = nil
+        for _, msg in ipairs(sent_messages) do
+            if type(msg.msg) == "table" and msg.msg.type == "JOIN_ACK" then
+                ack = msg
+                break
+            end
+        end
+        assert.is_not_nil(ack)
+        assert.equal("GUILD", ack.channel)
+        assert.equal("Joiner-Illidan", ack.msg.playerName)
+    end)
+
+    it("HandleJoinRequest should send JOIN_ACK via WHISPER for community joiner", function()
+        WHLSN:AddCommunityPlayer("CommunityGuy-Stormrage")
+        local data = {
+            type = "JOIN_REQUEST",
+            player = { name = "CommunityGuy-Stormrage", mainRole = "healer", offspecs = {}, utilities = {} },
+        }
+        WHLSN:HandleJoinRequest(data, "CommunityGuy-Stormrage", "WHISPER")
+
+        local ack = nil
+        for _, msg in ipairs(sent_messages) do
+            if type(msg.msg) == "table" and msg.msg.type == "JOIN_ACK" then
+                ack = msg
+                break
+            end
+        end
+        assert.is_not_nil(ack)
+        assert.equal("WHISPER", ack.channel)
+        assert.equal("CommunityGuy-Stormrage", ack.target)
+    end)
+
+    it("HandleJoinAck should clear joinPending when name matches", function()
+        WHLSN.session.joinPending = true
+        WHLSN.joinAckTimer = { Cancel = function() end }
+        WHLSN:HandleJoinAck({ playerName = "TestPlayer-Illidan" }, "HostPlayer-Illidan")
+        assert.is_false(WHLSN.session.joinPending)
+        assert.is_nil(WHLSN.joinAckTimer)
+    end)
+
+    it("HandleJoinAck should ignore when name does not match", function()
+        WHLSN.session.joinPending = true
+        WHLSN.joinAckTimer = { Cancel = function() end }
+        WHLSN:HandleJoinAck({ playerName = "OtherPlayer-Illidan" }, "HostPlayer-Illidan")
+        assert.is_true(WHLSN.session.joinPending)
+    end)
+
+    it("HandleJoinAck should ignore when not pending", function()
+        WHLSN.session.joinPending = false
+        WHLSN:HandleJoinAck({ playerName = "TestPlayer-Illidan" }, "HostPlayer-Illidan")
+        assert.is_false(WHLSN.session.joinPending)
+    end)
+
+    it("OnCommReceived should route JOIN_ACK to HandleJoinAck", function()
+        WHLSN.session.joinPending = true
+        WHLSN.joinAckTimer = { Cancel = function() end }
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, {
+            type = "JOIN_ACK", playerName = "TestPlayer-Illidan",
+        }, "GUILD", "HostPlayer")
+        assert.is_false(WHLSN.session.joinPending)
+    end)
+end)

@@ -20,6 +20,7 @@ function WHLSN:OnInitialize()
         connectedCommunity = {},  -- sender -> sender (host only, realm-qualified keys)
         removedPlayers = {},      -- full player name -> true (hidden from group formation)
         commChannel = nil,        -- "GUILD" or "WHISPER" (community clients only)
+        joinPending = false,      -- true while waiting for JOIN_ACK from host
     }
 
     -- Throttle timer for roster update events
@@ -460,6 +461,11 @@ function WHLSN:ClearSessionState()
     self.session.connectedCommunity = {}
     self.session.removedPlayers = {}
     self.session.commChannel = nil
+    self.session.joinPending = false
+    if self.joinAckTimer then
+        self.joinAckTimer:Cancel()
+        self.joinAckTimer = nil
+    end
     self.commQueue = {}
 end
 
@@ -611,6 +617,8 @@ function WHLSN:OnCommReceived(prefix, message, distribution, sender)
         self:HandleLeaveRequest(data, sender)
     elseif data.type == "SPEC_UPDATE" then
         self:HandleSpecUpdate(data, sender, distribution)
+    elseif data.type == "JOIN_ACK" then
+        self:HandleJoinAck(data, sender)
     elseif data.type == "SESSION_PING" then
         self:HandleSessionPing(data, sender)
     elseif data.type == "ADDON_PING" then
@@ -727,10 +735,22 @@ function WHLSN:HandleJoinRequest(data, sender, distribution)
     local player = WHLSN.Player.FromDict(data.player)
     self:ResolvePlayerName(player, sender)
 
+    local ackData = { type = "JOIN_ACK", playerName = player.name }
+    local ackSerialized = self:Serialize(ackData)
+
+    local function sendAck()
+        if distribution == "WHISPER" then
+            self:SafeSendCommMessage(self.COMM_PREFIX, ackSerialized, "WHISPER", sender)
+        else
+            self:SafeSendCommMessage(self.COMM_PREFIX, ackSerialized, "GUILD")
+        end
+    end
+
     -- Replace if already in list
     for i, p in ipairs(self.session.players) do
         if self:NamesMatch(p.name, player.name) then
             self.session.players[i] = player
+            sendAck()
             self:NotifySessionChange()
             return
         end
@@ -743,7 +763,19 @@ function WHLSN:HandleJoinRequest(data, sender, distribution)
         self.session.connectedCommunity[sender] = sender
     end
 
+    sendAck()
     self:NotifySessionChange()
+end
+
+--- Handle JOIN_ACK from host (client-side).
+function WHLSN:HandleJoinAck(data, _sender)
+    if not self.session.joinPending then return end
+    if not self:NamesMatch(data.playerName, self:GetMyFullName()) then return end
+    self.session.joinPending = false
+    if self.joinAckTimer then
+        self.joinAckTimer:Cancel()
+        self.joinAckTimer = nil
+    end
 end
 
 function WHLSN:HandleLeaveRequest(data, sender)

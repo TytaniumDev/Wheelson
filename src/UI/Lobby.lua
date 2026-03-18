@@ -731,7 +731,8 @@ end
 local function UpdateLobbyButtons(frame, isHost, hasSession, isInSession, playerCount)
     frame.spinButton:SetShown(isHost and hasSession)
     frame.spinButton:SetEnabled(playerCount >= 5)
-    frame.joinButton:SetShown(not isHost and hasSession and not isInSession)
+    local isPending = WHLSN.session.joinPending or false
+    frame.joinButton:SetShown(not isHost and hasSession and not isInSession and not isPending)
     frame.leaveButton:SetShown(not isHost and hasSession and isInSession)
     frame.startButton:SetShown(not hasSession)
     frame.testButton:SetShown(not hasSession)
@@ -739,6 +740,15 @@ local function UpdateLobbyButtons(frame, isHost, hasSession, isInSession, player
     frame.communityRosterButton:SetShown(isHost and hasSession)
     if not (isHost and hasSession) then
         WHLSN:HideCommunityPanel()
+    end
+    -- Show "Joining..." text when pending
+    if isPending and not isInSession then
+        frame.joinButton:SetShown(true)
+        frame.joinButton:SetText("Joining...")
+        frame.joinButton:SetEnabled(false)
+    else
+        frame.joinButton:SetText("Join Session")
+        frame.joinButton:SetEnabled(true)
     end
 end
 
@@ -970,4 +980,12 @@ function WHLSN:RequestJoin()
     end
 
     self:Print("Join request sent.")
+    self.session.joinPending = true
+    self.joinAckTimer = C_Timer.NewTimer(5, function()
+        WHLSN.session.joinPending = false
+        WHLSN.joinAckTimer = nil
+        WHLSN:Print("Join request may not have been received. Try again.")
+        WHLSN:UpdateLobbyView()
+    end)
+    self:UpdateLobbyView()
 end
