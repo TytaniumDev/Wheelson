@@ -57,11 +57,10 @@ function WHLSN:DetectLocalPlayer(selectedOffspecs, overrideRole)
     if not specID then return nil end
 
     -- Apply saved overrides when no explicit override provided
-    if not overrideRole and not selectedOffspecs
-            and self.db and self.db.char and self.db.char.specOverrides then
-        local saved = self.db.char.specOverrides
-        overrideRole = saved.mainRole
-        selectedOffspecs = saved.offspecs
+    local savedOverrides = self.db and self.db.char and self.db.char.specOverrides
+    if not overrideRole and not selectedOffspecs and savedOverrides then
+        overrideRole = savedOverrides.mainRole
+        selectedOffspecs = savedOverrides.offspecs
     end
 
     local mainRole = overrideRole or WHLSN.SpecRoles[specID]

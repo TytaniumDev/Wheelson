@@ -646,10 +646,10 @@ local function CreateSpecOverrideSection(parent)
         if not specID then return end
 
         -- Restore from saved overrides if available
+        self.selectedOffs = {}
         local saved = WHLSN.db and WHLSN.db.char and WHLSN.db.char.specOverrides
         if saved and saved.mainRole then
             self.selectedMain = saved.mainRole
-            self.selectedOffs = {}
             if saved.offspecs then
                 for role, enabled in pairs(saved.offspecs) do
                     if enabled then
@@ -659,7 +659,6 @@ local function CreateSpecOverrideSection(parent)
             end
         else
             self.selectedMain = WHLSN.SpecRoles[specID]
-            self.selectedOffs = {}
 
             local allOffspecs = WHLSN:DetectAllOffspecs()
             for _, offRole in ipairs(allOffspecs) do
