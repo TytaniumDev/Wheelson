@@ -388,8 +388,7 @@ function WHLSN:HidePlayer(playerName)
     for _, p in ipairs(self.session.players) do
         if self:StripRealmName(p.name) == stripped then
             self.session.removedPlayers[stripped] = true
-            self:BroadcastSessionUpdate()
-            self:UpdateLobbyView()
+            self:NotifySessionChange()
             self:Print(playerName .. " hidden from session.")
             return
         end
@@ -404,8 +403,7 @@ function WHLSN:UnhidePlayer(playerName)
 
     local stripped = self:StripRealmName(playerName)
     self.session.removedPlayers[stripped] = nil
-    self:BroadcastSessionUpdate()
-    self:UpdateLobbyView()
+    self:NotifySessionChange()
     self:Print(playerName .. " restored to session.")
 end
 
@@ -512,6 +510,12 @@ function WHLSN:ENCOUNTER_END()        flushAfterDelay() end
 function WHLSN:CHALLENGE_MODE_COMPLETED() flushAfterDelay() end
 function WHLSN:CHALLENGE_MODE_RESET()     flushAfterDelay() end
 function WHLSN:PVP_MATCH_COMPLETE()       flushAfterDelay() end
+
+--- Broadcast session state to the guild (throttled) and refresh the host's lobby UI.
+function WHLSN:NotifySessionChange()
+    self:BroadcastSessionUpdate()
+    self:UpdateLobbyView()
+end
 
 --- Broadcast session state to the guild (throttled).
 function WHLSN:BroadcastSessionUpdate()
@@ -729,7 +733,7 @@ function WHLSN:HandleJoinRequest(data, sender, distribution)
     for i, p in ipairs(self.session.players) do
         if self:StripRealmName(p.name) == self:StripRealmName(player.name) then
             self.session.players[i] = player
-            self:BroadcastSessionUpdate()
+            self:NotifySessionChange()
             return
         end
     end
@@ -741,7 +745,7 @@ function WHLSN:HandleJoinRequest(data, sender, distribution)
         self.session.connectedCommunity[self:StripRealmName(sender)] = sender
     end
 
-    self:BroadcastSessionUpdate()
+    self:NotifySessionChange()
 end
 
 function WHLSN:HandleLeaveRequest(data, sender)
@@ -755,7 +759,7 @@ function WHLSN:HandleLeaveRequest(data, sender)
             table.remove(self.session.players, i)
             self.session.connectedCommunity[self:StripRealmName(sender)] = nil
             self.session.removedPlayers[self:StripRealmName(sender)] = nil
-            self:BroadcastSessionUpdate()
+            self:NotifySessionChange()
             return
         end
     end
@@ -783,7 +787,7 @@ function WHLSN:HandleSpecUpdate(data, sender, distribution)
     for i, p in ipairs(self.session.players) do
         if self:StripRealmName(p.name) == self:StripRealmName(player.name) then
             self.session.players[i] = player
-            self:BroadcastSessionUpdate()
+            self:NotifySessionChange()
             return
         end
     end
