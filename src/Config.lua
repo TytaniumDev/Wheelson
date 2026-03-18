@@ -150,4 +150,7 @@ WHLSN.defaults = {
         soundEnabled = true,
         communityRoster = {},
     },
+    char = {
+        specOverrides = nil,
+    },
 }

@@ -539,6 +539,14 @@ local function CreateSpecOverrideSection(parent)
             end
         end
 
+        -- Persist spec overrides to character storage
+        if WHLSN.db and WHLSN.db.char then
+            WHLSN.db.char.specOverrides = {
+                mainRole = section.selectedMain,
+                offspecs = selectedOffspecs,
+            }
+        end
+
         local playerData = WHLSN:DetectLocalPlayer(selectedOffspecs, section.selectedMain)
         if not playerData then return end
 
@@ -630,19 +638,33 @@ local function CreateSpecOverrideSection(parent)
         section.mainButtons[i] = btn
     end
 
-    --- Initialize the section from the local player's detected spec data.
+    --- Initialize the section from saved overrides or the local player's detected spec data.
     function section:Initialize()
         local specIndex = C_SpecializationInfo.GetSpecialization()
         if not specIndex then return end
         local specID = C_SpecializationInfo.GetSpecializationInfo(specIndex)
         if not specID then return end
 
-        self.selectedMain = WHLSN.SpecRoles[specID]
-        self.selectedOffs = {}
+        -- Restore from saved overrides if available
+        local saved = WHLSN.db and WHLSN.db.char and WHLSN.db.char.specOverrides
+        if saved and saved.mainRole then
+            self.selectedMain = saved.mainRole
+            self.selectedOffs = {}
+            if saved.offspecs then
+                for role, enabled in pairs(saved.offspecs) do
+                    if enabled then
+                        self.selectedOffs[role] = true
+                    end
+                end
+            end
+        else
+            self.selectedMain = WHLSN.SpecRoles[specID]
+            self.selectedOffs = {}
 
-        local allOffspecs = WHLSN:DetectAllOffspecs()
-        for _, offRole in ipairs(allOffspecs) do
-            self.selectedOffs[offRole] = true
+            local allOffspecs = WHLSN:DetectAllOffspecs()
+            for _, offRole in ipairs(allOffspecs) do
+                self.selectedOffs[offRole] = true
+            end
         end
 
         -- Style main buttons

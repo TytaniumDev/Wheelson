@@ -15,7 +15,12 @@ _G.LibStub = function()
         addon.SendCommMessage = function() end
         return addon
     end
-    addon.New = function(_, name, defaults) return { profile = defaults and defaults.profile or {} } end
+    addon.New = function(_, name, defaults)
+        return {
+            profile = defaults and defaults.profile or {},
+            char = defaults and defaults.char and setmetatable({}, { __index = defaults.char }) or {},
+        }
+    end
     addon.Register = function(_, _id) return setmetatable({}, { __index = function() return function() end end }) end
     return addon
 end
@@ -45,6 +50,7 @@ describe("SpecService", function()
         _G.GetNumSpecializations = function() return 0 end
         _G.UnitName = function() return "TestPlayer" end
         _G.UnitClass = function() return "Paladin", "PALADIN" end
+        WHLSN.db = nil
     end)
 
     describe(":DetectLocalPlayer()", function()
@@ -123,6 +129,86 @@ describe("SpecService", function()
             assert.is_not_nil(result)
             assert.equal("healer", result.mainRole)
             assert.is_true(result:IsHealerMain())
+        end)
+
+        it("should include active spec role as offspec when overrideRole changes main", function()
+            -- Paladin: Holy (65)=healer, Prot (66)=tank, Ret (70)=melee
+            -- Active spec is Prot (tank). Override main to healer, select tank as offspec.
+            _G.C_SpecializationInfo.GetSpecialization = function() return 2 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
+                local specs = { [1] = 65, [2] = 66, [3] = 70 }
+                return specs[index]
+            end
+            _G.GetNumSpecializations = function() return 3 end
+
+            local result = WHLSN:DetectLocalPlayer({ tank = true }, "healer")
+            assert.is_not_nil(result)
+            assert.equal("healer", result.mainRole)
+            assert.is_true(result:IsOfftank())
+        end)
+
+        it("should apply saved overrides when no explicit args provided", function()
+            -- Paladin: Holy (65)=healer, Prot (66)=tank, Ret (70)=melee
+            -- Active spec is Prot (tank). Saved override: main=healer, offspecs={tank=true}
+            _G.C_SpecializationInfo.GetSpecialization = function() return 2 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
+                local specs = { [1] = 65, [2] = 66, [3] = 70 }
+                return specs[index]
+            end
+            _G.GetNumSpecializations = function() return 3 end
+
+            WHLSN.db = {
+                char = {
+                    specOverrides = {
+                        mainRole = "healer",
+                        offspecs = { tank = true, melee = true },
+                    },
+                },
+            }
+
+            local result = WHLSN:DetectLocalPlayer()
+            assert.is_not_nil(result)
+            assert.equal("healer", result.mainRole)
+            assert.is_true(result:IsOfftank())
+            assert.is_true(result:IsOffmelee())
+        end)
+
+        it("should not apply saved overrides when explicit args provided", function()
+            _G.C_SpecializationInfo.GetSpecialization = function() return 2 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
+                local specs = { [1] = 65, [2] = 66, [3] = 70 }
+                return specs[index]
+            end
+            _G.GetNumSpecializations = function() return 3 end
+
+            WHLSN.db = {
+                char = {
+                    specOverrides = {
+                        mainRole = "healer",
+                        offspecs = { tank = true },
+                    },
+                },
+            }
+
+            -- Explicit override should take precedence over saved
+            local result = WHLSN:DetectLocalPlayer(nil, "melee")
+            assert.is_not_nil(result)
+            assert.equal("melee", result.mainRole)
+        end)
+
+        it("should ignore saved overrides when db is nil", function()
+            _G.C_SpecializationInfo.GetSpecialization = function() return 2 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
+                local specs = { [1] = 65, [2] = 66, [3] = 70 }
+                return specs[index]
+            end
+            _G.GetNumSpecializations = function() return 3 end
+
+            WHLSN.db = nil
+
+            local result = WHLSN:DetectLocalPlayer()
+            assert.is_not_nil(result)
+            assert.equal("tank", result.mainRole) -- Falls back to WoW-detected spec
         end)
 
         it("should detect a Restoration Shaman as healer with lust", function()
@@ -305,6 +391,46 @@ describe("SpecService", function()
             local result = WHLSN:DetectAllOffspecs()
             -- Guardian Druid offspecs: ranged, melee, healer
             assert.equal(3, #result)
+        end)
+
+        it("should include active spec role as offspec when overrideMainRole differs", function()
+            -- Paladin: Holy (65)=healer, Prot (66)=tank, Ret (70)=melee
+            -- Active spec is Prot (tank). Override main to healer -> tank should be an offspec.
+            _G.C_SpecializationInfo.GetSpecialization = function() return 2 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
+                local specs = { [1] = 65, [2] = 66, [3] = 70 }
+                return specs[index]
+            end
+            _G.GetNumSpecializations = function() return 3 end
+
+            local result = WHLSN:DetectAllOffspecs("healer")
+            -- Override to healer: offspecs should be tank (from Prot) and melee (from Ret)
+            assert.equal(2, #result)
+            local hasTank, hasMelee = false, false
+            for _, r in ipairs(result) do
+                if r == "tank" then hasTank = true end
+                if r == "melee" then hasMelee = true end
+            end
+            assert.is_true(hasTank)
+            assert.is_true(hasMelee)
+        end)
+
+        it("should exclude overrideMainRole from offspecs", function()
+            -- Druid: Balance (102)=ranged, Feral (103)=melee, Guardian (104)=tank, Resto (105)=healer
+            -- Active spec is Guardian (tank). Override main to melee.
+            _G.C_SpecializationInfo.GetSpecialization = function() return 3 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
+                local specs = { [1] = 102, [2] = 103, [3] = 104, [4] = 105 }
+                return specs[index]
+            end
+            _G.GetNumSpecializations = function() return 4 end
+
+            local result = WHLSN:DetectAllOffspecs("melee")
+            -- Override to melee: offspecs should be ranged, tank, healer (not melee)
+            assert.equal(3, #result)
+            for _, r in ipairs(result) do
+                assert.is_not_equal("melee", r)
+            end
         end)
     end)
 
