@@ -135,6 +135,11 @@ end
 
 --- Start a new lobby session. Any guild member can host.
 function WHLSN:StartSession()
+    -- Allow starting a new session if we're just waiting for a restore query
+    if self.sessionRestoreTimer then
+        self:ClearSessionState()
+    end
+
     if self.session.status then
         self:Print("A session is already active.")
         return
@@ -224,7 +229,7 @@ function WHLSN:LeaveSession()
 
     local data = {
         type = "LEAVE_REQUEST",
-        playerName = UnitName("player"),
+        playerName = self:GetMyFullName(),
     }
     local serialized = self:Serialize(data)
 
