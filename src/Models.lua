@@ -81,9 +81,7 @@ function Player:HasRoles()
 end
 
 function Player:Equals(other)
-    local myName = WHLSN:StripRealmName(self.name)
-    local otherName = WHLSN:StripRealmName(other.name)
-    return myName == otherName
+    return WHLSN:NamesMatch(self.name, other.name)
 end
 
 --- Serialize to a table for addon comms.
