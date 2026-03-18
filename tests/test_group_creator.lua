@@ -31,6 +31,7 @@ _G.C_SpecializationInfo = {
     GetSpecializationInfo = function() return 71 end,
 }
 _G.GetNumSpecializations = function() return 3 end
+_G.GetNormalizedRealmName = function() return "Illidan" end
 
 -- Load source files in order
 dofile("src/Config.lua")

@@ -61,7 +61,7 @@ local function CreateGroupDisplayFrame(parent)
     frame.endButton:SetPoint("BOTTOMRIGHT", -8, 8)
     frame.endButton:SetText("Finish")
     frame.endButton:SetScript("OnClick", function()
-        local isHost = WHLSN.session.host == UnitName("player")
+        local isHost = WHLSN:NamesMatch(WHLSN.session.host, WHLSN:GetMyFullName())
         WHLSN:ToggleMainFrame()
         if isHost then
             WHLSN:EndSession()
@@ -294,10 +294,9 @@ end
 
 --- Invite players from the group containing the local player.
 function WHLSN:InviteMyGroup()
-    local myName = UnitName("player")
     for _, group in ipairs(self.session.groups) do
         for _, player in ipairs(group:GetPlayers()) do
-            if self:StripRealmName(player.name) == myName then
+            if self:NamesMatch(player.name, self:GetMyFullName()) then
                 self:InvitePlayers(group:GetPlayers())
                 return
             end

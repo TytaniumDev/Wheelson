@@ -894,17 +894,17 @@ describe("HandleSessionPing", function()
         assert.equals("WHISPER", WHLSN.session.commChannel)
     end)
 
-    it("should store realm-qualified host name", function()
+    it("should store host from sender (realm-qualified)", function()
         local data = { type = "SESSION_PING", host = "HostPlayer", status = "lobby", version = WHLSN.VERSION }
         WHLSN:HandleSessionPing(data, "HostPlayer-Illidan")
-        assert.equals("HostPlayer-Illidan", WHLSN.session.hostFullName)
+        assert.equals("HostPlayer-Illidan", WHLSN.session.host)
     end)
 
-    it("should set session status and host", function()
+    it("should set session status and host from sender", function()
         local data = { type = "SESSION_PING", host = "HostPlayer", status = "lobby", version = WHLSN.VERSION }
         WHLSN:HandleSessionPing(data, "HostPlayer-Illidan")
         assert.equals("lobby", WHLSN.session.status)
-        assert.equals("HostPlayer", WHLSN.session.host)
+        assert.equals("HostPlayer-Illidan", WHLSN.session.host)
     end)
 
     it("should not overwrite an active session from a different host", function()
@@ -958,7 +958,7 @@ describe("HandleJoinRequest community", function()
         WHLSN:AddCommunityPlayer("CommunityGuy-Stormrage")
         local data = {
             type = "JOIN_REQUEST",
-            player = { name = "CommunityGuy", mainRole = "healer", offspecs = {}, utilities = {} },
+            player = { name = "CommunityGuy-Stormrage", mainRole = "healer", offspecs = {}, utilities = {} },
         }
         WHLSN:HandleJoinRequest(data, "CommunityGuy-Stormrage", "WHISPER")
         assert.equals(2, #WHLSN.session.players)
@@ -968,10 +968,10 @@ describe("HandleJoinRequest community", function()
         WHLSN:AddCommunityPlayer("CommunityGuy-Stormrage")
         local data = {
             type = "JOIN_REQUEST",
-            player = { name = "CommunityGuy", mainRole = "healer", offspecs = {}, utilities = {} },
+            player = { name = "CommunityGuy-Stormrage", mainRole = "healer", offspecs = {}, utilities = {} },
         }
         WHLSN:HandleJoinRequest(data, "CommunityGuy-Stormrage", "WHISPER")
-        assert.equals("CommunityGuy-Stormrage", WHLSN.session.connectedCommunity["CommunityGuy"])
+        assert.equals("CommunityGuy-Stormrage", WHLSN.session.connectedCommunity["CommunityGuy-Stormrage"])
     end)
 end)
 
@@ -1018,15 +1018,13 @@ describe("ClearSessionState community fields", function()
     end)
 
     it("should clear community session fields", function()
-        WHLSN.session.connectedCommunity = { ["Tyler"] = "Tyler-Stormrage" }
+        WHLSN.session.connectedCommunity = { ["Tyler-Stormrage"] = "Tyler-Stormrage" }
         WHLSN.session.commChannel = "WHISPER"
-        WHLSN.session.hostFullName = "Host-Realm"
 
         WHLSN:ClearSessionState()
 
         assert.same({}, WHLSN.session.connectedCommunity)
         assert.is_nil(WHLSN.session.commChannel)
-        assert.is_nil(WHLSN.session.hostFullName)
     end)
 
     it("should cancel commThrottleTimer and clear commPendingUpdate", function()
@@ -1295,6 +1293,68 @@ describe("HandleSpecUpdate", function()
     end)
 end)
 
+describe("SessionQuery", function()
+    local origSendSessionUpdate
+
+    before_each(function()
+        WHLSN:OnInitialize()
+        origSendSessionUpdate = WHLSN.SendSessionUpdate
+        WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.UpdateUI = function() end
+        WHLSN.UpdateLobbyView = function() end
+        WHLSN.Serialize = function(self, data) return data end
+    end)
+
+    after_each(function()
+        WHLSN.SendSessionUpdate = origSendSessionUpdate
+    end)
+
+    it("HandleSessionQuery should call SendSessionUpdate when host", function()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer-Illidan"
+        local called = false
+        WHLSN.SendSessionUpdate = function() called = true end
+        WHLSN:HandleSessionQuery("OtherPlayer-Illidan")
+        assert.is_true(called)
+    end)
+
+    it("HandleSessionQuery should ignore when not host", function()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "SomeoneElse-Illidan"
+        local called = false
+        WHLSN.SendSessionUpdate = function() called = true end
+        WHLSN:HandleSessionQuery("OtherPlayer-Illidan")
+        assert.is_false(called)
+    end)
+
+    it("HandleSessionQuery should ignore when no session", function()
+        WHLSN.session.status = nil
+        WHLSN.session.host = nil
+        local called = false
+        WHLSN.SendSessionUpdate = function() called = true end
+        WHLSN:HandleSessionQuery("OtherPlayer-Illidan")
+        assert.is_false(called)
+    end)
+
+    it("SendSessionQuery should be throttled", function()
+        local sent = 0
+        WHLSN.SendCommMessage = function() sent = sent + 1 end
+        WHLSN:SendSessionQuery()
+        WHLSN:SendSessionQuery()
+        assert.equal(1, sent)
+    end)
+
+    it("OnCommReceived should route SESSION_QUERY to HandleSessionQuery", function()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer-Illidan"
+        local called = false
+        WHLSN.SendSessionUpdate = function() called = true end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, { type = "SESSION_QUERY" }, "GUILD", "OtherPlayer")
+        assert.is_true(called)
+    end)
+end)
+
 describe("SendSessionUpdate removedPlayers", function()
     before_each(function()
         WHLSN:OnInitialize()
@@ -1353,5 +1413,278 @@ describe("HandleSessionUpdate removedPlayers", function()
         WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
 
         assert.same({ ["Existing"] = true }, WHLSN.session.removedPlayers)
+    end)
+end)
+
+describe("Realm-qualified identity", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.UpdateUI = function() end
+        WHLSN.ShowMainFrame = function() end
+        WHLSN.UpdateLobbyView = function() end
+        WHLSN.SendCommunityPings = function() end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.analytics = setmetatable({}, { __index = function() return function() end end })
+    end)
+
+    it("StartSession should set host as realm-qualified name", function()
+        WHLSN:StartSession()
+        assert.equal("TestPlayer-Illidan", WHLSN.session.host)
+    end)
+
+    it("LeaveSession should compare host using NamesMatch", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "TestPlayer-Illidan"
+        WHLSN:LeaveSession()
+        assert.equal("lobby", WHLSN.session.status)
+    end)
+
+    it("HandleJoinRequest should accept with realm-qualified host", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "TestPlayer-Illidan"
+        WHLSN.session.players = { WHLSN.Player:New("TestPlayer-Illidan", "tank", {}, {}) }
+        local data = {
+            type = "JOIN_REQUEST",
+            player = { name = "Other", mainRole = "healer", offspecs = {}, utilities = {} },
+        }
+        WHLSN:HandleJoinRequest(data, "Other-Illidan", "GUILD")
+        assert.equals(2, #WHLSN.session.players)
+    end)
+
+    it("HandleSessionEnd should match realm-qualified host", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "HostPlayer-Illidan"
+        WHLSN:HandleSessionEnd("HostPlayer-Illidan")
+        assert.is_true(WHLSN.session.hostEnded)
+    end)
+
+    it("HidePlayer should key removedPlayers by full name", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "TestPlayer-Illidan"
+        local player = WHLSN.Player:New("Other-Illidan", "healer", {}, {})
+        WHLSN.session.players = {
+            WHLSN.Player:New("TestPlayer-Illidan", "tank", {}, {}),
+            player,
+        }
+        WHLSN:HidePlayer("Other-Illidan")
+        assert.is_true(WHLSN.session.removedPlayers["Other-Illidan"] or false)
+        assert.is_nil(WHLSN.session.removedPlayers["Other"])
+    end)
+end)
+
+describe("JoinAck", function()
+    local sent_messages
+
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer-Illidan"
+        WHLSN.session.players = { WHLSN.Player:New("TestPlayer-Illidan", "tank", {}, {}) }
+        WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.UpdateLobbyView = function() end
+        sent_messages = {}
+        WHLSN.SendCommMessage = function(self, prefix, msg, channel, target)
+            sent_messages[#sent_messages + 1] = { msg = msg, channel = channel, target = target }
+        end
+        WHLSN.Serialize = function(self, data) return data end
+    end)
+
+    it("HandleJoinRequest should send JOIN_ACK to GUILD joiner", function()
+        local data = {
+            type = "JOIN_REQUEST",
+            player = { name = "Joiner", mainRole = "healer", offspecs = {}, utilities = {} },
+        }
+        WHLSN:HandleJoinRequest(data, "Joiner-Illidan", "GUILD")
+
+        local ack = nil
+        for _, msg in ipairs(sent_messages) do
+            if type(msg.msg) == "table" and msg.msg.type == "JOIN_ACK" then
+                ack = msg
+                break
+            end
+        end
+        assert.is_not_nil(ack)
+        assert.equal("GUILD", ack.channel)
+        assert.equal("Joiner-Illidan", ack.msg.playerName)
+    end)
+
+    it("HandleJoinRequest should send JOIN_ACK via WHISPER for community joiner", function()
+        WHLSN:AddCommunityPlayer("CommunityGuy-Stormrage")
+        local data = {
+            type = "JOIN_REQUEST",
+            player = { name = "CommunityGuy-Stormrage", mainRole = "healer", offspecs = {}, utilities = {} },
+        }
+        WHLSN:HandleJoinRequest(data, "CommunityGuy-Stormrage", "WHISPER")
+
+        local ack = nil
+        for _, msg in ipairs(sent_messages) do
+            if type(msg.msg) == "table" and msg.msg.type == "JOIN_ACK" then
+                ack = msg
+                break
+            end
+        end
+        assert.is_not_nil(ack)
+        assert.equal("WHISPER", ack.channel)
+        assert.equal("CommunityGuy-Stormrage", ack.target)
+    end)
+
+    it("HandleJoinAck should clear joinPending when name matches", function()
+        WHLSN.session.joinPending = true
+        WHLSN.joinAckTimer = { Cancel = function() end }
+        WHLSN:HandleJoinAck({ playerName = "TestPlayer-Illidan" }, "HostPlayer-Illidan")
+        assert.is_false(WHLSN.session.joinPending)
+        assert.is_nil(WHLSN.joinAckTimer)
+    end)
+
+    it("HandleJoinAck should ignore when name does not match", function()
+        WHLSN.session.joinPending = true
+        WHLSN.joinAckTimer = { Cancel = function() end }
+        WHLSN:HandleJoinAck({ playerName = "OtherPlayer-Illidan" }, "HostPlayer-Illidan")
+        assert.is_true(WHLSN.session.joinPending)
+    end)
+
+    it("HandleJoinAck should ignore when not pending", function()
+        WHLSN.session.joinPending = false
+        WHLSN:HandleJoinAck({ playerName = "TestPlayer-Illidan" }, "HostPlayer-Illidan")
+        assert.is_false(WHLSN.session.joinPending)
+    end)
+
+    it("OnCommReceived should route JOIN_ACK to HandleJoinAck", function()
+        WHLSN.session.joinPending = true
+        WHLSN.joinAckTimer = { Cancel = function() end }
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, {
+            type = "JOIN_ACK", playerName = "TestPlayer-Illidan",
+        }, "GUILD", "HostPlayer")
+        assert.is_false(WHLSN.session.joinPending)
+    end)
+end)
+
+describe("SessionPersistence", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.UpdateUI = function() end
+        WHLSN.ShowMainFrame = function() end
+        WHLSN.UpdateLobbyView = function() end
+        WHLSN.SendCommunityPings = function() end
+        WHLSN.SendSessionQuery = function() end
+        WHLSN.SendSessionUpdate = function() end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.analytics = setmetatable({}, { __index = function() return function() end end })
+        if not WHLSN.db.char then
+            WHLSN.db.char = {}
+        end
+        -- Clear any leftover persisted session from previous test
+        WHLSN.db.char.activeSession = nil
+        WHLSN.session.status = nil
+    end)
+
+    it("PersistSessionState should save host session state", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "TestPlayer-Illidan"
+        WHLSN.session.players = {
+            WHLSN.Player:New("TestPlayer-Illidan", "tank", {}, {}),
+            WHLSN.Player:New("Other-Illidan", "healer", {}, {}),
+        }
+        WHLSN.session.removedPlayers = {}
+        WHLSN.session.connectedCommunity = {}
+
+        WHLSN:PersistSessionState()
+
+        local saved = WHLSN.db.char.activeSession
+        assert.is_not_nil(saved)
+        assert.equal("lobby", saved.status)
+        assert.equal("TestPlayer-Illidan", saved.host)
+        assert.is_true(saved.isHost)
+        assert.is_not_nil(saved.players)
+        assert.equal(2, #saved.players)
+    end)
+
+    it("PersistSessionState should save non-host session state without players", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "OtherHost-Illidan"
+        WHLSN.session.players = { WHLSN.Player:New("OtherHost-Illidan", "tank", {}, {}) }
+
+        WHLSN:PersistSessionState()
+
+        local saved = WHLSN.db.char.activeSession
+        assert.is_not_nil(saved)
+        assert.equal("OtherHost-Illidan", saved.host)
+        assert.is_false(saved.isHost)
+        assert.is_nil(saved.players)
+    end)
+
+    it("ClearSessionState should clear persisted state", function()
+        WHLSN.db.char.activeSession = { host = "X", status = "lobby" }
+        WHLSN:ClearSessionState()
+        assert.is_nil(WHLSN.db.char.activeSession)
+    end)
+
+    it("RestoreSessionState should restore host state with players", function()
+        WHLSN.db.char.activeSession = {
+            host = "TestPlayer-Illidan",
+            status = "lobby",
+            commChannel = nil,
+            timestamp = time(),
+            isHost = true,
+            players = {
+                { name = "TestPlayer-Illidan", mainRole = "tank", offspecs = {}, utilities = {} },
+                { name = "Other-Illidan", mainRole = "healer", offspecs = {}, utilities = {} },
+            },
+            removedPlayers = {},
+            connectedCommunity = {},
+        }
+
+        local broadcastCalled = false
+        WHLSN.SendSessionUpdate = function() broadcastCalled = true end
+
+        WHLSN:RestoreSessionState()
+
+        assert.equal("lobby", WHLSN.session.status)
+        assert.equal("TestPlayer-Illidan", WHLSN.session.host)
+        assert.equal(2, #WHLSN.session.players)
+        assert.is_true(broadcastCalled)
+    end)
+
+    it("RestoreSessionState should send SESSION_QUERY for non-host", function()
+        WHLSN.db.char.activeSession = {
+            host = "OtherHost-Illidan",
+            status = "lobby",
+            commChannel = nil,
+            timestamp = time(),
+            isHost = false,
+        }
+
+        local queryCalled = false
+        WHLSN.SendSessionQuery = function() queryCalled = true end
+
+        WHLSN:RestoreSessionState()
+
+        assert.equal("lobby", WHLSN.session.status)
+        assert.equal("OtherHost-Illidan", WHLSN.session.host)
+        assert.is_true(queryCalled)
+    end)
+
+    it("RestoreSessionState should discard stale sessions", function()
+        WHLSN.db.char.activeSession = {
+            host = "OtherHost-Illidan",
+            status = "lobby",
+            timestamp = time() - WHLSN.SESSION_TIMEOUT - 1,
+            isHost = false,
+        }
+
+        WHLSN:RestoreSessionState()
+
+        assert.is_nil(WHLSN.session.status)
+        assert.is_nil(WHLSN.db.char.activeSession)
+    end)
+
+    it("PersistSessionState should clear when no status", function()
+        WHLSN.db.char.activeSession = { host = "X", status = "lobby" }
+        WHLSN.session.status = nil
+        WHLSN:PersistSessionState()
+        assert.is_nil(WHLSN.db.char.activeSession)
     end)
 end)

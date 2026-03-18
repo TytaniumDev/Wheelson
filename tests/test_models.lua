@@ -28,6 +28,7 @@ _G.C_SpecializationInfo = {
     GetSpecializationInfo = function() return 71 end,
 }
 _G.GetNumSpecializations = function() return 3 end
+_G.GetNormalizedRealmName = function() return "Illidan" end
 
 -- Load source files in order
 dofile("src/Config.lua")
@@ -139,6 +140,12 @@ describe("Player", function()
             local p2 = Player:New("Tyler-Illidan", "tank", {}, {})
             assert.is_true(p1:Equals(p2))
             assert.is_true(p2:Equals(p1))
+        end)
+
+        it("should distinguish same name on different realms", function()
+            local p1 = Player:New("Tyler-Illidan", "tank", {}, {})
+            local p2 = Player:New("Tyler-Stormrage", "tank", {}, {})
+            assert.is_false(p1:Equals(p2))
         end)
     end)
 

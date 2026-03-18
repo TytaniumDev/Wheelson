@@ -152,5 +152,6 @@ WHLSN.defaults = {
     },
     char = {
         specOverrides = nil,
+        activeSession = nil,
     },
 }

@@ -198,7 +198,7 @@ describe("HandleJoinRequest cross-realm", function()
         local data = {
             type = "JOIN_REQUEST",
             player = {
-                name = "CrossRealmPlayer",
+                name = "CrossRealmPlayer-Stormrage",
                 mainRole = "healer",
                 offspecs = {},
                 utilities = {},
@@ -235,7 +235,7 @@ describe("HandleJoinRequest cross-realm", function()
         local data = {
             type = "JOIN_REQUEST",
             player = {
-                name = "CrossRealmPlayer",
+                name = "CrossRealmPlayer-Stormrage",
                 mainRole = "healer",
                 offspecs = {},
                 utilities = {},
@@ -275,7 +275,7 @@ describe("HandleSpecUpdate cross-realm", function()
         local data = {
             type = "SPEC_UPDATE",
             player = {
-                name = "CrossRealmPlayer",
+                name = "CrossRealmPlayer-Stormrage",
                 mainRole = "ranged",
                 offspecs = {},
                 utilities = { "lust" },

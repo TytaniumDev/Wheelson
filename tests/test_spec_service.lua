@@ -33,6 +33,7 @@ _G.C_SpecializationInfo = {
 _G.GetNumSpecializations = function() return 0 end
 _G.UnitName = function() return "TestPlayer" end
 _G.UnitClass = function() return "Paladin", "PALADIN" end
+_G.GetNormalizedRealmName = function() return "Illidan" end
 
 -- Load source files in order
 dofile("src/Config.lua")
@@ -54,6 +55,10 @@ describe("SpecService", function()
     end)
 
     describe(":DetectLocalPlayer()", function()
+        before_each(function()
+            WHLSN._myFullName = nil
+        end)
+
         it("should return nil when no specialization is active", function()
             local result = WHLSN:DetectLocalPlayer()
             assert.is_nil(result)
@@ -77,7 +82,7 @@ describe("SpecService", function()
 
             local result = WHLSN:DetectLocalPlayer()
             assert.is_not_nil(result)
-            assert.equal("Tankadin", result.name)
+            assert.equal("Tankadin-Illidan", result.name)
             assert.equal("tank", result.mainRole)
             assert.is_true(result:IsTankMain())
             assert.is_true(result:HasBrez())
@@ -223,6 +228,7 @@ describe("SpecService", function()
 
             local result = WHLSN:DetectLocalPlayer()
             assert.is_not_nil(result)
+            assert.equal("Healbot-Illidan", result.name)
             assert.equal("healer", result.mainRole)
             assert.is_true(result:HasLust())
             assert.is_false(result:HasBrez())
@@ -240,6 +246,7 @@ describe("SpecService", function()
 
             local result = WHLSN:DetectLocalPlayer()
             assert.is_not_nil(result)
+            assert.equal("Shadowfiend-Illidan", result.name)
             assert.equal("ranged", result.mainRole)
             assert.is_true(result:IsDpsMain())
             assert.is_false(result:HasBrez())
@@ -260,6 +267,7 @@ describe("SpecService", function()
 
             local result = WHLSN:DetectLocalPlayer()
             assert.is_not_nil(result)
+            assert.equal("Boneshield-Illidan", result.name)
             assert.equal("tank", result.mainRole)
             assert.is_true(result:HasBrez())
             assert.is_false(result:HasLust())
@@ -285,6 +293,7 @@ describe("SpecService", function()
 
             local result = WHLSN:DetectLocalPlayer()
             assert.is_not_nil(result)
+            assert.equal("Voidgaze-Illidan", result.name)
             assert.equal("ranged", result.mainRole)
             assert.is_true(result:IsRanged())
             assert.is_true(result:IsDpsMain())
@@ -489,6 +498,63 @@ describe("SpecService", function()
             assert.equal("TreeHugger", result.name)
             assert.is_true(result:HasBrez())
             assert.is_false(result:HasLust())
+        end)
+    end)
+
+    describe(":GetMyFullName()", function()
+        before_each(function()
+            _G.UnitName = function() return "TestPlayer" end
+            _G.GetNormalizedRealmName = function() return "Illidan" end
+            -- Clear the cache between tests
+            WHLSN._myFullName = nil
+        end)
+
+        it("should return realm-qualified name", function()
+            assert.equal("TestPlayer-Illidan", WHLSN:GetMyFullName())
+        end)
+
+        it("should cache the result", function()
+            local result1 = WHLSN:GetMyFullName()
+            _G.UnitName = function() return "Changed" end
+            local result2 = WHLSN:GetMyFullName()
+            assert.equal(result1, result2)
+        end)
+    end)
+
+    describe(":NamesMatch()", function()
+        before_each(function()
+            _G.GetNormalizedRealmName = function() return "Illidan" end
+        end)
+
+        it("should match identical realm-qualified names", function()
+            assert.is_true(WHLSN:NamesMatch("Alice-Illidan", "Alice-Illidan"))
+        end)
+
+        it("should not match different realms", function()
+            assert.is_false(WHLSN:NamesMatch("Alice-Illidan", "Alice-Stormrage"))
+        end)
+
+        it("should normalize bare names to local realm", function()
+            assert.is_true(WHLSN:NamesMatch("Alice", "Alice-Illidan"))
+            assert.is_true(WHLSN:NamesMatch("Alice-Illidan", "Alice"))
+        end)
+
+        it("should not match bare names when realm differs", function()
+            assert.is_false(WHLSN:NamesMatch("Alice", "Alice-Stormrage"))
+        end)
+
+        it("should return false for nil inputs", function()
+            assert.is_false(WHLSN:NamesMatch(nil, "Alice-Illidan"))
+            assert.is_false(WHLSN:NamesMatch("Alice-Illidan", nil))
+            assert.is_false(WHLSN:NamesMatch(nil, nil))
+        end)
+
+        it("should match two bare names on the same local realm", function()
+            assert.is_true(WHLSN:NamesMatch("Alice", "Alice"))
+        end)
+
+        it("should not match different bare names", function()
+            assert.is_false(WHLSN:NamesMatch("Alice", "Bob"))
         end)
     end)
 end)

@@ -248,7 +248,7 @@ local function CreateCommunityPanel()
                 if WHLSN.session.status == WHLSN.Status.LOBBY then
                     local pingData = {
                         type = "SESSION_PING",
-                        host = UnitName("player"),
+                        host = WHLSN:GetMyFullName(),
                         status = WHLSN.session.status,
                         version = WHLSN.VERSION,
                     }
@@ -441,8 +441,8 @@ local function CreatePlayerRow(parent, index)
         end
 
         -- Show kick button if host
-        if WHLSN.session.host == UnitName("player") and rowFrame.playerData then
-            if rowFrame.playerData.name ~= UnitName("player") then
+        if WHLSN:NamesMatch(WHLSN.session.host, WHLSN:GetMyFullName()) and rowFrame.playerData then
+            if not WHLSN:NamesMatch(rowFrame.playerData.name, WHLSN:GetMyFullName()) then
                 rowFrame.kickButton:Show()
             end
         end
@@ -551,23 +551,22 @@ local function CreateSpecOverrideSection(parent)
         if not playerData then return end
 
         -- Update local player in session
-        local myName = UnitName("player")
         for i, p in ipairs(WHLSN.session.players) do
-            if WHLSN:StripRealmName(p.name) == myName then
+            if WHLSN:NamesMatch(p.name, WHLSN:GetMyFullName()) then
                 WHLSN.session.players[i] = playerData
                 break
             end
         end
 
         -- Send to host (unless we are the host — already updated locally)
-        if WHLSN.session.host ~= myName then
+        if not WHLSN:NamesMatch(WHLSN.session.host, WHLSN:GetMyFullName()) then
             local data = {
                 type = "SPEC_UPDATE",
                 player = playerData:ToDict(),
             }
             local serialized = WHLSN:Serialize(data)
-            if WHLSN.session.commChannel == "WHISPER" and WHLSN.session.hostFullName then
-                WHLSN:SafeSendCommMessage(WHLSN.COMM_PREFIX, serialized, "WHISPER", WHLSN.session.hostFullName)
+            if WHLSN.session.commChannel == "WHISPER" and WHLSN.session.host then
+                WHLSN:SafeSendCommMessage(WHLSN.COMM_PREFIX, serialized, "WHISPER", WHLSN.session.host)
             else
                 WHLSN:SafeSendCommMessage(WHLSN.COMM_PREFIX, serialized, "GUILD")
             end
@@ -723,7 +722,7 @@ end
 
 local function UpdateLobbyStatus(frame, session, hasSession)
     if hasSession then
-        frame.statusText:SetText("Lobby - Hosted by " .. (session.host or "Unknown"))
+        frame.statusText:SetText("Lobby - Hosted by " .. WHLSN:StripRealmName(session.host or "Unknown"))
     else
         frame.statusText:SetText("No active session")
     end
@@ -732,7 +731,8 @@ end
 local function UpdateLobbyButtons(frame, isHost, hasSession, isInSession, playerCount)
     frame.spinButton:SetShown(isHost and hasSession)
     frame.spinButton:SetEnabled(playerCount >= 5)
-    frame.joinButton:SetShown(not isHost and hasSession and not isInSession)
+    local isPending = WHLSN.session.joinPending or false
+    frame.joinButton:SetShown(not isHost and hasSession and not isInSession and not isPending)
     frame.leaveButton:SetShown(not isHost and hasSession and isInSession)
     frame.startButton:SetShown(not hasSession)
     frame.testButton:SetShown(not hasSession)
@@ -740,6 +740,15 @@ local function UpdateLobbyButtons(frame, isHost, hasSession, isInSession, player
     frame.communityRosterButton:SetShown(isHost and hasSession)
     if not (isHost and hasSession) then
         WHLSN:HideCommunityPanel()
+    end
+    -- Show "Joining..." text when pending
+    if isPending and not isInSession then
+        frame.joinButton:SetShown(true)
+        frame.joinButton:SetText("Joining...")
+        frame.joinButton:SetEnabled(false)
+    else
+        frame.joinButton:SetText("Join Session")
+        frame.joinButton:SetEnabled(true)
     end
 end
 
@@ -749,7 +758,7 @@ end
 ---@return string
 local function FormatPlayerLabel(player, classColor)
     local hex = classColor and classColor.hex or "FFFFFF"
-    local parts = { "|cFF" .. hex .. player.name .. "|r" }
+    local parts = { "|cFF" .. hex .. WHLSN:StripRealmName(player.name) .. "|r" }
 
     if player.mainRole then
         local rc = WHLSN.RoleColors[player.mainRole]
@@ -804,9 +813,8 @@ local function PopulatePlayerRows(frame, players)
         row.brezIcon:SetShown(player:HasBrez())
         row.lustIcon:SetShown(player:HasLust())
 
-        local stripped = WHLSN:StripRealmName(player.name)
         local isRemoved = WHLSN.session.removedPlayers
-            and WHLSN.session.removedPlayers[stripped]
+            and WHLSN.session.removedPlayers[player.name]
 
         if isRemoved then
             row.nameText:SetAlpha(0.35)
@@ -876,9 +884,8 @@ function WHLSN:UpdateLobbyView()
     if not frame then return end
 
     local players = self.session.players
-    local isHost = self.session.host == UnitName("player")
+    local isHost = self:NamesMatch(self.session.host, self:GetMyFullName())
     local hasSession = self.session.status ~= nil
-    local myName = UnitName("player")
 
     UpdateLobbyStatus(frame, self.session, hasSession)
 
@@ -886,7 +893,7 @@ function WHLSN:UpdateLobbyView()
     local activePlayers = {}
     for _, p in ipairs(players) do
         if not self.session.removedPlayers
-            or not self.session.removedPlayers[self:StripRealmName(p.name)] then
+            or not self.session.removedPlayers[p.name] then
             activePlayers[#activePlayers + 1] = p
         end
     end
@@ -901,7 +908,7 @@ function WHLSN:UpdateLobbyView()
 
     local isInSession = false
     for _, p in ipairs(players) do
-        if self:StripRealmName(p.name) == myName then
+        if self:NamesMatch(p.name, self:GetMyFullName()) then
             isInSession = true
             break
         end
@@ -966,11 +973,19 @@ function WHLSN:RequestJoin()
 
     local serialized = self:Serialize(data)
 
-    if self.session.commChannel == "WHISPER" and self.session.hostFullName then
-        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", self.session.hostFullName)
+    if self.session.commChannel == "WHISPER" and self.session.host then
+        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", self.session.host)
     else
         self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
     end
 
     self:Print("Join request sent.")
+    self.session.joinPending = true
+    self.joinAckTimer = C_Timer.NewTimer(5, function()
+        WHLSN.session.joinPending = false
+        WHLSN.joinAckTimer = nil
+        WHLSN:Print("Join request may not have been received. Try again.")
+        WHLSN:UpdateLobbyView()
+    end)
+    self:UpdateLobbyView()
 end

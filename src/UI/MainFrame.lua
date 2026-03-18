@@ -66,6 +66,10 @@ function WHLSN:ToggleMainFrame()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
         frame.Content:Show()
         self:UpdateUI()
+        -- Query for active sessions when opening
+        if not self:NamesMatch(self.session.host or "", self:GetMyFullName()) then
+            self:SendSessionQuery()
+        end
     end
 end
 

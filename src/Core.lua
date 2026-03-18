@@ -17,10 +17,10 @@ function WHLSN:OnInitialize()
         isTest = false,  -- true when running a test session (no guild comms)
         viewingHistory = false, -- true when displaying a past session
         hostEnded = false, -- true when the host explicitly ended the session
-        connectedCommunity = {},  -- bare name -> realm-qualified name (host only)
-        removedPlayers = {},      -- stripped name -> true (hidden from group formation)
+        connectedCommunity = {},  -- sender -> sender (host only, realm-qualified keys)
+        removedPlayers = {},      -- full player name -> true (hidden from group formation)
         commChannel = nil,        -- "GUILD" or "WHISPER" (community clients only)
-        hostFullName = nil,       -- realm-qualified host name (community clients only)
+        joinPending = false,      -- true while waiting for JOIN_ACK from host
     }
 
     -- Throttle timer for roster update events
@@ -42,7 +42,11 @@ function WHLSN:OnInitialize()
     self.addonUsersCache = {}
     self.isScanning = false
 
+    -- Throttle timestamp for SESSION_QUERY broadcasts
+    self.lastSessionQuery = 0
+
     self:RegisterComm(self.COMM_PREFIX)
+    self:RestoreSessionState()
 
     -- Minimap icon via LibDataBroker + LibDBIcon
     local LDB = LibStub("LibDataBroker-1.1")
@@ -65,7 +69,7 @@ function WHLSN:OnInitialize()
             tooltip:AddLine("|cFFAAAAAA" .. WHLSN.VERSION .. "|r")
             if WHLSN.session.status then
                 tooltip:AddLine("Session: " .. WHLSN.session.status, 0.5, 1, 0.5)
-                tooltip:AddLine("Host: " .. (WHLSN.session.host or "Unknown"), 0.7, 0.7, 0.7)
+                tooltip:AddLine("Host: " .. WHLSN:StripRealmName(WHLSN.session.host or "Unknown"), 0.7, 0.7, 0.7)
             else
                 tooltip:AddLine("No active session", 0.5, 0.5, 0.5)
             end
@@ -131,6 +135,11 @@ end
 
 --- Start a new lobby session. Any guild member can host.
 function WHLSN:StartSession()
+    -- Allow starting a new session if we're just waiting for a restore query
+    if self.sessionRestoreTimer then
+        self:ClearSessionState()
+    end
+
     if self.session.status then
         self:Print("A session is already active.")
         return
@@ -138,7 +147,7 @@ function WHLSN:StartSession()
 
     self.leftSessionHost = nil
     self.session.status = self.Status.LOBBY
-    self.session.host = UnitName("player")
+    self.session.host = self:GetMyFullName()
     self.session.players = {}
     self.session.groups = {}
     self.session.algorithmSnapshot = nil
@@ -158,6 +167,7 @@ function WHLSN:StartSession()
     self:ShowMainFrame()
     self:BroadcastSessionUpdate()
     self:SendCommunityPings()
+    self:PersistSessionState()
     self:Print("Session started! Guild members can join via the Wheelson addon.")
 end
 
@@ -169,7 +179,7 @@ function WHLSN:StartTestSession()
     end
 
     self.session.status = self.Status.LOBBY
-    self.session.host = UnitName("player")
+    self.session.host = self:GetMyFullName()
     self.session.players = self:GetTestPlayers()
     self.session.groups = {}
     self.session.isTest = true
@@ -210,8 +220,7 @@ function WHLSN:LeaveSession()
         return
     end
 
-    local myName = UnitName("player")
-    if self:StripRealmName(self.session.host) == myName then
+    if self:NamesMatch(self.session.host, self:GetMyFullName()) then
         self:Print("You are the host. Use the End Session button to end the session.")
         return
     end
@@ -220,12 +229,12 @@ function WHLSN:LeaveSession()
 
     local data = {
         type = "LEAVE_REQUEST",
-        playerName = myName,
+        playerName = self:GetMyFullName(),
     }
     local serialized = self:Serialize(data)
 
-    if self.session.commChannel == "WHISPER" and self.session.hostFullName then
-        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", self.session.hostFullName)
+    if self.session.commChannel == "WHISPER" and self.session.host then
+        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", self.session.host)
     else
         self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
     end
@@ -244,7 +253,7 @@ function WHLSN:SpinGroups()
     -- Filter out removed/hidden players
     local activePlayers = {}
     for _, p in ipairs(self.session.players) do
-        if not self.session.removedPlayers[self:StripRealmName(p.name)] then
+        if not self.session.removedPlayers[p.name] then
             activePlayers[#activePlayers + 1] = p
         end
     end
@@ -292,6 +301,7 @@ function WHLSN:SpinGroups()
     self.lastActivity = time()
     self:BroadcastSessionUpdate()
     self:UpdateUI()
+    self:PersistSessionState()
 end
 
 --- Mark session as completed after wheel animation finishes.
@@ -299,6 +309,7 @@ function WHLSN:CompleteSession()
     self.session.status = self.Status.COMPLETED
     self:SaveSessionResults()
     self:BroadcastSessionUpdate()
+    self:PersistSessionState()
 end
 
 --- Save session results to SavedVariables.
@@ -378,18 +389,15 @@ end
 --- but is excluded from group formation and shown as dimmed/struck-through.
 ---@param playerName string
 function WHLSN:HidePlayer(playerName)
-    if self.session.host ~= UnitName("player") then return end
+    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
     if self.session.status ~= self.Status.LOBBY then return end
-
-    local stripped = self:StripRealmName(playerName)
-    -- Don't allow hiding the host
-    if stripped == UnitName("player") then return end
+    if self:NamesMatch(playerName, self:GetMyFullName()) then return end
 
     for _, p in ipairs(self.session.players) do
-        if self:StripRealmName(p.name) == stripped then
-            self.session.removedPlayers[stripped] = true
+        if self:NamesMatch(p.name, playerName) then
+            self.session.removedPlayers[p.name] = true
             self:NotifySessionChange()
-            self:Print(playerName .. " hidden from session.")
+            self:Print(self:StripRealmName(playerName) .. " hidden from session.")
             return
         end
     end
@@ -398,13 +406,17 @@ end
 --- Unhide a previously hidden player (host only).
 ---@param playerName string
 function WHLSN:UnhidePlayer(playerName)
-    if self.session.host ~= UnitName("player") then return end
+    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
     if self.session.status ~= self.Status.LOBBY then return end
 
-    local stripped = self:StripRealmName(playerName)
-    self.session.removedPlayers[stripped] = nil
-    self:NotifySessionChange()
-    self:Print(playerName .. " restored to session.")
+    for _, p in ipairs(self.session.players) do
+        if self:NamesMatch(p.name, playerName) then
+            self.session.removedPlayers[p.name] = nil
+            self:NotifySessionChange()
+            self:Print(self:StripRealmName(playerName) .. " restored to session.")
+            return
+        end
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -461,8 +473,94 @@ function WHLSN:ClearSessionState()
     self.session.connectedCommunity = {}
     self.session.removedPlayers = {}
     self.session.commChannel = nil
-    self.session.hostFullName = nil
+    self.session.joinPending = false
+    if self.joinAckTimer then
+        self.joinAckTimer:Cancel()
+        self.joinAckTimer = nil
+    end
     self.commQueue = {}
+    if self.db and self.db.char then
+        self.db.char.activeSession = nil
+    end
+    if self.sessionRestoreTimer then
+        self.sessionRestoreTimer:Cancel()
+        self.sessionRestoreTimer = nil
+    end
+end
+
+--- Persist minimal session state to SavedVariables for /reload recovery.
+function WHLSN:PersistSessionState()
+    if not self.db or not self.db.char then return end
+    if not self.session.status then
+        self.db.char.activeSession = nil
+        return
+    end
+
+    local isHost = self:NamesMatch(self.session.host, self:GetMyFullName())
+
+    local saved = {
+        host = self.session.host,
+        status = self.session.status,
+        commChannel = self.session.commChannel,
+        timestamp = time(),
+        isHost = isHost,
+    }
+
+    if isHost then
+        local playerDicts = {}
+        for _, p in ipairs(self.session.players) do
+            playerDicts[#playerDicts + 1] = p:ToDict()
+        end
+        saved.players = playerDicts
+        saved.removedPlayers = self.session.removedPlayers
+        saved.connectedCommunity = self.session.connectedCommunity
+    end
+
+    self.db.char.activeSession = saved
+end
+
+--- Restore session state from SavedVariables after /reload.
+function WHLSN:RestoreSessionState()
+    if not self.db or not self.db.char then return end
+
+    local saved = self.db.char.activeSession
+    if not saved then return end
+
+    if saved.timestamp and (time() - saved.timestamp) > self.SESSION_TIMEOUT then
+        self.db.char.activeSession = nil
+        return
+    end
+
+    self.session.status = saved.status
+    self.session.host = saved.host
+    self.session.commChannel = saved.commChannel
+
+    if saved.isHost then
+        if saved.players then
+            self.session.players = {}
+            for _, pd in ipairs(saved.players) do
+                self.session.players[#self.session.players + 1] = WHLSN.Player.FromDict(pd)
+            end
+        end
+        if saved.removedPlayers then
+            self.session.removedPlayers = saved.removedPlayers
+        end
+        if saved.connectedCommunity then
+            self.session.connectedCommunity = saved.connectedCommunity
+        end
+        self:SendSessionUpdate()
+        self:ResetSessionTimeout()
+    else
+        self:SendSessionQuery()
+        self.sessionRestoreTimer = C_Timer.NewTimer(10, function()
+            if WHLSN.session.status and #WHLSN.session.players == 0 then
+                WHLSN:Print("Previous session is no longer active.")
+                WHLSN:ClearSessionState()
+                WHLSN:UpdateUI()
+            end
+            WHLSN.sessionRestoreTimer = nil
+        end)
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -515,6 +613,7 @@ function WHLSN:PVP_MATCH_COMPLETE()       flushAfterDelay() end
 function WHLSN:NotifySessionChange()
     self:BroadcastSessionUpdate()
     self:UpdateLobbyView()
+    self:PersistSessionState()
 end
 
 --- Broadcast session state to the guild (throttled).
@@ -593,7 +692,8 @@ function WHLSN:OnCommReceived(prefix, message, distribution, sender)
     if not success then return end
 
     -- Version handshake warning (skip for discovery and ping messages to avoid noise)
-    if data.type ~= "ADDON_PING" and data.type ~= "ADDON_PONG" and data.type ~= "SESSION_PING" then
+    if data.type ~= "ADDON_PING" and data.type ~= "ADDON_PONG" and data.type ~= "SESSION_PING"
+        and data.type ~= "JOIN_ACK" and data.type ~= "SESSION_QUERY" then
         if data.version and data.version ~= self.VERSION then
             if data.version ~= "@project-version@" and self.VERSION ~= "@project-version@" then
                 self:Print("Warning: " .. sender .. " is using addon version " .. tostring(data.version)
@@ -612,6 +712,10 @@ function WHLSN:OnCommReceived(prefix, message, distribution, sender)
         self:HandleLeaveRequest(data, sender)
     elseif data.type == "SPEC_UPDATE" then
         self:HandleSpecUpdate(data, sender, distribution)
+    elseif data.type == "JOIN_ACK" then
+        self:HandleJoinAck(data, sender)
+    elseif data.type == "SESSION_QUERY" then
+        self:HandleSessionQuery(sender)
     elseif data.type == "SESSION_PING" then
         self:HandleSessionPing(data, sender)
     elseif data.type == "ADDON_PING" then
@@ -626,14 +730,13 @@ function WHLSN:HandleSessionPing(data, sender)
     -- so a SESSION_PING would incorrectly overwrite their channel to WHISPER)
     if self.session.status then return end
     -- Ignore if we intentionally left this host
-    if self.leftSessionHost and self:StripRealmName(self.leftSessionHost) == self:StripRealmName(data.host) then
+    if self.leftSessionHost and self:NamesMatch(self.leftSessionHost, data.host) then
         return
     end
 
     self.session.status = data.status
-    self.session.host = data.host
+    self.session.host = sender
     self.session.commChannel = "WHISPER"
-    self.session.hostFullName = sender
 
     self:ShowMainFrame()
     self:UpdateUI()
@@ -641,12 +744,12 @@ end
 
 function WHLSN:HandleSessionUpdate(data, sender)
     -- Suppress updates from the specific host we left (scoped, not global)
-    if self.leftSessionHost and self:StripRealmName(sender) == self:StripRealmName(self.leftSessionHost) then
+    if self.leftSessionHost and self:NamesMatch(sender, self.leftSessionHost) then
         return
     end
 
     -- Only accept updates from the session host (or accept new sessions when no host set)
-    if self.session.host and self:StripRealmName(sender) ~= self:StripRealmName(self.session.host) then
+    if self.session.host and not self:NamesMatch(sender, self.session.host) then
         return
     end
 
@@ -694,13 +797,14 @@ function WHLSN:HandleSessionUpdate(data, sender)
         end
 
         self:UpdateUI()
+        self:PersistSessionState()
     end
 end
 
 function WHLSN:HandleSessionEnd(sender)
     -- Only accept end from the session host; ignore if not in a session
     if not self.session.host then return end
-    if self:StripRealmName(self.session.host) ~= self:StripRealmName(sender) then return end
+    if not self:NamesMatch(self.session.host, sender) then return end
 
     -- Non-host: preserve display state, mark session as host-ended
     self.session.hostEnded = true
@@ -712,12 +816,12 @@ end
 
 function WHLSN:HandleJoinRequest(data, sender, distribution)
     -- Only the host processes join requests
-    if self.session.host ~= UnitName("player") then return end
+    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
     if self.session.status ~= self.Status.LOBBY then return end
 
-    -- Validate sender matches the player data (strip realm for comparison)
+    -- Validate sender matches the player data
     if not data.player then return end
-    if self:StripRealmName(data.player.name) ~= self:StripRealmName(sender) then return end
+    if not self:NamesMatch(data.player.name, sender) then return end
 
     -- Only accept joins over expected channels
     if distribution ~= "GUILD" and distribution ~= "WHISPER" then return end
@@ -729,10 +833,22 @@ function WHLSN:HandleJoinRequest(data, sender, distribution)
     local player = WHLSN.Player.FromDict(data.player)
     self:ResolvePlayerName(player, sender)
 
+    local ackData = { type = "JOIN_ACK", playerName = player.name }
+    local ackSerialized = self:Serialize(ackData)
+
+    local function sendAck()
+        if distribution == "WHISPER" then
+            self:SafeSendCommMessage(self.COMM_PREFIX, ackSerialized, "WHISPER", sender)
+        else
+            self:SafeSendCommMessage(self.COMM_PREFIX, ackSerialized, "GUILD")
+        end
+    end
+
     -- Replace if already in list
     for i, p in ipairs(self.session.players) do
-        if self:StripRealmName(p.name) == self:StripRealmName(player.name) then
+        if self:NamesMatch(p.name, player.name) then
             self.session.players[i] = player
+            sendAck()
             self:NotifySessionChange()
             return
         end
@@ -742,23 +858,59 @@ function WHLSN:HandleJoinRequest(data, sender, distribution)
 
     -- Track community player for whisper broadcasts
     if distribution == "WHISPER" then
-        self.session.connectedCommunity[self:StripRealmName(sender)] = sender
+        self.session.connectedCommunity[sender] = sender
     end
 
+    sendAck()
     self:NotifySessionChange()
+end
+
+--- Handle JOIN_ACK from host (client-side).
+function WHLSN:HandleJoinAck(data, _sender)
+    if not self.session.joinPending then return end
+    if not self:NamesMatch(data.playerName, self:GetMyFullName()) then return end
+    self.session.joinPending = false
+    if self.joinAckTimer then
+        self.joinAckTimer:Cancel()
+        self.joinAckTimer = nil
+    end
+end
+
+--- Handle SESSION_QUERY from a non-host (host only).
+function WHLSN:HandleSessionQuery(_sender)
+    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
+    if not self.session.status then return end
+    self:SendSessionUpdate()
+end
+
+--- Broadcast a SESSION_QUERY to discover or validate an active session.
+--- Throttled to at most one per 10 seconds.
+function WHLSN:SendSessionQuery()
+    local now = time()
+    if self.lastSessionQuery and (now - self.lastSessionQuery) < 10 then return end
+    self.lastSessionQuery = now
+
+    local data = { type = "SESSION_QUERY" }
+    local serialized = self:Serialize(data)
+
+    if self.session.commChannel == "WHISPER" and self.session.host then
+        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", self.session.host)
+    else
+        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
+    end
 end
 
 function WHLSN:HandleLeaveRequest(data, sender)
     -- Only the host processes leave requests
-    if self.session.host ~= UnitName("player") then return end
+    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
     if not data.playerName then return end
-    if self:StripRealmName(data.playerName) ~= self:StripRealmName(sender) then return end
+    if not self:NamesMatch(data.playerName, sender) then return end
 
     for i, p in ipairs(self.session.players) do
-        if self:StripRealmName(p.name) == self:StripRealmName(sender) then
+        if self:NamesMatch(p.name, sender) then
             table.remove(self.session.players, i)
-            self.session.connectedCommunity[self:StripRealmName(sender)] = nil
-            self.session.removedPlayers[self:StripRealmName(sender)] = nil
+            self.session.connectedCommunity[sender] = nil
+            self.session.removedPlayers[p.name] = nil
             self:NotifySessionChange()
             return
         end
@@ -767,12 +919,12 @@ end
 
 function WHLSN:HandleSpecUpdate(data, sender, distribution)
     -- Only the host processes spec updates
-    if self.session.host ~= UnitName("player") then return end
+    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
     if self.session.status ~= self.Status.LOBBY then return end
 
     -- Validate sender matches the player data
     if not data.player then return end
-    if self:StripRealmName(data.player.name) ~= self:StripRealmName(sender) then return end
+    if not self:NamesMatch(data.player.name, sender) then return end
 
     -- Only accept over expected channels
     if distribution ~= "GUILD" and distribution ~= "WHISPER" then return end
@@ -785,7 +937,7 @@ function WHLSN:HandleSpecUpdate(data, sender, distribution)
 
     -- Find and replace existing player
     for i, p in ipairs(self.session.players) do
-        if self:StripRealmName(p.name) == self:StripRealmName(player.name) then
+        if self:NamesMatch(p.name, player.name) then
             self.session.players[i] = player
             self:NotifySessionChange()
             return
