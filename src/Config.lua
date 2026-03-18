@@ -41,6 +41,7 @@ WHLSN.SpecRoles = {
     -- Demon Hunter
     [577] = "melee",   -- Havoc
     [581] = "tank",    -- Vengeance
+    [1480] = "ranged", -- Devourer
     -- Druid
     [102] = "ranged",  -- Balance
     [103] = "melee",   -- Feral

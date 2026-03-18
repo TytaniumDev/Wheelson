@@ -186,6 +186,29 @@ describe("SpecService", function()
             assert.is_nil(result)
         end)
 
+        it("should detect a Devourer Demon Hunter as ranged DPS", function()
+            -- DH: Havoc (577)=melee, Vengeance (581)=tank, Devourer (1480)=ranged
+            _G.C_SpecializationInfo.GetSpecialization = function() return 3 end
+            _G.C_SpecializationInfo.GetSpecializationInfo = function(index)
+                local specs = { [1] = 577, [2] = 581, [3] = 1480 }
+                return specs[index]
+            end
+            _G.GetNumSpecializations = function() return 3 end
+            _G.UnitName = function() return "Voidgaze" end
+            _G.UnitClass = function() return "Demon Hunter", "DEMONHUNTER" end
+
+            local result = WHLSN:DetectLocalPlayer()
+            assert.is_not_nil(result)
+            assert.equal("ranged", result.mainRole)
+            assert.is_true(result:IsRanged())
+            assert.is_true(result:IsDpsMain())
+            assert.is_false(result:HasBrez())
+            assert.is_false(result:HasLust())
+            -- Offspecs: melee (Havoc) and tank (Vengeance)
+            assert.is_true(result:IsOffmelee())
+            assert.is_true(result:IsOfftank())
+        end)
+
         it("should handle unknown spec IDs gracefully", function()
             _G.C_SpecializationInfo.GetSpecialization = function() return 1 end
             _G.C_SpecializationInfo.GetSpecializationInfo = function() return 99999 end -- Unknown spec
