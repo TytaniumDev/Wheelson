@@ -46,6 +46,7 @@ function WHLSN:OnInitialize()
     self.lastSessionQuery = 0
 
     self:RegisterComm(self.COMM_PREFIX)
+    self:RestoreSessionState()
 
     -- Minimap icon via LibDataBroker + LibDBIcon
     local LDB = LibStub("LibDataBroker-1.1")
@@ -161,6 +162,7 @@ function WHLSN:StartSession()
     self:ShowMainFrame()
     self:BroadcastSessionUpdate()
     self:SendCommunityPings()
+    self:PersistSessionState()
     self:Print("Session started! Guild members can join via the Wheelson addon.")
 end
 
@@ -294,6 +296,7 @@ function WHLSN:SpinGroups()
     self.lastActivity = time()
     self:BroadcastSessionUpdate()
     self:UpdateUI()
+    self:PersistSessionState()
 end
 
 --- Mark session as completed after wheel animation finishes.
@@ -301,6 +304,7 @@ function WHLSN:CompleteSession()
     self.session.status = self.Status.COMPLETED
     self:SaveSessionResults()
     self:BroadcastSessionUpdate()
+    self:PersistSessionState()
 end
 
 --- Save session results to SavedVariables.
@@ -470,6 +474,88 @@ function WHLSN:ClearSessionState()
         self.joinAckTimer = nil
     end
     self.commQueue = {}
+    if self.db and self.db.char then
+        self.db.char.activeSession = nil
+    end
+    if self.sessionRestoreTimer then
+        self.sessionRestoreTimer:Cancel()
+        self.sessionRestoreTimer = nil
+    end
+end
+
+--- Persist minimal session state to SavedVariables for /reload recovery.
+function WHLSN:PersistSessionState()
+    if not self.db or not self.db.char then return end
+    if not self.session.status then
+        self.db.char.activeSession = nil
+        return
+    end
+
+    local isHost = self:NamesMatch(self.session.host, self:GetMyFullName())
+
+    local saved = {
+        host = self.session.host,
+        status = self.session.status,
+        commChannel = self.session.commChannel,
+        timestamp = time(),
+        isHost = isHost,
+    }
+
+    if isHost then
+        local playerDicts = {}
+        for _, p in ipairs(self.session.players) do
+            playerDicts[#playerDicts + 1] = p:ToDict()
+        end
+        saved.players = playerDicts
+        saved.removedPlayers = self.session.removedPlayers
+        saved.connectedCommunity = self.session.connectedCommunity
+    end
+
+    self.db.char.activeSession = saved
+end
+
+--- Restore session state from SavedVariables after /reload.
+function WHLSN:RestoreSessionState()
+    if not self.db or not self.db.char then return end
+
+    local saved = self.db.char.activeSession
+    if not saved then return end
+
+    if saved.timestamp and (time() - saved.timestamp) > self.SESSION_TIMEOUT then
+        self.db.char.activeSession = nil
+        return
+    end
+
+    self.session.status = saved.status
+    self.session.host = saved.host
+    self.session.commChannel = saved.commChannel
+
+    if saved.isHost then
+        if saved.players then
+            self.session.players = {}
+            for _, pd in ipairs(saved.players) do
+                self.session.players[#self.session.players + 1] = WHLSN.Player.FromDict(pd)
+            end
+        end
+        if saved.removedPlayers then
+            self.session.removedPlayers = saved.removedPlayers
+        end
+        if saved.connectedCommunity then
+            self.session.connectedCommunity = saved.connectedCommunity
+        end
+        self:SendSessionUpdate()
+        self:ResetSessionTimeout()
+    else
+        self:SendSessionQuery()
+        self.sessionRestoreTimer = C_Timer.NewTimer(10, function()
+            if WHLSN.session.status and #WHLSN.session.players == 0 then
+                WHLSN:Print("Previous session is no longer active.")
+                WHLSN:ClearSessionState()
+                WHLSN:UpdateUI()
+            end
+            WHLSN.sessionRestoreTimer = nil
+        end)
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -522,6 +608,7 @@ function WHLSN:PVP_MATCH_COMPLETE()       flushAfterDelay() end
 function WHLSN:NotifySessionChange()
     self:BroadcastSessionUpdate()
     self:UpdateLobbyView()
+    self:PersistSessionState()
 end
 
 --- Broadcast session state to the guild (throttled).
@@ -705,6 +792,7 @@ function WHLSN:HandleSessionUpdate(data, sender)
         end
 
         self:UpdateUI()
+        self:PersistSessionState()
     end
 end
 

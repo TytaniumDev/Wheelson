@@ -1560,3 +1560,131 @@ describe("JoinAck", function()
         assert.is_false(WHLSN.session.joinPending)
     end)
 end)
+
+describe("SessionPersistence", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.UpdateUI = function() end
+        WHLSN.ShowMainFrame = function() end
+        WHLSN.UpdateLobbyView = function() end
+        WHLSN.SendCommunityPings = function() end
+        WHLSN.SendSessionQuery = function() end
+        WHLSN.SendSessionUpdate = function() end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.analytics = setmetatable({}, { __index = function() return function() end end })
+        if not WHLSN.db.char then
+            WHLSN.db.char = {}
+        end
+        -- Clear any leftover persisted session from previous test
+        WHLSN.db.char.activeSession = nil
+        WHLSN.session.status = nil
+    end)
+
+    it("PersistSessionState should save host session state", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "TestPlayer-Illidan"
+        WHLSN.session.players = {
+            WHLSN.Player:New("TestPlayer-Illidan", "tank", {}, {}),
+            WHLSN.Player:New("Other-Illidan", "healer", {}, {}),
+        }
+        WHLSN.session.removedPlayers = {}
+        WHLSN.session.connectedCommunity = {}
+
+        WHLSN:PersistSessionState()
+
+        local saved = WHLSN.db.char.activeSession
+        assert.is_not_nil(saved)
+        assert.equal("lobby", saved.status)
+        assert.equal("TestPlayer-Illidan", saved.host)
+        assert.is_true(saved.isHost)
+        assert.is_not_nil(saved.players)
+        assert.equal(2, #saved.players)
+    end)
+
+    it("PersistSessionState should save non-host session state without players", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "OtherHost-Illidan"
+        WHLSN.session.players = { WHLSN.Player:New("OtherHost-Illidan", "tank", {}, {}) }
+
+        WHLSN:PersistSessionState()
+
+        local saved = WHLSN.db.char.activeSession
+        assert.is_not_nil(saved)
+        assert.equal("OtherHost-Illidan", saved.host)
+        assert.is_false(saved.isHost)
+        assert.is_nil(saved.players)
+    end)
+
+    it("ClearSessionState should clear persisted state", function()
+        WHLSN.db.char.activeSession = { host = "X", status = "lobby" }
+        WHLSN:ClearSessionState()
+        assert.is_nil(WHLSN.db.char.activeSession)
+    end)
+
+    it("RestoreSessionState should restore host state with players", function()
+        WHLSN.db.char.activeSession = {
+            host = "TestPlayer-Illidan",
+            status = "lobby",
+            commChannel = nil,
+            timestamp = time(),
+            isHost = true,
+            players = {
+                { name = "TestPlayer-Illidan", mainRole = "tank", offspecs = {}, utilities = {} },
+                { name = "Other-Illidan", mainRole = "healer", offspecs = {}, utilities = {} },
+            },
+            removedPlayers = {},
+            connectedCommunity = {},
+        }
+
+        local broadcastCalled = false
+        WHLSN.SendSessionUpdate = function() broadcastCalled = true end
+
+        WHLSN:RestoreSessionState()
+
+        assert.equal("lobby", WHLSN.session.status)
+        assert.equal("TestPlayer-Illidan", WHLSN.session.host)
+        assert.equal(2, #WHLSN.session.players)
+        assert.is_true(broadcastCalled)
+    end)
+
+    it("RestoreSessionState should send SESSION_QUERY for non-host", function()
+        WHLSN.db.char.activeSession = {
+            host = "OtherHost-Illidan",
+            status = "lobby",
+            commChannel = nil,
+            timestamp = time(),
+            isHost = false,
+        }
+
+        local queryCalled = false
+        WHLSN.SendSessionQuery = function() queryCalled = true end
+
+        WHLSN:RestoreSessionState()
+
+        assert.equal("lobby", WHLSN.session.status)
+        assert.equal("OtherHost-Illidan", WHLSN.session.host)
+        assert.is_true(queryCalled)
+    end)
+
+    it("RestoreSessionState should discard stale sessions", function()
+        WHLSN.db.char.activeSession = {
+            host = "OtherHost-Illidan",
+            status = "lobby",
+            timestamp = time() - WHLSN.SESSION_TIMEOUT - 1,
+            isHost = false,
+        }
+
+        WHLSN:RestoreSessionState()
+
+        assert.is_nil(WHLSN.session.status)
+        assert.is_nil(WHLSN.db.char.activeSession)
+    end)
+
+    it("PersistSessionState should clear when no status", function()
+        WHLSN.db.char.activeSession = { host = "X", status = "lobby" }
+        WHLSN.session.status = nil
+        WHLSN:PersistSessionState()
+        assert.is_nil(WHLSN.db.char.activeSession)
+    end)
+end)
