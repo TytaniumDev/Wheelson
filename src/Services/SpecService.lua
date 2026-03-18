@@ -7,20 +7,22 @@ local WHLSN = _G.Wheelson
 ---------------------------------------------------------------------------
 
 --- Detect all available offspecs for the local player.
+---@param overrideMainRole? string When provided, consider all specs (including active) and exclude this role
 ---@return string[] allOffspecs All possible offspec roles
-function WHLSN:DetectAllOffspecs()
+function WHLSN:DetectAllOffspecs(overrideMainRole)
     local specIndex = C_SpecializationInfo.GetSpecialization()
     if not specIndex then return {} end
 
     local specID = C_SpecializationInfo.GetSpecializationInfo(specIndex)
     if not specID then return {} end
 
-    local mainRole = WHLSN.SpecRoles[specID]
+    local mainRole = overrideMainRole or WHLSN.SpecRoles[specID]
     local offspecs = {}
     local numSpecs = GetNumSpecializations()
 
     for i = 1, numSpecs do
-        if i ~= specIndex then
+        -- When main role is overridden, consider all specs (active spec may provide a valid offspec)
+        if overrideMainRole or i ~= specIndex then
             local otherSpecID = C_SpecializationInfo.GetSpecializationInfo(i)
             if otherSpecID then
                 local otherRole = WHLSN.SpecRoles[otherSpecID]
@@ -54,12 +56,19 @@ function WHLSN:DetectLocalPlayer(selectedOffspecs, overrideRole)
     local specID = C_SpecializationInfo.GetSpecializationInfo(specIndex)
     if not specID then return nil end
 
+    -- Apply saved overrides when no explicit override provided
+    local savedOverrides = self.db and self.db.char and self.db.char.specOverrides
+    if not overrideRole and not selectedOffspecs and savedOverrides then
+        overrideRole = savedOverrides.mainRole
+        selectedOffspecs = savedOverrides.offspecs
+    end
+
     local mainRole = overrideRole or WHLSN.SpecRoles[specID]
     if not mainRole then return nil end
 
     -- Detect offspecs from other specializations
     local offspecs = {}
-    local allOffspecs = self:DetectAllOffspecs()
+    local allOffspecs = self:DetectAllOffspecs(overrideRole)
 
     if selectedOffspecs then
         -- Use player-selected offspecs
