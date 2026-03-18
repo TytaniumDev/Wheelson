@@ -64,7 +64,7 @@ local function CreateGroupDisplayFrame(parent)
         local isHost = WHLSN:NamesMatch(WHLSN.session.host, WHLSN:GetMyFullName())
         WHLSN:ToggleMainFrame()
         if isHost then
-            WHLSN:EndSession()
+            WHLSN:CloseLobby()
         else
             WHLSN:ClearSessionState()
         end

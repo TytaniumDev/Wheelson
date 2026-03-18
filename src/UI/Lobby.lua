@@ -62,7 +62,7 @@ local function CreateLobbyFrame(parent)
     frame.joinButton = CreateFrame("Button", "WHLSNJoinButton", frame, "UIPanelButtonTemplate")
     frame.joinButton:SetSize(100, 32)
     frame.joinButton:SetPoint("BOTTOMLEFT", 8, 8)
-    frame.joinButton:SetText("Join Session")
+    frame.joinButton:SetText("Join Lobby")
     frame.joinButton:SetScript("OnClick", function()
         WHLSN:RequestJoin()
     end)
@@ -76,37 +76,37 @@ local function CreateLobbyFrame(parent)
         WHLSN:LeaveSession()
     end)
 
-    -- Start Session button (shown when no session is active)
+    -- Create Lobby button (shown when no lobby is active)
     frame.startButton = CreateFrame("Button", "WHLSNStartButton", frame, "UIPanelButtonTemplate")
     frame.startButton:SetSize(140, 32)
     frame.startButton:SetPoint("BOTTOMLEFT", 8, 8)
-    frame.startButton:SetText("Start Session")
+    frame.startButton:SetText("Create Lobby")
     frame.startButton:SetScript("OnClick", function()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-        WHLSN:StartSession()
+        WHLSN:CreateLobby()
     end)
 
-    -- Test button (shown when no session is active, next to Start Session)
+    -- Test button (shown when no lobby is active, next to Create Lobby)
     frame.testButton = CreateFrame("Button", "WHLSNTestButton", frame, "UIPanelButtonTemplate")
     frame.testButton:SetSize(80, 32)
     frame.testButton:SetPoint("BOTTOMRIGHT", -8, 8)
     frame.testButton:SetText("Test")
     frame.testButton:SetScript("OnClick", function()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-        WHLSN:StartTestSession()
+        WHLSN:CreateTestLobby()
     end)
 
-    -- End Session button (host only, active session)
+    -- Close Lobby button (host only, active lobby)
     frame.endButton = CreateFrame("Button", "WHLSNEndButton", frame, "UIPanelButtonTemplate")
     frame.endButton:SetSize(100, 32)
     frame.endButton:SetPoint("BOTTOMLEFT", 8, 8)
-    frame.endButton:SetText("End Session")
+    frame.endButton:SetText("Close Lobby")
     frame.endButton:SetScript("OnClick", function()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-        WHLSN:EndSession()
+        WHLSN:CloseLobby()
     end)
 
-    -- Community Roster button (host only, during active session)
+    -- Community Roster button (host only, during active lobby)
     frame.communityRosterButton = CreateFrame("Button", "WHLSNCommunityRosterButton", frame, "UIPanelButtonTemplate")
     frame.communityRosterButton:SetSize(120, 32)
     frame.communityRosterButton:SetPoint("BOTTOMRIGHT", -8, 8)
@@ -724,7 +724,7 @@ local function UpdateLobbyStatus(frame, session, hasSession)
     if hasSession then
         frame.statusText:SetText("Lobby - Hosted by " .. WHLSN:StripRealmName(session.host or "Unknown"))
     else
-        frame.statusText:SetText("No active session")
+        frame.statusText:SetText("No active lobby")
     end
 end
 
@@ -747,7 +747,7 @@ local function UpdateLobbyButtons(frame, isHost, hasSession, isInSession, player
         frame.joinButton:SetText("Joining...")
         frame.joinButton:SetEnabled(false)
     else
-        frame.joinButton:SetText("Join Session")
+        frame.joinButton:SetText("Join Lobby")
         frame.joinButton:SetEnabled(true)
     end
 end
@@ -823,7 +823,7 @@ local function PopulatePlayerRows(frame, players)
             row.lustIcon:SetAlpha(0.35)
             row.strikethrough:Show()
             row.kickButton:SetText("+")
-            row.kickButton.tooltipText = "Include in session"
+            row.kickButton.tooltipText = "Include in lobby"
             row.kickButton:SetScript("OnClick", function()
                 WHLSN:UnhidePlayer(player.name)
             end)
@@ -834,7 +834,7 @@ local function PopulatePlayerRows(frame, players)
             row.lustIcon:SetAlpha(1)
             row.strikethrough:Hide()
             row.kickButton:SetText("X")
-            row.kickButton.tooltipText = "Remove from session"
+            row.kickButton.tooltipText = "Remove from lobby"
             row.kickButton:SetScript("OnClick", function()
                 WHLSN:HidePlayer(player.name)
             end)
@@ -849,8 +849,8 @@ end
 
 local function PopulateHistoryRows(frame, history)
     local rows = lobbyState.historyRows
-    frame.statusText:SetText("Recent Sessions")
-    frame.countText:SetText(#history .. " sessions")
+    frame.statusText:SetText("Recent Lobbies")
+    frame.countText:SetText(#history .. " lobbies")
 
     for i, record in ipairs(history) do
         if not rows[i] then
@@ -949,12 +949,12 @@ end
 --- Send a join request to the session host.
 function WHLSN:RequestJoin()
     if not self.session.host then
-        self:Print("No active session to join.")
+        self:Print("No active lobby to join.")
         return
     end
 
     if self.session.hostEnded then
-        self:Print("That session has ended.")
+        self:Print("That lobby has ended.")
         return
     end
 
