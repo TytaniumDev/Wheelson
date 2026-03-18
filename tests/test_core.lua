@@ -642,9 +642,9 @@ describe("leftSessionHost", function()
         assert.equals("HostB", WHLSN.session.host)
     end)
 
-    it("should clear leftSessionHost on StartSession", function()
+    it("should clear leftSessionHost on CreateLobby", function()
         WHLSN.leftSessionHost = "HostA"
-        WHLSN:StartSession()
+        WHLSN:CreateLobby()
 
         assert.is_nil(WHLSN.leftSessionHost)
     end)
@@ -1428,8 +1428,8 @@ describe("Realm-qualified identity", function()
         WHLSN.analytics = setmetatable({}, { __index = function() return function() end end })
     end)
 
-    it("StartSession should set host as realm-qualified name", function()
-        WHLSN:StartSession()
+    it("CreateLobby should set host as realm-qualified name", function()
+        WHLSN:CreateLobby()
         assert.equal("TestPlayer-Illidan", WHLSN.session.host)
     end)
 

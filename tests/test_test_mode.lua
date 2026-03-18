@@ -104,9 +104,9 @@ describe("Test Mode", function()
         WHLSN:OnInitialize()
     end)
 
-    describe("StartTestSession", function()
+    describe("CreateTestLobby", function()
         it("should populate session with 15 test players in lobby status", function()
-            WHLSN:StartTestSession()
+            WHLSN:CreateTestLobby()
 
             assert.equal("lobby", WHLSN.session.status)
             assert.equal(15, #WHLSN.session.players)
@@ -116,14 +116,14 @@ describe("Test Mode", function()
 
         it("should not start if a session is already active", function()
             WHLSN.session.status = "lobby"
-            WHLSN:StartTestSession()
+            WHLSN:CreateTestLobby()
 
             -- Players should not be overwritten
             assert.equal(0, #WHLSN.session.players)
         end)
 
         it("should include correct player data", function()
-            WHLSN:StartTestSession()
+            WHLSN:CreateTestLobby()
 
             local players = WHLSN.session.players
             -- Check first player
@@ -142,7 +142,7 @@ describe("Test Mode", function()
             local commSent = false
             WHLSN.SendCommMessage = function() commSent = true end
 
-            WHLSN:StartTestSession()
+            WHLSN:CreateTestLobby()
             WHLSN:BroadcastSessionUpdate()
 
             assert.is_false(commSent)
@@ -152,23 +152,23 @@ describe("Test Mode", function()
             local commSent = false
             WHLSN.SendCommMessage = function() commSent = true end
 
-            WHLSN:StartTestSession()
-            WHLSN:EndSession()
+            WHLSN:CreateTestLobby()
+            WHLSN:CloseLobby()
 
             assert.is_false(commSent)
         end)
 
         it("should not save session results in test mode", function()
-            WHLSN:StartTestSession()
+            WHLSN:CreateTestLobby()
             WHLSN.session.groups = WHLSN:CreateMythicPlusGroups(WHLSN.session.players)
             WHLSN:SaveSessionResults()
 
             assert.is_nil(WHLSN.db.profile.lastSession)
         end)
 
-        it("should clean up isTest flag on EndSession", function()
-            WHLSN:StartTestSession()
-            WHLSN:EndSession()
+        it("should clean up isTest flag on CloseLobby", function()
+            WHLSN:CreateTestLobby()
+            WHLSN:CloseLobby()
 
             assert.is_nil(WHLSN.session.isTest)
             assert.is_nil(WHLSN.session.status)
@@ -178,8 +178,8 @@ describe("Test Mode", function()
             local commSent = false
             WHLSN.SendCommMessage = function() commSent = true end
 
-            WHLSN:StartTestSession()
-            WHLSN:EndSession()
+            WHLSN:CreateTestLobby()
+            WHLSN:CloseLobby()
 
             assert.is_false(commSent)
         end)
@@ -193,7 +193,7 @@ describe("Test Mode", function()
             local printed = {}
             WHLSN.Print = function(_, msg) printed[#printed + 1] = msg end
 
-            WHLSN:StartTestSession()
+            WHLSN:CreateTestLobby()
             local players = {
                 WHLSN.Player:New("Alice", "tank"),
                 WHLSN.Player:New("Bob", "melee"),

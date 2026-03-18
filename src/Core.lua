@@ -68,10 +68,10 @@ function WHLSN:OnInitialize()
             tooltip:AddLine("Wheelson", 1, 0.82, 0)
             tooltip:AddLine("|cFFAAAAAA" .. WHLSN.VERSION .. "|r")
             if WHLSN.session.status then
-                tooltip:AddLine("Session: " .. WHLSN.session.status, 0.5, 1, 0.5)
+                tooltip:AddLine("Lobby: " .. WHLSN.session.status, 0.5, 1, 0.5)
                 tooltip:AddLine("Host: " .. WHLSN:StripRealmName(WHLSN.session.host or "Unknown"), 0.7, 0.7, 0.7)
             else
-                tooltip:AddLine("No active session", 0.5, 0.5, 0.5)
+                tooltip:AddLine("No active lobby", 0.5, 0.5, 0.5)
             end
             tooltip:AddLine(" ")
             tooltip:AddLine("|cFFFFFFFFLeft-click:|r Open addon", 0.8, 0.8, 0.8)
@@ -133,15 +133,15 @@ end
 -- Session Management
 ---------------------------------------------------------------------------
 
---- Start a new lobby session. Any guild member can host.
-function WHLSN:StartSession()
+--- Start a new lobby. Any guild member can host.
+function WHLSN:CreateLobby()
     -- Allow starting a new session if we're just waiting for a restore query
     if self.sessionRestoreTimer then
         self:ClearSessionState()
     end
 
     if self.session.status then
-        self:Print("A session is already active.")
+        self:Print("A lobby is already active.")
         return
     end
 
@@ -168,13 +168,13 @@ function WHLSN:StartSession()
     self:BroadcastSessionUpdate()
     self:SendCommunityPings()
     self:PersistSessionState()
-    self:Print("Session started! Guild members can join via the Wheelson addon.")
+    self:Print("Lobby created! Guild members can join via the Wheelson addon.")
 end
 
---- Start a test session with hardcoded players (no guild comms).
-function WHLSN:StartTestSession()
+--- Start a test lobby with hardcoded players (no guild comms).
+function WHLSN:CreateTestLobby()
     if self.session.status then
-        self:Print("A session is already active.")
+        self:Print("A lobby is already active.")
         return
     end
 
@@ -187,13 +187,13 @@ function WHLSN:StartTestSession()
 
     self:ShowMainFrame()
     self:UpdateUI()
-    self:Print("[Test Mode] Session started with " .. #self.session.players .. " test players.")
+    self:Print("[Test Mode] Lobby created with " .. #self.session.players .. " test players.")
 end
 
---- End the current session and clean up.
-function WHLSN:EndSession()
+--- Close the current lobby and clean up.
+function WHLSN:CloseLobby()
     if not self.session.status then
-        self:Print("No active session.")
+        self:Print("No active lobby.")
         return
     end
 
@@ -205,9 +205,9 @@ function WHLSN:EndSession()
 
     if not wasViewing and not wasTest then
         self:BroadcastSessionEnd(wasCommunity)
-        self:Print("Session ended.")
+        self:Print("Lobby closed.")
     elseif wasTest then
-        self:Print("[Test Mode] Session ended.")
+        self:Print("[Test Mode] Lobby closed.")
     end
 
     self:UpdateUI()
@@ -216,12 +216,12 @@ end
 --- Leave the current session (for non-hosts).
 function WHLSN:LeaveSession()
     if not self.session.status then
-        self:Print("No active session.")
+        self:Print("No active lobby.")
         return
     end
 
     if self:NamesMatch(self.session.host, self:GetMyFullName()) then
-        self:Print("You are the host. Use the End Session button to end the session.")
+        self:Print("You are the host. Use the Close Lobby button to close the lobby.")
         return
     end
 
@@ -240,7 +240,7 @@ function WHLSN:LeaveSession()
     end
 
     self:ClearSessionState()
-    self:Print("You have left the session.")
+    self:Print("You have left the lobby.")
 end
 
 --- Run the group creation algorithm and transition to spinning.
@@ -361,13 +361,13 @@ function WHLSN:ViewHistorySession(index)
 
     local history = self.db and self.db.profile.sessionHistory
     if not history or not history[index] then
-        self:Print("Session not found.")
+        self:Print("Lobby not found.")
         return
     end
 
     local record = history[index]
     if not record.groups or #record.groups == 0 then
-        self:Print("No group data for that session.")
+        self:Print("No group data for that lobby.")
         return
     end
 
@@ -397,7 +397,7 @@ function WHLSN:HidePlayer(playerName)
         if self:NamesMatch(p.name, playerName) then
             self.session.removedPlayers[p.name] = true
             self:NotifySessionChange()
-            self:Print(self:StripRealmName(playerName) .. " hidden from session.")
+            self:Print(self:StripRealmName(playerName) .. " hidden from lobby.")
             return
         end
     end
@@ -413,7 +413,7 @@ function WHLSN:UnhidePlayer(playerName)
         if self:NamesMatch(p.name, playerName) then
             self.session.removedPlayers[p.name] = nil
             self:NotifySessionChange()
-            self:Print(self:StripRealmName(playerName) .. " restored to session.")
+            self:Print(self:StripRealmName(playerName) .. " restored to lobby.")
             return
         end
     end
@@ -444,8 +444,8 @@ end
 function WHLSN:OnSessionTimeout()
     if not self.session.status then return end
 
-    self:Print("Session timed out after " .. math.floor(self.SESSION_TIMEOUT / 60) .. " minutes of inactivity.")
-    self:EndSession()
+    self:Print("Lobby timed out after " .. math.floor(self.SESSION_TIMEOUT / 60) .. " minutes of inactivity.")
+    self:CloseLobby()
 end
 
 --- Touch the session activity timer (called on meaningful actions).
@@ -454,7 +454,7 @@ function WHLSN:TouchActivity()
     self:ResetSessionTimeout()
 end
 
---- Clear all local session state (shared by host EndSession and non-host Finish).
+--- Clear all local session state (shared by host CloseLobby and non-host Finish).
 function WHLSN:ClearSessionState()
     self:CancelSessionTimeout()
     if self.commThrottleTimer then
@@ -554,7 +554,7 @@ function WHLSN:RestoreSessionState()
         self:SendSessionQuery()
         self.sessionRestoreTimer = C_Timer.NewTimer(10, function()
             if WHLSN.session.status and #WHLSN.session.players == 0 then
-                WHLSN:Print("Previous session is no longer active.")
+                WHLSN:Print("Previous lobby is no longer active.")
                 WHLSN:ClearSessionState()
                 WHLSN:UpdateUI()
             end
@@ -738,7 +738,6 @@ function WHLSN:HandleSessionPing(data, sender)
     self.session.host = sender
     self.session.commChannel = "WHISPER"
 
-    self:ShowMainFrame()
     self:UpdateUI()
 end
 
@@ -757,7 +756,7 @@ function WHLSN:HandleSessionUpdate(data, sender)
         -- Notify on first lobby discovery (no active session, or previous session ended by host)
         if data.status == "lobby"
             and (self.session.status == nil or self.session.hostEnded) then
-            self:Print(data.host .. " started a group session! Type /wheelson to join.")
+            self:Print(data.host .. " created a lobby! Type /wheelson to join.")
         end
 
         self.session.status = data.status
