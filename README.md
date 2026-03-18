@@ -62,3 +62,7 @@ Install from [CurseForge](https://www.curseforge.com/wow/addons/wheelson) or [Wa
 | `/wheelson` | Open or close the Wheelson window |
 | `/wheel` | Shorthand alias |
 
+## Credits
+
+- Wheelson logo based on [10 Color Spinner Wheel](https://creazilla.com/media/clipart/15540171/10-color-spinner-wheel) from Creazilla, adapted by Gazzi
+
