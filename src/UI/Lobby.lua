@@ -248,7 +248,7 @@ local function CreateCommunityPanel()
                 if WHLSN.session.status == WHLSN.Status.LOBBY then
                     local pingData = {
                         type = "SESSION_PING",
-                        host = UnitName("player"),
+                        host = WHLSN:GetMyFullName(),
                         status = WHLSN.session.status,
                         version = WHLSN.VERSION,
                     }
@@ -441,8 +441,8 @@ local function CreatePlayerRow(parent, index)
         end
 
         -- Show kick button if host
-        if WHLSN.session.host == UnitName("player") and rowFrame.playerData then
-            if rowFrame.playerData.name ~= UnitName("player") then
+        if WHLSN:NamesMatch(WHLSN.session.host, WHLSN:GetMyFullName()) and rowFrame.playerData then
+            if not WHLSN:NamesMatch(rowFrame.playerData.name, WHLSN:GetMyFullName()) then
                 rowFrame.kickButton:Show()
             end
         end
@@ -551,16 +551,15 @@ local function CreateSpecOverrideSection(parent)
         if not playerData then return end
 
         -- Update local player in session
-        local myName = UnitName("player")
         for i, p in ipairs(WHLSN.session.players) do
-            if WHLSN:StripRealmName(p.name) == myName then
+            if WHLSN:NamesMatch(p.name, WHLSN:GetMyFullName()) then
                 WHLSN.session.players[i] = playerData
                 break
             end
         end
 
         -- Send to host (unless we are the host — already updated locally)
-        if WHLSN.session.host ~= myName then
+        if not WHLSN:NamesMatch(WHLSN.session.host, WHLSN:GetMyFullName()) then
             local data = {
                 type = "SPEC_UPDATE",
                 player = playerData:ToDict(),
@@ -804,9 +803,8 @@ local function PopulatePlayerRows(frame, players)
         row.brezIcon:SetShown(player:HasBrez())
         row.lustIcon:SetShown(player:HasLust())
 
-        local stripped = WHLSN:StripRealmName(player.name)
         local isRemoved = WHLSN.session.removedPlayers
-            and WHLSN.session.removedPlayers[stripped]
+            and WHLSN.session.removedPlayers[player.name]
 
         if isRemoved then
             row.nameText:SetAlpha(0.35)
@@ -876,9 +874,8 @@ function WHLSN:UpdateLobbyView()
     if not frame then return end
 
     local players = self.session.players
-    local isHost = self.session.host == UnitName("player")
+    local isHost = self:NamesMatch(self.session.host, self:GetMyFullName())
     local hasSession = self.session.status ~= nil
-    local myName = UnitName("player")
 
     UpdateLobbyStatus(frame, self.session, hasSession)
 
@@ -886,7 +883,7 @@ function WHLSN:UpdateLobbyView()
     local activePlayers = {}
     for _, p in ipairs(players) do
         if not self.session.removedPlayers
-            or not self.session.removedPlayers[self:StripRealmName(p.name)] then
+            or not self.session.removedPlayers[p.name] then
             activePlayers[#activePlayers + 1] = p
         end
     end
@@ -901,7 +898,7 @@ function WHLSN:UpdateLobbyView()
 
     local isInSession = false
     for _, p in ipairs(players) do
-        if self:StripRealmName(p.name) == myName then
+        if self:NamesMatch(p.name, self:GetMyFullName()) then
             isInSession = true
             break
         end
