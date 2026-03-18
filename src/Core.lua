@@ -730,6 +730,7 @@ function WHLSN:HandleJoinRequest(data, sender, distribution)
         if self:StripRealmName(p.name) == self:StripRealmName(player.name) then
             self.session.players[i] = player
             self:BroadcastSessionUpdate()
+            self:UpdateLobbyView()
             return
         end
     end
@@ -742,6 +743,7 @@ function WHLSN:HandleJoinRequest(data, sender, distribution)
     end
 
     self:BroadcastSessionUpdate()
+    self:UpdateLobbyView()
 end
 
 function WHLSN:HandleLeaveRequest(data, sender)
@@ -756,6 +758,7 @@ function WHLSN:HandleLeaveRequest(data, sender)
             self.session.connectedCommunity[self:StripRealmName(sender)] = nil
             self.session.removedPlayers[self:StripRealmName(sender)] = nil
             self:BroadcastSessionUpdate()
+            self:UpdateLobbyView()
             return
         end
     end
@@ -784,6 +787,7 @@ function WHLSN:HandleSpecUpdate(data, sender, distribution)
         if self:StripRealmName(p.name) == self:StripRealmName(player.name) then
             self.session.players[i] = player
             self:BroadcastSessionUpdate()
+            self:UpdateLobbyView()
             return
         end
     end

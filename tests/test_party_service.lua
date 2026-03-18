@@ -80,6 +80,7 @@ dofile("src/Services/CommunityService.lua")
 dofile("src/Services/PartyService.lua")
 
 local WHLSN = _G.Wheelson
+WHLSN.UpdateLobbyView = function() end
 
 describe("InvitePlayers", function()
     local invited, printed
