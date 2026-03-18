@@ -42,6 +42,9 @@ function WHLSN:OnInitialize()
     self.addonUsersCache = {}
     self.isScanning = false
 
+    -- Throttle timestamp for SESSION_QUERY broadcasts
+    self.lastSessionQuery = 0
+
     self:RegisterComm(self.COMM_PREFIX)
 
     -- Minimap icon via LibDataBroker + LibDBIcon
@@ -619,6 +622,8 @@ function WHLSN:OnCommReceived(prefix, message, distribution, sender)
         self:HandleSpecUpdate(data, sender, distribution)
     elseif data.type == "JOIN_ACK" then
         self:HandleJoinAck(data, sender)
+    elseif data.type == "SESSION_QUERY" then
+        self:HandleSessionQuery(sender)
     elseif data.type == "SESSION_PING" then
         self:HandleSessionPing(data, sender)
     elseif data.type == "ADDON_PING" then
@@ -775,6 +780,30 @@ function WHLSN:HandleJoinAck(data, _sender)
     if self.joinAckTimer then
         self.joinAckTimer:Cancel()
         self.joinAckTimer = nil
+    end
+end
+
+--- Handle SESSION_QUERY from a non-host (host only).
+function WHLSN:HandleSessionQuery(_sender)
+    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
+    if not self.session.status then return end
+    self:SendSessionUpdate()
+end
+
+--- Broadcast a SESSION_QUERY to discover or validate an active session.
+--- Throttled to at most one per 10 seconds.
+function WHLSN:SendSessionQuery()
+    local now = time()
+    if self.lastSessionQuery and (now - self.lastSessionQuery) < 10 then return end
+    self.lastSessionQuery = now
+
+    local data = { type = "SESSION_QUERY" }
+    local serialized = self:Serialize(data)
+
+    if self.session.commChannel == "WHISPER" and self.session.host then
+        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", self.session.host)
+    else
+        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
     end
 end
 

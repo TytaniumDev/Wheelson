@@ -1293,6 +1293,68 @@ describe("HandleSpecUpdate", function()
     end)
 end)
 
+describe("SessionQuery", function()
+    local origSendSessionUpdate
+
+    before_each(function()
+        WHLSN:OnInitialize()
+        origSendSessionUpdate = WHLSN.SendSessionUpdate
+        WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.UpdateUI = function() end
+        WHLSN.UpdateLobbyView = function() end
+        WHLSN.Serialize = function(self, data) return data end
+    end)
+
+    after_each(function()
+        WHLSN.SendSessionUpdate = origSendSessionUpdate
+    end)
+
+    it("HandleSessionQuery should call SendSessionUpdate when host", function()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer-Illidan"
+        local called = false
+        WHLSN.SendSessionUpdate = function() called = true end
+        WHLSN:HandleSessionQuery("OtherPlayer-Illidan")
+        assert.is_true(called)
+    end)
+
+    it("HandleSessionQuery should ignore when not host", function()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "SomeoneElse-Illidan"
+        local called = false
+        WHLSN.SendSessionUpdate = function() called = true end
+        WHLSN:HandleSessionQuery("OtherPlayer-Illidan")
+        assert.is_false(called)
+    end)
+
+    it("HandleSessionQuery should ignore when no session", function()
+        WHLSN.session.status = nil
+        WHLSN.session.host = nil
+        local called = false
+        WHLSN.SendSessionUpdate = function() called = true end
+        WHLSN:HandleSessionQuery("OtherPlayer-Illidan")
+        assert.is_false(called)
+    end)
+
+    it("SendSessionQuery should be throttled", function()
+        local sent = 0
+        WHLSN.SendCommMessage = function() sent = sent + 1 end
+        WHLSN:SendSessionQuery()
+        WHLSN:SendSessionQuery()
+        assert.equal(1, sent)
+    end)
+
+    it("OnCommReceived should route SESSION_QUERY to HandleSessionQuery", function()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN.session.host = "TestPlayer-Illidan"
+        local called = false
+        WHLSN.SendSessionUpdate = function() called = true end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, { type = "SESSION_QUERY" }, "GUILD", "OtherPlayer")
+        assert.is_true(called)
+    end)
+end)
+
 describe("SendSessionUpdate removedPlayers", function()
     before_each(function()
         WHLSN:OnInitialize()
