@@ -69,7 +69,7 @@ function WHLSN:OnInitialize()
             tooltip:AddLine("|cFFAAAAAA" .. WHLSN.VERSION .. "|r")
             if WHLSN.session.status then
                 tooltip:AddLine("Session: " .. WHLSN.session.status, 0.5, 1, 0.5)
-                tooltip:AddLine("Host: " .. (WHLSN.session.host or "Unknown"), 0.7, 0.7, 0.7)
+                tooltip:AddLine("Host: " .. WHLSN:StripRealmName(WHLSN.session.host or "Unknown"), 0.7, 0.7, 0.7)
             else
                 tooltip:AddLine("No active session", 0.5, 0.5, 0.5)
             end

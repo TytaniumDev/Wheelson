@@ -722,7 +722,7 @@ end
 
 local function UpdateLobbyStatus(frame, session, hasSession)
     if hasSession then
-        frame.statusText:SetText("Lobby - Hosted by " .. (session.host or "Unknown"))
+        frame.statusText:SetText("Lobby - Hosted by " .. WHLSN:StripRealmName(session.host or "Unknown"))
     else
         frame.statusText:SetText("No active session")
     end
@@ -758,7 +758,7 @@ end
 ---@return string
 local function FormatPlayerLabel(player, classColor)
     local hex = classColor and classColor.hex or "FFFFFF"
-    local parts = { "|cFF" .. hex .. player.name .. "|r" }
+    local parts = { "|cFF" .. hex .. WHLSN:StripRealmName(player.name) .. "|r" }
 
     if player.mainRole then
         local rc = WHLSN.RoleColors[player.mainRole]
