@@ -128,10 +128,10 @@ end
 ---@param communityList table|nil Optional override list; defaults to session.connectedCommunity
 function WHLSN:WhisperCommunityPlayers(serialized, communityList)
     local list = communityList or self.session.connectedCommunity
-    local myName = UnitName("player")
+    local myFullName = self:GetMyFullName()
 
-    for bareName, fullName in pairs(list) do
-        if bareName ~= myName then
+    for _, fullName in pairs(list) do
+        if not self:NamesMatch(fullName, myFullName) then
             self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", fullName)
         end
     end

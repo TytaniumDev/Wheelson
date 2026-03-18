@@ -894,17 +894,17 @@ describe("HandleSessionPing", function()
         assert.equals("WHISPER", WHLSN.session.commChannel)
     end)
 
-    it("should store realm-qualified host name", function()
+    it("should store host from sender (realm-qualified)", function()
         local data = { type = "SESSION_PING", host = "HostPlayer", status = "lobby", version = WHLSN.VERSION }
         WHLSN:HandleSessionPing(data, "HostPlayer-Illidan")
-        assert.equals("HostPlayer-Illidan", WHLSN.session.hostFullName)
+        assert.equals("HostPlayer-Illidan", WHLSN.session.host)
     end)
 
-    it("should set session status and host", function()
+    it("should set session status and host from sender", function()
         local data = { type = "SESSION_PING", host = "HostPlayer", status = "lobby", version = WHLSN.VERSION }
         WHLSN:HandleSessionPing(data, "HostPlayer-Illidan")
         assert.equals("lobby", WHLSN.session.status)
-        assert.equals("HostPlayer", WHLSN.session.host)
+        assert.equals("HostPlayer-Illidan", WHLSN.session.host)
     end)
 
     it("should not overwrite an active session from a different host", function()
@@ -958,7 +958,7 @@ describe("HandleJoinRequest community", function()
         WHLSN:AddCommunityPlayer("CommunityGuy-Stormrage")
         local data = {
             type = "JOIN_REQUEST",
-            player = { name = "CommunityGuy", mainRole = "healer", offspecs = {}, utilities = {} },
+            player = { name = "CommunityGuy-Stormrage", mainRole = "healer", offspecs = {}, utilities = {} },
         }
         WHLSN:HandleJoinRequest(data, "CommunityGuy-Stormrage", "WHISPER")
         assert.equals(2, #WHLSN.session.players)
@@ -968,10 +968,10 @@ describe("HandleJoinRequest community", function()
         WHLSN:AddCommunityPlayer("CommunityGuy-Stormrage")
         local data = {
             type = "JOIN_REQUEST",
-            player = { name = "CommunityGuy", mainRole = "healer", offspecs = {}, utilities = {} },
+            player = { name = "CommunityGuy-Stormrage", mainRole = "healer", offspecs = {}, utilities = {} },
         }
         WHLSN:HandleJoinRequest(data, "CommunityGuy-Stormrage", "WHISPER")
-        assert.equals("CommunityGuy-Stormrage", WHLSN.session.connectedCommunity["CommunityGuy"])
+        assert.equals("CommunityGuy-Stormrage", WHLSN.session.connectedCommunity["CommunityGuy-Stormrage"])
     end)
 end)
 
@@ -1018,15 +1018,13 @@ describe("ClearSessionState community fields", function()
     end)
 
     it("should clear community session fields", function()
-        WHLSN.session.connectedCommunity = { ["Tyler"] = "Tyler-Stormrage" }
+        WHLSN.session.connectedCommunity = { ["Tyler-Stormrage"] = "Tyler-Stormrage" }
         WHLSN.session.commChannel = "WHISPER"
-        WHLSN.session.hostFullName = "Host-Realm"
 
         WHLSN:ClearSessionState()
 
         assert.same({}, WHLSN.session.connectedCommunity)
         assert.is_nil(WHLSN.session.commChannel)
-        assert.is_nil(WHLSN.session.hostFullName)
     end)
 
     it("should cancel commThrottleTimer and clear commPendingUpdate", function()
@@ -1353,5 +1351,62 @@ describe("HandleSessionUpdate removedPlayers", function()
         WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
 
         assert.same({ ["Existing"] = true }, WHLSN.session.removedPlayers)
+    end)
+end)
+
+describe("Realm-qualified identity", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.BroadcastSessionUpdate = function() end
+        WHLSN.UpdateUI = function() end
+        WHLSN.ShowMainFrame = function() end
+        WHLSN.UpdateLobbyView = function() end
+        WHLSN.SendCommunityPings = function() end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.analytics = setmetatable({}, { __index = function() return function() end end })
+    end)
+
+    it("StartSession should set host as realm-qualified name", function()
+        WHLSN:StartSession()
+        assert.equal("TestPlayer-Illidan", WHLSN.session.host)
+    end)
+
+    it("LeaveSession should compare host using NamesMatch", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "TestPlayer-Illidan"
+        WHLSN:LeaveSession()
+        assert.equal("lobby", WHLSN.session.status)
+    end)
+
+    it("HandleJoinRequest should accept with realm-qualified host", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "TestPlayer-Illidan"
+        WHLSN.session.players = { WHLSN.Player:New("TestPlayer-Illidan", "tank", {}, {}) }
+        local data = {
+            type = "JOIN_REQUEST",
+            player = { name = "Other", mainRole = "healer", offspecs = {}, utilities = {} },
+        }
+        WHLSN:HandleJoinRequest(data, "Other-Illidan", "GUILD")
+        assert.equals(2, #WHLSN.session.players)
+    end)
+
+    it("HandleSessionEnd should match realm-qualified host", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "HostPlayer-Illidan"
+        WHLSN:HandleSessionEnd("HostPlayer-Illidan")
+        assert.is_true(WHLSN.session.hostEnded)
+    end)
+
+    it("HidePlayer should key removedPlayers by full name", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "TestPlayer-Illidan"
+        local player = WHLSN.Player:New("Other-Illidan", "healer", {}, {})
+        WHLSN.session.players = {
+            WHLSN.Player:New("TestPlayer-Illidan", "tank", {}, {}),
+            player,
+        }
+        WHLSN:HidePlayer("Other-Illidan")
+        assert.is_true(WHLSN.session.removedPlayers["Other-Illidan"] or false)
+        assert.is_nil(WHLSN.session.removedPlayers["Other"])
     end)
 end)

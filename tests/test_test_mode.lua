@@ -111,7 +111,7 @@ describe("Test Mode", function()
             assert.equal("lobby", WHLSN.session.status)
             assert.equal(15, #WHLSN.session.players)
             assert.is_true(WHLSN.session.isTest)
-            assert.equal(UnitName("player"), WHLSN.session.host)
+            assert.equal(WHLSN:GetMyFullName(), WHLSN.session.host)
         end)
 
         it("should not start if a session is already active", function()

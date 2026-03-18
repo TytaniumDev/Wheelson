@@ -17,10 +17,9 @@ function WHLSN:OnInitialize()
         isTest = false,  -- true when running a test session (no guild comms)
         viewingHistory = false, -- true when displaying a past session
         hostEnded = false, -- true when the host explicitly ended the session
-        connectedCommunity = {},  -- bare name -> realm-qualified name (host only)
-        removedPlayers = {},      -- stripped name -> true (hidden from group formation)
+        connectedCommunity = {},  -- sender -> sender (host only, realm-qualified keys)
+        removedPlayers = {},      -- full player name -> true (hidden from group formation)
         commChannel = nil,        -- "GUILD" or "WHISPER" (community clients only)
-        hostFullName = nil,       -- realm-qualified host name (community clients only)
     }
 
     -- Throttle timer for roster update events
@@ -138,7 +137,7 @@ function WHLSN:StartSession()
 
     self.leftSessionHost = nil
     self.session.status = self.Status.LOBBY
-    self.session.host = UnitName("player")
+    self.session.host = self:GetMyFullName()
     self.session.players = {}
     self.session.groups = {}
     self.session.algorithmSnapshot = nil
@@ -169,7 +168,7 @@ function WHLSN:StartTestSession()
     end
 
     self.session.status = self.Status.LOBBY
-    self.session.host = UnitName("player")
+    self.session.host = self:GetMyFullName()
     self.session.players = self:GetTestPlayers()
     self.session.groups = {}
     self.session.isTest = true
@@ -210,8 +209,7 @@ function WHLSN:LeaveSession()
         return
     end
 
-    local myName = UnitName("player")
-    if self:StripRealmName(self.session.host) == myName then
+    if self:NamesMatch(self.session.host, self:GetMyFullName()) then
         self:Print("You are the host. Use the End Session button to end the session.")
         return
     end
@@ -220,12 +218,12 @@ function WHLSN:LeaveSession()
 
     local data = {
         type = "LEAVE_REQUEST",
-        playerName = myName,
+        playerName = UnitName("player"),
     }
     local serialized = self:Serialize(data)
 
-    if self.session.commChannel == "WHISPER" and self.session.hostFullName then
-        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", self.session.hostFullName)
+    if self.session.commChannel == "WHISPER" and self.session.host then
+        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", self.session.host)
     else
         self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
     end
@@ -244,7 +242,7 @@ function WHLSN:SpinGroups()
     -- Filter out removed/hidden players
     local activePlayers = {}
     for _, p in ipairs(self.session.players) do
-        if not self.session.removedPlayers[self:StripRealmName(p.name)] then
+        if not self.session.removedPlayers[p.name] then
             activePlayers[#activePlayers + 1] = p
         end
     end
@@ -378,18 +376,15 @@ end
 --- but is excluded from group formation and shown as dimmed/struck-through.
 ---@param playerName string
 function WHLSN:HidePlayer(playerName)
-    if self.session.host ~= UnitName("player") then return end
+    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
     if self.session.status ~= self.Status.LOBBY then return end
-
-    local stripped = self:StripRealmName(playerName)
-    -- Don't allow hiding the host
-    if stripped == UnitName("player") then return end
+    if self:NamesMatch(playerName, self:GetMyFullName()) then return end
 
     for _, p in ipairs(self.session.players) do
-        if self:StripRealmName(p.name) == stripped then
-            self.session.removedPlayers[stripped] = true
+        if self:NamesMatch(p.name, playerName) then
+            self.session.removedPlayers[p.name] = true
             self:NotifySessionChange()
-            self:Print(playerName .. " hidden from session.")
+            self:Print(self:StripRealmName(playerName) .. " hidden from session.")
             return
         end
     end
@@ -398,13 +393,17 @@ end
 --- Unhide a previously hidden player (host only).
 ---@param playerName string
 function WHLSN:UnhidePlayer(playerName)
-    if self.session.host ~= UnitName("player") then return end
+    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
     if self.session.status ~= self.Status.LOBBY then return end
 
-    local stripped = self:StripRealmName(playerName)
-    self.session.removedPlayers[stripped] = nil
-    self:NotifySessionChange()
-    self:Print(playerName .. " restored to session.")
+    for _, p in ipairs(self.session.players) do
+        if self:NamesMatch(p.name, playerName) then
+            self.session.removedPlayers[p.name] = nil
+            self:NotifySessionChange()
+            self:Print(self:StripRealmName(playerName) .. " restored to session.")
+            return
+        end
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -461,7 +460,6 @@ function WHLSN:ClearSessionState()
     self.session.connectedCommunity = {}
     self.session.removedPlayers = {}
     self.session.commChannel = nil
-    self.session.hostFullName = nil
     self.commQueue = {}
 end
 
@@ -593,7 +591,8 @@ function WHLSN:OnCommReceived(prefix, message, distribution, sender)
     if not success then return end
 
     -- Version handshake warning (skip for discovery and ping messages to avoid noise)
-    if data.type ~= "ADDON_PING" and data.type ~= "ADDON_PONG" and data.type ~= "SESSION_PING" then
+    if data.type ~= "ADDON_PING" and data.type ~= "ADDON_PONG" and data.type ~= "SESSION_PING"
+        and data.type ~= "JOIN_ACK" and data.type ~= "SESSION_QUERY" then
         if data.version and data.version ~= self.VERSION then
             if data.version ~= "@project-version@" and self.VERSION ~= "@project-version@" then
                 self:Print("Warning: " .. sender .. " is using addon version " .. tostring(data.version)
@@ -626,14 +625,13 @@ function WHLSN:HandleSessionPing(data, sender)
     -- so a SESSION_PING would incorrectly overwrite their channel to WHISPER)
     if self.session.status then return end
     -- Ignore if we intentionally left this host
-    if self.leftSessionHost and self:StripRealmName(self.leftSessionHost) == self:StripRealmName(data.host) then
+    if self.leftSessionHost and self:NamesMatch(self.leftSessionHost, data.host) then
         return
     end
 
     self.session.status = data.status
-    self.session.host = data.host
+    self.session.host = sender
     self.session.commChannel = "WHISPER"
-    self.session.hostFullName = sender
 
     self:ShowMainFrame()
     self:UpdateUI()
@@ -641,12 +639,12 @@ end
 
 function WHLSN:HandleSessionUpdate(data, sender)
     -- Suppress updates from the specific host we left (scoped, not global)
-    if self.leftSessionHost and self:StripRealmName(sender) == self:StripRealmName(self.leftSessionHost) then
+    if self.leftSessionHost and self:NamesMatch(sender, self.leftSessionHost) then
         return
     end
 
     -- Only accept updates from the session host (or accept new sessions when no host set)
-    if self.session.host and self:StripRealmName(sender) ~= self:StripRealmName(self.session.host) then
+    if self.session.host and not self:NamesMatch(sender, self.session.host) then
         return
     end
 
@@ -700,7 +698,7 @@ end
 function WHLSN:HandleSessionEnd(sender)
     -- Only accept end from the session host; ignore if not in a session
     if not self.session.host then return end
-    if self:StripRealmName(self.session.host) ~= self:StripRealmName(sender) then return end
+    if not self:NamesMatch(self.session.host, sender) then return end
 
     -- Non-host: preserve display state, mark session as host-ended
     self.session.hostEnded = true
@@ -712,12 +710,12 @@ end
 
 function WHLSN:HandleJoinRequest(data, sender, distribution)
     -- Only the host processes join requests
-    if self.session.host ~= UnitName("player") then return end
+    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
     if self.session.status ~= self.Status.LOBBY then return end
 
-    -- Validate sender matches the player data (strip realm for comparison)
+    -- Validate sender matches the player data
     if not data.player then return end
-    if self:StripRealmName(data.player.name) ~= self:StripRealmName(sender) then return end
+    if not self:NamesMatch(data.player.name, sender) then return end
 
     -- Only accept joins over expected channels
     if distribution ~= "GUILD" and distribution ~= "WHISPER" then return end
@@ -731,7 +729,7 @@ function WHLSN:HandleJoinRequest(data, sender, distribution)
 
     -- Replace if already in list
     for i, p in ipairs(self.session.players) do
-        if self:StripRealmName(p.name) == self:StripRealmName(player.name) then
+        if self:NamesMatch(p.name, player.name) then
             self.session.players[i] = player
             self:NotifySessionChange()
             return
@@ -742,7 +740,7 @@ function WHLSN:HandleJoinRequest(data, sender, distribution)
 
     -- Track community player for whisper broadcasts
     if distribution == "WHISPER" then
-        self.session.connectedCommunity[self:StripRealmName(sender)] = sender
+        self.session.connectedCommunity[sender] = sender
     end
 
     self:NotifySessionChange()
@@ -750,15 +748,15 @@ end
 
 function WHLSN:HandleLeaveRequest(data, sender)
     -- Only the host processes leave requests
-    if self.session.host ~= UnitName("player") then return end
+    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
     if not data.playerName then return end
-    if self:StripRealmName(data.playerName) ~= self:StripRealmName(sender) then return end
+    if not self:NamesMatch(data.playerName, sender) then return end
 
     for i, p in ipairs(self.session.players) do
-        if self:StripRealmName(p.name) == self:StripRealmName(sender) then
+        if self:NamesMatch(p.name, sender) then
             table.remove(self.session.players, i)
-            self.session.connectedCommunity[self:StripRealmName(sender)] = nil
-            self.session.removedPlayers[self:StripRealmName(sender)] = nil
+            self.session.connectedCommunity[sender] = nil
+            self.session.removedPlayers[p.name] = nil
             self:NotifySessionChange()
             return
         end
@@ -767,12 +765,12 @@ end
 
 function WHLSN:HandleSpecUpdate(data, sender, distribution)
     -- Only the host processes spec updates
-    if self.session.host ~= UnitName("player") then return end
+    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
     if self.session.status ~= self.Status.LOBBY then return end
 
     -- Validate sender matches the player data
     if not data.player then return end
-    if self:StripRealmName(data.player.name) ~= self:StripRealmName(sender) then return end
+    if not self:NamesMatch(data.player.name, sender) then return end
 
     -- Only accept over expected channels
     if distribution ~= "GUILD" and distribution ~= "WHISPER" then return end
@@ -785,7 +783,7 @@ function WHLSN:HandleSpecUpdate(data, sender, distribution)
 
     -- Find and replace existing player
     for i, p in ipairs(self.session.players) do
-        if self:StripRealmName(p.name) == self:StripRealmName(player.name) then
+        if self:NamesMatch(p.name, player.name) then
             self.session.players[i] = player
             self:NotifySessionChange()
             return

@@ -566,8 +566,8 @@ local function CreateSpecOverrideSection(parent)
                 player = playerData:ToDict(),
             }
             local serialized = WHLSN:Serialize(data)
-            if WHLSN.session.commChannel == "WHISPER" and WHLSN.session.hostFullName then
-                WHLSN:SafeSendCommMessage(WHLSN.COMM_PREFIX, serialized, "WHISPER", WHLSN.session.hostFullName)
+            if WHLSN.session.commChannel == "WHISPER" and WHLSN.session.host then
+                WHLSN:SafeSendCommMessage(WHLSN.COMM_PREFIX, serialized, "WHISPER", WHLSN.session.host)
             else
                 WHLSN:SafeSendCommMessage(WHLSN.COMM_PREFIX, serialized, "GUILD")
             end
@@ -966,8 +966,8 @@ function WHLSN:RequestJoin()
 
     local serialized = self:Serialize(data)
 
-    if self.session.commChannel == "WHISPER" and self.session.hostFullName then
-        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", self.session.hostFullName)
+    if self.session.commChannel == "WHISPER" and self.session.host then
+        self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "WHISPER", self.session.host)
     else
         self:SafeSendCommMessage(self.COMM_PREFIX, serialized, "GUILD")
     end
