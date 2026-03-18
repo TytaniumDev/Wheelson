@@ -113,6 +113,29 @@ function WHLSN:StripRealmName(name)
     return cached
 end
 
+--- Get the local player's full realm-qualified name (cached).
+---@return string
+function WHLSN:GetMyFullName()
+    if self._myFullName then return self._myFullName end
+    local name = UnitName("player")
+    local realm = GetNormalizedRealmName()
+    if name and realm then
+        self._myFullName = name .. "-" .. realm
+    end
+    return self._myFullName or name or ""
+end
+
+--- Compare two player names for identity, normalizing bare names to local realm.
+---@param a string|nil
+---@param b string|nil
+---@return boolean
+function WHLSN:NamesMatch(a, b)
+    if not a or not b then return false end
+    if not a:find("-") then a = a .. "-" .. GetNormalizedRealmName() end
+    if not b:find("-") then b = b .. "-" .. GetNormalizedRealmName() end
+    return a == b
+end
+
 --- Resolve a player's name using the comm sender, preserving realm for cross-realm players.
 ---@param player WHLSNPlayer
 ---@param sender string The addon comm sender (may include "-RealmName")
