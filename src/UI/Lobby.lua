@@ -53,9 +53,22 @@ local function CreateLobbyFrame(parent)
     frame.spinButton:SetSize(160, 32)
     frame.spinButton:SetPoint("BOTTOM", 0, 8)
     frame.spinButton:SetText("Spin the Wheel!")
+    frame.spinButton:SetMotionScriptsWhileDisabled(true)
     frame.spinButton:SetScript("OnClick", function()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
         WHLSN:SpinGroups()
+    end)
+    frame.spinButton:SetScript("OnEnter", function(self)
+        if not self:IsEnabled() then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Requires at least 5 players to spin.", 1, 0.3, 0.3, true)
+            GameTooltip:Show()
+        end
+    end)
+    frame.spinButton:SetScript("OnLeave", function(self)
+        if GameTooltip:GetOwner() == self then
+            GameTooltip:Hide()
+        end
     end)
 
     -- Join button (for non-hosts)
