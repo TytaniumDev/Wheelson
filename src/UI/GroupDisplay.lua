@@ -163,8 +163,10 @@ local function UpdatePlayerLine(lineFrame, prefix, hexColor, player)
         lineFrame:SetScript("OnEnter", function(self)
             WHLSN:ShowPlayerTooltip(self, player)
         end)
-        lineFrame:SetScript("OnLeave", function()
-            GameTooltip:Hide()
+        lineFrame:SetScript("OnLeave", function(self)
+            if GameTooltip:GetOwner() == self then
+                GameTooltip:Hide()
+            end
         end)
     else
         lineFrame.text:SetText("|cFF666666" .. prefix .. " (empty)|r")

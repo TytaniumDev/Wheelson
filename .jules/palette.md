@@ -1,0 +1,3 @@
+## 2024-05-14 - Tooltip Accessibility on Disabled Elements and Global Tooltip Hiding
+**Learning:** In the WoW UI API, disabled buttons do not receive motion events by default, making it difficult to provide context for why an element is disabled. Also, blindly hiding the global `GameTooltip` on `OnLeave` can accidentally clear tooltips triggered by other UI elements overlapping or changing state simultaneously.
+**Action:** Use `SetMotionScriptsWhileDisabled(true)` on buttons that need a tooltip to explain their disabled state, and always check `if GameTooltip:GetOwner() == self then GameTooltip:Hide() end` in `OnLeave` scripts to ensure you only hide tooltips owned by the current frame.
