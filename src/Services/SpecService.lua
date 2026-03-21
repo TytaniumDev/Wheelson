@@ -131,8 +131,9 @@ end
 ---@return boolean
 function WHLSN:NamesMatch(a, b)
     if not a or not b then return false end
-    if not a:find("-") then a = a .. "-" .. GetNormalizedRealmName() end
-    if not b:find("-") then b = b .. "-" .. GetNormalizedRealmName() end
+    -- ⚡ Bolt: Use plain string matching to bypass pattern compilation overhead for simple substring searches.
+    if not a:find("-", 1, true) then a = a .. "-" .. GetNormalizedRealmName() end
+    if not b:find("-", 1, true) then b = b .. "-" .. GetNormalizedRealmName() end
     return a == b
 end
 
@@ -140,7 +141,8 @@ end
 ---@param player WHLSNPlayer
 ---@param sender string The addon comm sender (may include "-RealmName")
 function WHLSN:ResolvePlayerName(player, sender)
-    if sender:find("-") then
+    -- ⚡ Bolt: Use plain string matching to bypass pattern compilation overhead for simple substring searches.
+    if sender:find("-", 1, true) then
         player.name = sender
     end
 end

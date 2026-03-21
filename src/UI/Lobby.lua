@@ -210,7 +210,8 @@ local function CreateCommunityPanel()
             btn:SetPoint("RIGHT", -4, 0)
             local r = results[i]
             local name = type(r) == "table" and r.name or tostring(r)
-            if not name:find("-") then
+            -- ⚡ Bolt: Use plain string matching to bypass pattern compilation overhead for simple substring searches.
+            if not name:find("-", 1, true) then
                 name = name .. "-" .. GetNormalizedRealmName()
             end
             btn.acName = name

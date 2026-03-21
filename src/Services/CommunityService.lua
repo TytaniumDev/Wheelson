@@ -27,7 +27,8 @@ end
 ---@return string
 function WHLSN:NormalizeCommunityName(name)
     local trimmed = strtrim(name)
-    if not trimmed:find("-") then
+    -- ⚡ Bolt: Use plain string matching to bypass pattern compilation overhead for simple substring searches.
+    if not trimmed:find("-", 1, true) then
         local realm = GetNormalizedRealmName()
         if realm then
             trimmed = trimmed .. "-" .. realm
