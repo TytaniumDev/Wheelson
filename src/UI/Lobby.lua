@@ -57,6 +57,22 @@ local function CreateLobbyFrame(parent)
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
         WHLSN:SpinGroups()
     end)
+    frame.spinButton:SetMotionScriptsWhileDisabled(true)
+    frame.spinButton:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Spin the Wheel!", 1, 1, 1)
+        if self:IsEnabled() then
+            GameTooltip:AddLine("Randomly sort players into balanced Mythic+ groups.", nil, nil, nil, true)
+        else
+            GameTooltip:AddLine("|cFFFF0000Requires at least 5 players in the lobby to spin.|r", nil, nil, nil, true)
+        end
+        GameTooltip:Show()
+    end)
+    frame.spinButton:SetScript("OnLeave", function(self)
+        if GameTooltip:GetOwner() == self then
+            GameTooltip:Hide()
+        end
+    end)
 
     -- Join button (for non-hosts)
     frame.joinButton = CreateFrame("Button", "WHLSNJoinButton", frame, "UIPanelButtonTemplate")

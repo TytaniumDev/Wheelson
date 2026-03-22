@@ -1,0 +1,3 @@
+## 2024-05-18 - Tooltips on Disabled Buttons
+**Learning:** In the WoW UI API, disabled buttons do not receive motion events by default. This makes it impossible to show a tooltip explaining *why* a button is disabled, which is a key accessibility/UX pattern.
+**Action:** Use `button:SetMotionScriptsWhileDisabled(true)` to allow `OnEnter` and `OnLeave` scripts to fire even when the button is disabled. Additionally, in `OnLeave`, verify ownership (`if GameTooltip:GetOwner() == self then GameTooltip:Hide() end`) to avoid inadvertently hiding other tooltips.
