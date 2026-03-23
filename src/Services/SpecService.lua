@@ -131,8 +131,10 @@ end
 ---@return boolean
 function WHLSN:NamesMatch(a, b)
     if not a or not b then return false end
-    if not a:find("-") then a = a .. "-" .. GetNormalizedRealmName() end
-    if not b:find("-") then b = b .. "-" .. GetNormalizedRealmName() end
+    if a == b then return true end -- ⚡ Bolt: Fast path for exact matches
+    -- ⚡ Bolt: Use plain string matching (true flag) to bypass pattern compilation overhead
+    if not a:find("-", 1, true) then a = a .. "-" .. GetNormalizedRealmName() end
+    if not b:find("-", 1, true) then b = b .. "-" .. GetNormalizedRealmName() end
     return a == b
 end
 
