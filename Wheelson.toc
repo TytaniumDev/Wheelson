@@ -78,6 +78,8 @@ src/Utils/BugReport.lua
 # UI
 src/UI/MainFrame.xml
 src/UI/MainFrame.lua
+src/UI/SpecOverride.lua
+src/UI/CommunityPanel.lua
 src/UI/Lobby.lua
 src/UI/ReelFrames.lua
 src/UI/ReelAnimation.lua

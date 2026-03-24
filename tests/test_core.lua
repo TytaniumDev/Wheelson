@@ -94,6 +94,8 @@ _G.random = math.random
 _G.wipe = function(t) for k in pairs(t) do t[k] = nil end end
 dofile("src/GroupCreator.lua")
 dofile("src/Services/CommunityService.lua")
+dofile("src/UI/SpecOverride.lua")
+dofile("src/UI/CommunityPanel.lua")
 dofile("src/UI/Lobby.lua")
 dofile("src/Services/PartyService.lua")
 dofile("src/UI/GroupDisplay.lua")
