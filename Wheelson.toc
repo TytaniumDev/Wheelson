@@ -60,6 +60,9 @@ src/Config.lua
 src/Models.lua
 src/TestData.lua
 src/GroupCreator.lua
+src/Session.lua
+src/Comm.lua
+src/Discovery.lua
 src/Core.lua
 
 # Services

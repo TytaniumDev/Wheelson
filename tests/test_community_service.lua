@@ -66,12 +66,15 @@ _G.Settings = {
 
 dofile("src/Config.lua")
 dofile("src/Models.lua")
-dofile("src/Core.lua")
-dofile("src/Services/SpecService.lua")
-
 _G.random = math.random
 _G.wipe = function(t) for k in pairs(t) do t[k] = nil end end
 dofile("src/GroupCreator.lua")
+dofile("src/Session.lua")
+dofile("src/Comm.lua")
+dofile("src/Discovery.lua")
+dofile("src/Core.lua")
+dofile("src/Services/SpecService.lua")
+
 dofile("src/Services/CommunityService.lua")
 
 local WHLSN = _G.Wheelson

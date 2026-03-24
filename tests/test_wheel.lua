@@ -136,6 +136,9 @@ _G.wipe = function(t) for k in pairs(t) do t[k] = nil end end
 -- Load source files in order
 dofile("src/Config.lua")
 dofile("src/Models.lua")
+dofile("src/Session.lua")
+dofile("src/Comm.lua")
+dofile("src/Discovery.lua")
 dofile("src/Core.lua")
 dofile("src/UI/Wheel.lua")
 
