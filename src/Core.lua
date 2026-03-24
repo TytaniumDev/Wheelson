@@ -102,6 +102,7 @@ end
 function WHLSN:OnEnable()
     self:RegisterEvent("GROUP_ROSTER_UPDATE")
     self:RegisterEvent("GUILD_ROSTER_UPDATE")
+    -- Comm queue flush handlers (defined in Comm.lua)
     self:RegisterEvent("ENCOUNTER_END")
     self:RegisterEvent("CHALLENGE_MODE_COMPLETED")
     self:RegisterEvent("CHALLENGE_MODE_RESET")

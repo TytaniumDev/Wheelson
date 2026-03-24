@@ -55,6 +55,8 @@ function WHLSN:CreateTestLobby()
     self.session.players = self:GetTestPlayers()
     self.session.groups = {}
     self.session.isTest = true
+    self.session.algorithmSnapshot = nil
+    self.session.connectedCommunity = {}
     self.session.removedPlayers = {}
 
     self:ShowMainFrame()
