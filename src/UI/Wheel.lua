@@ -25,9 +25,6 @@ local function GetAnimationSpeed()
     return 1.0
 end
 
--- Promote GetAnimationSpeed so ReelAnimation.lua can use it
-WHLSN._GetAnimationSpeed = GetAnimationSpeed
-
 ---------------------------------------------------------------------------
 -- Wheel Frame Creation
 ---------------------------------------------------------------------------
