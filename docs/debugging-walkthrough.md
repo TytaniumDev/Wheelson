@@ -24,12 +24,12 @@ The log is capped at 200 entries, auto-scrolls, and has **Copy All** (markdown f
 
 ## Phase 1: Host Creates a Lobby
 
-**Host clicks "Create Lobby"** -> `WHLSN:CreateLobby()` (`src/Core.lua:137`)
+**Host clicks "Create Lobby"** -> `WHLSN:CreateLobby()` (`src/Session.lua:9`)
 
 1. Sets `session.status = "lobby"` and `session.host = "HostName-Realm"`.
 2. Calls `DetectLocalPlayer()` (`src/Services/SpecService.lua:49`) to build the host's `Player` object from their active WoW spec, offspecs, utilities (brez/lust), and class token.
 3. Auto-adds the host as `session.players[1]`.
-4. Calls `BroadcastSessionUpdate()` (`src/Core.lua:620`) -> `SendSessionUpdate()` (`src/Core.lua:642`).
+4. Calls `BroadcastSessionUpdate()` (`src/Comm.lua:58`) -> `SendSessionUpdate()` (`src/Comm.lua:80`).
 
 ### Message sent by host
 
@@ -60,10 +60,10 @@ Payload: {
 
 ## Phase 2: Joiner Receives the Lobby Announcement
 
-**Joiner's addon receives the message** -> `OnCommReceived()` (`src/Core.lua:687`)
+**Joiner's addon receives the message** -> `OnCommReceived()` (`src/Comm.lua:125`)
 
 1. Deserializes the message, sees `type = "SESSION_UPDATE"`.
-2. Routes to `HandleSessionUpdate()` (`src/Core.lua:744`).
+2. Routes to `HandleSessionUpdate()` (`src/Comm.lua:182`).
 3. Since the joiner has no active session (`session.status == nil`) and `data.status == "lobby"`, prints:
    ```
    HostName-Realm created a lobby! Type /wheelson to join.
@@ -81,7 +81,7 @@ Payload: {
 
 ## Phase 3: Joiner Clicks "Join Lobby"
 
-**Joiner clicks "Join Lobby"** -> `WHLSN:RequestJoin()` (`src/UI/Lobby.lua:950`)
+**Joiner clicks "Join Lobby"** -> `WHLSN:RequestJoin()` (`src/UI/Lobby.lua:486`)
 
 1. Calls `DetectLocalPlayer()` to build the joiner's `Player` object from their current spec.
 2. If spec detection fails, prints `"Could not detect your spec..."` and aborts.
@@ -112,7 +112,7 @@ Payload: {
 
 ## Phase 4: Host Receives the Join Request
 
-**Host's addon receives the message** -> `OnCommReceived()` -> `HandleJoinRequest()` (`src/Core.lua:816`)
+**Host's addon receives the message** -> `OnCommReceived()` -> `HandleJoinRequest()` (`src/Comm.lua:254`)
 
 1. Validates: Is this addon the host? Is the lobby in `"lobby"` status? Does `data.player.name` match `sender`?
 2. For `WHISPER` distribution: also checks `IsCommunityRosterMember(sender)`.
@@ -146,12 +146,12 @@ Payload: {
 
 ## Phase 5: Joiner Receives JOIN_ACK + Updated Session
 
-**Joiner receives JOIN_ACK** -> `HandleJoinAck()` (`src/Core.lua:868`)
+**Joiner receives JOIN_ACK** -> `HandleJoinAck()` (`src/Comm.lua:306`)
 
 - Clears `joinPending`, cancels the 5-second timeout timer.
 - The "Join Lobby" button switches to "Leave".
 
-**Joiner receives SESSION_UPDATE** -> `HandleSessionUpdate()` (`src/Core.lua:744`)
+**Joiner receives SESSION_UPDATE** -> `HandleSessionUpdate()` (`src/Comm.lua:182`)
 
 - Updates the local player list from the host's authoritative state.
 - UI refreshes showing all players in the lobby.
@@ -167,7 +167,7 @@ Payload: {
 
 ## Phase 6: Host Spins the Wheel
 
-**Host clicks "Spin the Wheel!"** -> `WHLSN:SpinGroups()` (`src/Core.lua:247`)
+**Host clicks "Spin the Wheel!"** -> `WHLSN:SpinGroups()` (`src/Session.lua:119`)
 
 1. Filters out hidden/removed players.
 2. Requires at least 5 active players.
@@ -203,7 +203,7 @@ Payload: {
 
 ## Phase 7: Session Completion
 
-After the wheel animation finishes -> `WHLSN:CompleteSession()` (`src/Core.lua:308`)
+After the wheel animation finishes -> `WHLSN:CompleteSession()` (`src/Session.lua:180`)
 
 1. Sets `session.status = "completed"`.
 2. Saves results to SavedVariables via `SaveSessionResults()`.
@@ -221,7 +221,7 @@ After the wheel animation finishes -> `WHLSN:CompleteSession()` (`src/Core.lua:3
 
 ### Joiner clicks "Leave"
 
-`WHLSN:LeaveSession()` (`src/Core.lua:217`)
+`WHLSN:LeaveSession()` (`src/Session.lua:89`)
 
 ```
 Channel: GUILD (or WHISPER)
@@ -229,7 +229,7 @@ Type: LEAVE_REQUEST
 Payload: { type = "LEAVE_REQUEST", playerName = "JoinerName-Realm" }
 ```
 
-Host processes via `HandleLeaveRequest()` (`src/Core.lua:902`) -- removes the player, broadcasts updated session.
+Host processes via `HandleLeaveRequest()` (`src/Comm.lua:340`) -- removes the player, broadcasts updated session.
 
 ### Debug log (joiner)
 
@@ -246,7 +246,7 @@ Host processes via `HandleLeaveRequest()` (`src/Core.lua:902`) -- removes the pl
 
 ### Host clicks "Close Lobby"
 
-`WHLSN:CloseLobby()` (`src/Core.lua:194`)
+`WHLSN:CloseLobby()` (`src/Session.lua:66`)
 
 ```
 Channel: GUILD
@@ -254,7 +254,7 @@ Type: SESSION_END
 Payload: { type = "SESSION_END" }
 ```
 
-All non-hosts receive via `HandleSessionEnd()` (`src/Core.lua:803`) -- marks `hostEnded = true`, UI updates to show the lobby has ended.
+All non-hosts receive via `HandleSessionEnd()` (`src/Comm.lua:241`) -- marks `hostEnded = true`, UI updates to show the lobby has ended.
 
 ### Debug log (host)
 
