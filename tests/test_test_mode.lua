@@ -89,12 +89,16 @@ dofile("src/Config.lua")
 dofile("src/Models.lua")
 dofile("src/TestData.lua")
 dofile("src/GroupCreator.lua")
+dofile("src/Session.lua")
+dofile("src/Comm.lua")
+dofile("src/Discovery.lua")
 dofile("src/Core.lua")
 dofile("src/Services/SpecService.lua")
 dofile("src/Services/GuildService.lua")
 dofile("src/Services/CommunityService.lua")
 dofile("src/Services/PartyService.lua")
 dofile("src/Utils/Helpers.lua")
+dofile("src/Utils/BugReport.lua")
 
 local WHLSN = _G.Wheelson
 
