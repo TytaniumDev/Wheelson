@@ -140,6 +140,8 @@ dofile("src/Session.lua")
 dofile("src/Comm.lua")
 dofile("src/Discovery.lua")
 dofile("src/Core.lua")
+dofile("src/UI/ReelFrames.lua")
+dofile("src/UI/ReelAnimation.lua")
 dofile("src/UI/Wheel.lua")
 
 local WHLSN = _G.Wheelson

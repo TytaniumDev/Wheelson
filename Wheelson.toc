@@ -79,6 +79,8 @@ src/Utils/BugReport.lua
 src/UI/MainFrame.xml
 src/UI/MainFrame.lua
 src/UI/Lobby.lua
+src/UI/ReelFrames.lua
+src/UI/ReelAnimation.lua
 src/UI/Wheel.lua
 src/UI/GroupDisplay.lua
 src/UI/DebugPanel.lua
