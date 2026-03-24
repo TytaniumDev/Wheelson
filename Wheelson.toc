@@ -70,6 +70,7 @@ src/Services/PartyService.lua
 
 # Utilities
 src/Utils/Helpers.lua
+src/Utils/BugReport.lua
 
 # UI
 src/UI/MainFrame.xml

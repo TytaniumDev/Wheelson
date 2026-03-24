@@ -95,6 +95,7 @@ dofile("src/Services/GuildService.lua")
 dofile("src/Services/CommunityService.lua")
 dofile("src/Services/PartyService.lua")
 dofile("src/Utils/Helpers.lua")
+dofile("src/Utils/BugReport.lua")
 
 local WHLSN = _G.Wheelson
 
