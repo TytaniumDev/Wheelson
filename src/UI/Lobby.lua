@@ -78,6 +78,17 @@ local function CreateLobbyFrame(parent)
     frame.joinButton:SetScript("OnClick", function()
         WHLSN:RequestJoin()
     end)
+    frame.joinButton:SetMotionScriptsWhileDisabled(true)
+    frame.joinButton:SetScript("OnEnter", function(self)
+        if not self:IsEnabled() and self:GetText() == "Joining..." then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Waiting for response...", 1, 1, 1)
+            GameTooltip:Show()
+        end
+    end)
+    frame.joinButton:SetScript("OnLeave", function(self)
+        if GameTooltip:GetOwner() == self then GameTooltip:Hide() end
+    end)
 
     -- Leave button (for non-hosts who have joined)
     frame.leaveButton = CreateFrame("Button", "WHLSNLeaveButton", frame, "UIPanelButtonTemplate")
