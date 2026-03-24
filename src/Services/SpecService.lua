@@ -133,18 +133,20 @@ local normalizedNameCache = {}
 ---@return boolean
 function WHLSN:NamesMatch(a, b)
     if not a or not b then return false end
+    -- ⚡ Bolt: Fast-path exact match before expensive normalizations
+    if a == b then return true end
 
     -- ⚡ Bolt: Cache normalized name lookups to avoid repeated pattern matching
-    -- (a:find("-")) and string concatenations during heavily looped checks.
     local normA = normalizedNameCache[a]
     if not normA then
-        normA = a:find("-") and a or (a .. "-" .. GetNormalizedRealmName())
+        -- ⚡ Bolt: Use plain string search to bypass regex overhead
+        normA = a:find("-", 1, true) and a or (a .. "-" .. GetNormalizedRealmName())
         normalizedNameCache[a] = normA
     end
 
     local normB = normalizedNameCache[b]
     if not normB then
-        normB = b:find("-") and b or (b .. "-" .. GetNormalizedRealmName())
+        normB = b:find("-", 1, true) and b or (b .. "-" .. GetNormalizedRealmName())
         normalizedNameCache[b] = normB
     end
 
@@ -155,7 +157,8 @@ end
 ---@param player WHLSNPlayer
 ---@param sender string The addon comm sender (may include "-RealmName")
 function WHLSN:ResolvePlayerName(player, sender)
-    if sender:find("-") then
+    -- ⚡ Bolt: Use plain string search to bypass regex overhead
+    if sender:find("-", 1, true) then
         player.name = sender
     end
 end
