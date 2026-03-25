@@ -27,6 +27,7 @@ _G.C_ChatInfo = { SendChatMessage = function() end }
 dofile("src/Config.lua")
 dofile("src/Models.lua")
 dofile("src/Utils/Helpers.lua")
+dofile("src/Utils/BugReport.lua")
 
 local WHLSN = _G.Wheelson
 local Player = WHLSN.Player

@@ -85,12 +85,17 @@ _G.GetNormalizedRealmName = function() return "Illidan" end
 -- Load source files in order
 dofile("src/Config.lua")
 dofile("src/Models.lua")
+dofile("src/Session.lua")
+dofile("src/Comm.lua")
+dofile("src/Discovery.lua")
 dofile("src/Core.lua")
 dofile("src/Services/SpecService.lua")
 _G.random = math.random
 _G.wipe = function(t) for k in pairs(t) do t[k] = nil end end
 dofile("src/GroupCreator.lua")
 dofile("src/Services/CommunityService.lua")
+dofile("src/UI/SpecOverride.lua")
+dofile("src/UI/CommunityPanel.lua")
 dofile("src/UI/Lobby.lua")
 dofile("src/Services/PartyService.lua")
 dofile("src/UI/GroupDisplay.lua")
@@ -642,9 +647,9 @@ describe("leftSessionHost", function()
         assert.equals("HostB", WHLSN.session.host)
     end)
 
-    it("should clear leftSessionHost on StartSession", function()
+    it("should clear leftSessionHost on CreateLobby", function()
         WHLSN.leftSessionHost = "HostA"
-        WHLSN:StartSession()
+        WHLSN:CreateLobby()
 
         assert.is_nil(WHLSN.leftSessionHost)
     end)
@@ -1428,8 +1433,8 @@ describe("Realm-qualified identity", function()
         WHLSN.analytics = setmetatable({}, { __index = function() return function() end end })
     end)
 
-    it("StartSession should set host as realm-qualified name", function()
-        WHLSN:StartSession()
+    it("CreateLobby should set host as realm-qualified name", function()
+        WHLSN:CreateLobby()
         assert.equal("TestPlayer-Illidan", WHLSN.session.host)
     end)
 
