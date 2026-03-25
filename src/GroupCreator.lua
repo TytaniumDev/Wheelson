@@ -88,13 +88,14 @@ local function BuildLastGroupsDict(previousGroups)
     for _, group in ipairs(previousGroups) do
         local members = group:GetPlayers()
         for _, member in ipairs(members) do
-            local memberKey = WHLSN:StripRealmName(member.name)
+            -- ⚡ Bolt: Rely on pre-computed strippedName or fallback to computing it
+            local memberKey = member.strippedName or WHLSN:StripRealmName(member.name)
             if not dict[memberKey] then
                 dict[memberKey] = {}
             end
             for _, m in ipairs(members) do
                 if not m:Equals(member) then
-                    dict[memberKey][WHLSN:StripRealmName(m.name)] = true
+                    dict[memberKey][m.strippedName or WHLSN:StripRealmName(m.name)] = true
                 end
             end
         end
@@ -166,7 +167,8 @@ end
 --- Remove a player from all applicable pools.
 local function removePlayer(ctx, player)
     if player == nil then return end
-    ctx.usedPlayers[WHLSN:StripRealmName(player.name)] = true
+    -- ⚡ Bolt: Rely on pre-computed strippedName
+    ctx.usedPlayers[player.strippedName] = true
 
     if player:IsTankMain() then
         removeFromList(ctx.mainTanks, player)
@@ -207,7 +209,8 @@ local function grabNextAvailablePlayer(ctx, availablePlayers, group)
 
     local ineligible = {}
     for _, teammate in ipairs(teammates) do
-        local prev = ctx.lastGroupsDict[WHLSN:StripRealmName(teammate.name)]
+        -- ⚡ Bolt: Rely on pre-computed strippedName
+        local prev = ctx.lastGroupsDict[teammate.strippedName]
         if prev then
             for name in pairs(prev) do
                 ineligible[name] = true
@@ -216,7 +219,8 @@ local function grabNextAvailablePlayer(ctx, availablePlayers, group)
     end
 
     for _, p in ipairs(availablePlayers) do
-        local stripped = WHLSN:StripRealmName(p.name)
+        -- ⚡ Bolt: Use pre-computed strippedName to avoid thousands of StripRealmName calls
+        local stripped = p.strippedName
         if not ineligible[stripped] and not ctx.usedPlayers[stripped] then
             removePlayer(ctx, p)
             return p
@@ -224,7 +228,7 @@ local function grabNextAvailablePlayer(ctx, availablePlayers, group)
     end
 
     for _, p in ipairs(availablePlayers) do
-        if not ctx.usedPlayers[WHLSN:StripRealmName(p.name)] then
+        if not ctx.usedPlayers[p.strippedName] then
             removePlayer(ctx, p)
             return p
         end
@@ -353,7 +357,8 @@ local function HandleRemainderPlayers(ctx)
         while totalUsed < #ctx.players do
             local remaining = {}
             for _, p in ipairs(ctx.players) do
-                if not ctx.usedPlayers[WHLSN:StripRealmName(p.name)] then
+                -- ⚡ Bolt: Rely on pre-computed strippedName
+                if not ctx.usedPlayers[p.strippedName] then
                     remaining[#remaining + 1] = p
                 end
             end
@@ -403,8 +408,14 @@ end
 function WHLSN:CreateMythicPlusGroups(players, guildId)
     guildId = guildId or "default"
 
+    local copiedPlayers = copyList(players)
+    -- ⚡ Bolt: Pre-compute strippedName once to avoid repeated regex overhead in loops
+    for _, p in ipairs(copiedPlayers) do
+        p.strippedName = self:StripRealmName(p.name)
+    end
+
     local ctx = {
-        players         = copyList(players),
+        players         = copiedPlayers,
         usedPlayers     = {},
         groups          = {},
         lastGroupsDict  = BuildLastGroupsDict(self:GetLastGroups(guildId)),
