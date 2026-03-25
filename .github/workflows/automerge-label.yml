@@ -15,6 +15,6 @@ jobs:
       github.event.review.state == 'approved' &&
       (
         github.event.review.user.login == 'TytaniumDev' ||
-        (github.event.review.user.login == 'claude' && github.event.pull_request.user.login == 'app/google-labs-jules')
+        (github.event.review.user.login == 'claude[bot]' && github.event.pull_request.user.login == 'google-labs-jules[bot]')
       )
     uses: TytaniumDev/.github/.github/workflows/automerge-label.yml@main
