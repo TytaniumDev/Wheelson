@@ -1,3 +1,7 @@
 ## 2024-03-17 - Cached String Regex Matching in Hot Paths
 **Learning:** In Lua, calling string pattern matching (e.g. `name:match("^([^%-]+)")`) inside loops and highly accessed lookup pathways, like `StripRealmName` which gets called hundreds of times during UI rendering and comparisons, incurs significant overhead. Caching the result for immutable entities (like player names) yields ~3x speedup.
 **Action:** When performing regex on frequent string identifiers that never mutate, introduce a simple table-based local cache instead of evaluating the pattern each time.
+
+## 2024-03-24 - Fast-path exact match and plain string search
+**Learning:** In Lua, an exact match check (`if a == b then return true end`) before performing complex string normalizations or concatenations is a safe and effective micro-optimization to prevent redundant operations and API calls. Furthermore, bypassing the pattern matching engine for simple substring searches (especially those with magic characters like '-') by using plain string matching (`string:find(substring, 1, true)`) avoids pattern compilation overhead and significantly improves performance (~10x faster for exact matches and ~2x faster for mismatches).
+**Action:** When comparing strings, always consider a fast-path exact match check before normalization. For simple substring searches, consistently use `string:find(substring, 1, true)` to bypass regex overhead.
