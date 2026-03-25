@@ -895,19 +895,19 @@ describe("HandleSessionPing", function()
 
     it("should set commChannel to WHISPER", function()
         local data = { type = "SESSION_PING", host = "HostPlayer", status = "lobby", version = WHLSN.VERSION }
-        WHLSN:HandleSessionPing(data, "HostPlayer-Illidan")
+        WHLSN:HandleSessionPing(data, "HostPlayer-Illidan", "GUILD")
         assert.equals("WHISPER", WHLSN.session.commChannel)
     end)
 
     it("should store host from sender (realm-qualified)", function()
         local data = { type = "SESSION_PING", host = "HostPlayer", status = "lobby", version = WHLSN.VERSION }
-        WHLSN:HandleSessionPing(data, "HostPlayer-Illidan")
+        WHLSN:HandleSessionPing(data, "HostPlayer-Illidan", "GUILD")
         assert.equals("HostPlayer-Illidan", WHLSN.session.host)
     end)
 
     it("should set session status and host from sender", function()
         local data = { type = "SESSION_PING", host = "HostPlayer", status = "lobby", version = WHLSN.VERSION }
-        WHLSN:HandleSessionPing(data, "HostPlayer-Illidan")
+        WHLSN:HandleSessionPing(data, "HostPlayer-Illidan", "GUILD")
         assert.equals("lobby", WHLSN.session.status)
         assert.equals("HostPlayer-Illidan", WHLSN.session.host)
     end)
@@ -917,7 +917,7 @@ describe("HandleSessionPing", function()
         WHLSN.session.host = "ExistingHost"
 
         local data = { type = "SESSION_PING", host = "OtherHost", status = "lobby", version = WHLSN.VERSION }
-        WHLSN:HandleSessionPing(data, "OtherHost-Illidan")
+        WHLSN:HandleSessionPing(data, "OtherHost-Illidan", "GUILD")
         assert.equals("ExistingHost", WHLSN.session.host)
     end)
 
@@ -926,7 +926,7 @@ describe("HandleSessionPing", function()
         WHLSN.session.host = "SameHost"
 
         local data = { type = "SESSION_PING", host = "SameHost", status = "lobby", version = WHLSN.VERSION }
-        WHLSN:HandleSessionPing(data, "SameHost-Illidan")
+        WHLSN:HandleSessionPing(data, "SameHost-Illidan", "GUILD")
         -- Should not set commChannel to WHISPER since session is already active via GUILD
         assert.is_nil(WHLSN.session.commChannel)
     end)

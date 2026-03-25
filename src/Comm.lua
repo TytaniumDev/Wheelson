@@ -155,7 +155,7 @@ function WHLSN:OnCommReceived(prefix, message, distribution, sender)
     elseif data.type == "SESSION_QUERY" then
         self:HandleSessionQuery(sender)
     elseif data.type == "SESSION_PING" then
-        self:HandleSessionPing(data, sender)
+        self:HandleSessionPing(data, sender, distribution)
     elseif data.type == "ADDON_PING" then
         self:HandleAddonPing(sender)
     elseif data.type == "ADDON_PONG" then
@@ -163,7 +163,14 @@ function WHLSN:OnCommReceived(prefix, message, distribution, sender)
     end
 end
 
-function WHLSN:HandleSessionPing(data, sender)
+function WHLSN:HandleSessionPing(data, sender, distribution)
+    -- Only accept over expected channels
+    if distribution ~= "GUILD" and distribution ~= "WHISPER" then return end
+    -- Whisper pings require community roster membership
+    if distribution == "WHISPER" then
+        if not self:IsCommunityRosterMember(sender) then return end
+    end
+
     -- Ignore if already in any active session (guild members get SESSION_UPDATE via GUILD,
     -- so a SESSION_PING would incorrectly overwrite their channel to WHISPER)
     if self.session.status then return end
