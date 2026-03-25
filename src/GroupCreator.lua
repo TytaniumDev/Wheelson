@@ -71,13 +71,6 @@ local function removeFromList(list, player)
 end
 
 --- Check if a player is in a list.
-local function isInList(list, player)
-    for _, p in ipairs(list) do
-        if p:Equals(player) then return true end
-    end
-    return false
-end
-
 --- Copy a table shallowly.
 local function copyList(src)
     local dst = {}
@@ -141,12 +134,27 @@ end
 
 --- Build merged available lists and compute maxGroups.
 local function BuildAvailableLists(ctx)
-    for _, p in ipairs(ctx.mainTanks) do ctx.availableTanks[#ctx.availableTanks + 1] = p end
-    for _, p in ipairs(ctx.offTanks) do ctx.availableTanks[#ctx.availableTanks + 1] = p end
-    for _, p in ipairs(ctx.offTanksWithHeal) do ctx.availableTanks[#ctx.availableTanks + 1] = p end
+    for _, p in ipairs(ctx.mainTanks) do
+        ctx.availableTanks[#ctx.availableTanks + 1] = p
+        ctx.availableTanksSet[p.name] = true
+    end
+    for _, p in ipairs(ctx.offTanks) do
+        ctx.availableTanks[#ctx.availableTanks + 1] = p
+        ctx.availableTanksSet[p.name] = true
+    end
+    for _, p in ipairs(ctx.offTanksWithHeal) do
+        ctx.availableTanks[#ctx.availableTanks + 1] = p
+        ctx.availableTanksSet[p.name] = true
+    end
 
-    for _, p in ipairs(ctx.mainHealers) do ctx.availableHealers[#ctx.availableHealers + 1] = p end
-    for _, p in ipairs(ctx.offHealers) do ctx.availableHealers[#ctx.availableHealers + 1] = p end
+    for _, p in ipairs(ctx.mainHealers) do
+        ctx.availableHealers[#ctx.availableHealers + 1] = p
+        ctx.availableHealersSet[p.name] = true
+    end
+    for _, p in ipairs(ctx.offHealers) do
+        ctx.availableHealers[#ctx.availableHealers + 1] = p
+        ctx.availableHealersSet[p.name] = true
+    end
 
     for _, p in ipairs(ctx.mainDps) do ctx.availableDps[#ctx.availableDps + 1] = p end
     for _, p in ipairs(ctx.offDps) do ctx.availableDps[#ctx.availableDps + 1] = p end
@@ -163,18 +171,22 @@ local function removePlayer(ctx, player)
     if player:IsTankMain() then
         removeFromList(ctx.mainTanks, player)
         removeFromList(ctx.availableTanks, player)
+        ctx.availableTanksSet[player.name] = nil
     elseif player:IsOfftank() then
         removeFromList(ctx.offTanks, player)
         removeFromList(ctx.offTanksWithHeal, player)
         removeFromList(ctx.availableTanks, player)
+        ctx.availableTanksSet[player.name] = nil
     end
 
     if player:IsHealerMain() then
         removeFromList(ctx.mainHealers, player)
         removeFromList(ctx.availableHealers, player)
+        ctx.availableHealersSet[player.name] = nil
     elseif player:IsOffhealer() then
         removeFromList(ctx.offHealers, player)
         removeFromList(ctx.availableHealers, player)
+        ctx.availableHealersSet[player.name] = nil
     end
 
     if player:IsDpsMain() then
@@ -235,8 +247,9 @@ local function AssignLust(ctx)
     for _, currentGroup in ipairs(ctx.groups) do
         if not currentGroup:HasLust() then
             local filtered = {}
+            -- ⚡ Bolt: Replace O(N) list search with O(1) set lookup
             for _, p in ipairs(ctx.lustPlayers) do
-                if not isInList(ctx.availableTanks, p) then
+                if not ctx.availableTanksSet[p.name] then
                     filtered[#filtered + 1] = p
                 end
             end
@@ -259,16 +272,18 @@ local function AssignBrez(ctx)
             local brezPlayer
             if currentGroup.healer then
                 local filtered = {}
+                -- ⚡ Bolt: Replace O(N) list search with O(1) set lookup
                 for _, p in ipairs(ctx.brezPlayers) do
-                    if not isInList(ctx.availableTanks, p) and not isInList(ctx.availableHealers, p) then
+                    if not ctx.availableTanksSet[p.name] and not ctx.availableHealersSet[p.name] then
                         filtered[#filtered + 1] = p
                     end
                 end
                 brezPlayer = grabNextAvailablePlayer(ctx, filtered, currentGroup)
             else
                 local filtered = {}
+                -- ⚡ Bolt: Replace O(N) list search with O(1) set lookup
                 for _, p in ipairs(ctx.brezPlayers) do
-                    if not isInList(ctx.availableTanks, p) then
+                    if not ctx.availableTanksSet[p.name] then
                         filtered[#filtered + 1] = p
                     end
                 end
@@ -405,6 +420,8 @@ function WHLSN:CreateMythicPlusGroups(players, guildId)
         availableTanks  = {},
         availableHealers = {},
         availableDps    = {},
+        availableTanksSet   = {},
+        availableHealersSet = {},
         maxGroups       = 0,
         offhealersToGrab = 0,
     }
