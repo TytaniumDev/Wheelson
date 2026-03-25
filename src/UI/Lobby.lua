@@ -56,6 +56,19 @@ local function CreateLobbyFrame(parent)
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
         WHLSN:SpinGroups()
     end)
+    frame.spinButton:SetMotionScriptsWhileDisabled(true)
+    frame.spinButton:SetScript("OnEnter", function(self)
+        if not self:IsEnabled() then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Need at least 5 players to spin", 1, 0.1, 0.1)
+            GameTooltip:Show()
+        end
+    end)
+    frame.spinButton:SetScript("OnLeave", function(self)
+        if GameTooltip:GetOwner() == self then
+            GameTooltip:Hide()
+        end
+    end)
 
     -- Join button (for non-hosts)
     frame.joinButton = CreateFrame("Button", "WHLSNJoinButton", frame, "UIPanelButtonTemplate")
@@ -64,6 +77,17 @@ local function CreateLobbyFrame(parent)
     frame.joinButton:SetText("Join Lobby")
     frame.joinButton:SetScript("OnClick", function()
         WHLSN:RequestJoin()
+    end)
+    frame.joinButton:SetMotionScriptsWhileDisabled(true)
+    frame.joinButton:SetScript("OnEnter", function(self)
+        if not self:IsEnabled() and self:GetText() == "Joining..." then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Waiting for response...", 1, 1, 1)
+            GameTooltip:Show()
+        end
+    end)
+    frame.joinButton:SetScript("OnLeave", function(self)
+        if GameTooltip:GetOwner() == self then GameTooltip:Hide() end
     end)
 
     -- Leave button (for non-hosts who have joined)

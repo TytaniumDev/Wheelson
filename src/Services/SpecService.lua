@@ -125,22 +125,40 @@ function WHLSN:GetMyFullName()
     return self._myFullName or name or ""
 end
 
+local normalizedNameCache = {}
+
 --- Compare two player names for identity, normalizing bare names to local realm.
 ---@param a string|nil
 ---@param b string|nil
 ---@return boolean
 function WHLSN:NamesMatch(a, b)
     if not a or not b then return false end
-    if not a:find("-") then a = a .. "-" .. GetNormalizedRealmName() end
-    if not b:find("-") then b = b .. "-" .. GetNormalizedRealmName() end
-    return a == b
+    -- ⚡ Bolt: Fast-path exact match before expensive normalizations
+    if a == b then return true end
+
+    -- ⚡ Bolt: Cache normalized name lookups to avoid repeated pattern matching
+    local normA = normalizedNameCache[a]
+    if not normA then
+        -- ⚡ Bolt: Use plain string search to bypass regex overhead
+        normA = a:find("-", 1, true) and a or (a .. "-" .. GetNormalizedRealmName())
+        normalizedNameCache[a] = normA
+    end
+
+    local normB = normalizedNameCache[b]
+    if not normB then
+        normB = b:find("-", 1, true) and b or (b .. "-" .. GetNormalizedRealmName())
+        normalizedNameCache[b] = normB
+    end
+
+    return normA == normB
 end
 
 --- Resolve a player's name using the comm sender, preserving realm for cross-realm players.
 ---@param player WHLSNPlayer
 ---@param sender string The addon comm sender (may include "-RealmName")
 function WHLSN:ResolvePlayerName(player, sender)
-    if sender:find("-") then
+    -- ⚡ Bolt: Use plain string search to bypass regex overhead
+    if sender:find("-", 1, true) then
         player.name = sender
     end
 end
