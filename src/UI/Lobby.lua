@@ -17,6 +17,12 @@ local ROLE_TEXCOORDS = {
     melee = { 0, 0.25, 0, 1 },
 }
 
+-- ⚡ Bolt: Pre-calculate colored role strings for performance in Lobby UI loops
+local COLORED_ROLES = {}
+for role, rc in pairs(WHLSN.RoleColors) do
+    COLORED_ROLES[role] = "|cFF" .. rc.hex .. role .. "|r"
+end
+
 
 local function CreateLobbyFrame(parent)
     local frame = CreateFrame("Frame", "WHLSNLobbyFrame", parent)
@@ -293,13 +299,14 @@ end
 ---@param classColor table|nil  { r, g, b, hex }
 ---@return string
 local function FormatPlayerLabel(player, classColor)
+    -- ⚡ Bolt: Optimize string formatting using table.concat and pre-calculated role strings
     local hex = classColor and classColor.hex or "FFFFFF"
     local parts = { "|cFF" .. hex .. WHLSN:StripRealmName(player.name) .. "|r" }
 
     if player.mainRole then
-        local rc = WHLSN.RoleColors[player.mainRole]
-        if rc then
-            parts[#parts + 1] = " |cFF" .. rc.hex .. player.mainRole .. "|r"
+        local cr = COLORED_ROLES[player.mainRole]
+        if cr then
+            parts[#parts + 1] = " " .. cr
         end
     end
 
@@ -309,12 +316,7 @@ local function FormatPlayerLabel(player, classColor)
             if i > 1 then
                 parts[#parts + 1] = "|cFF808080, |r"
             end
-            local rc = WHLSN.RoleColors[spec]
-            if rc then
-                parts[#parts + 1] = "|cFF" .. rc.hex .. spec .. "|r"
-            else
-                parts[#parts + 1] = spec
-            end
+            parts[#parts + 1] = COLORED_ROLES[spec] or spec
         end
     end
 
