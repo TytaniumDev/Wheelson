@@ -60,6 +60,9 @@ src/Config.lua
 src/Models.lua
 src/TestData.lua
 src/GroupCreator.lua
+src/Session.lua
+src/Comm.lua
+src/Discovery.lua
 src/Core.lua
 
 # Services
@@ -70,11 +73,16 @@ src/Services/PartyService.lua
 
 # Utilities
 src/Utils/Helpers.lua
+src/Utils/BugReport.lua
 
 # UI
 src/UI/MainFrame.xml
 src/UI/MainFrame.lua
+src/UI/SpecOverride.lua
+src/UI/CommunityPanel.lua
 src/UI/Lobby.lua
+src/UI/ReelFrames.lua
+src/UI/ReelAnimation.lua
 src/UI/Wheel.lua
 src/UI/GroupDisplay.lua
 src/UI/DebugPanel.lua

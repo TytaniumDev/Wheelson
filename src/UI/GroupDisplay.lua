@@ -64,7 +64,7 @@ local function CreateGroupDisplayFrame(parent)
         local isHost = WHLSN:NamesMatch(WHLSN.session.host, WHLSN:GetMyFullName())
         WHLSN:ToggleMainFrame()
         if isHost then
-            WHLSN:EndSession()
+            WHLSN:CloseLobby()
         else
             WHLSN:ClearSessionState()
         end
@@ -267,7 +267,7 @@ function WHLSN:UpdateGroupDisplayView()
     displayFrame.reportButton:SetShown(not isViewing and WHLSN.session.algorithmSnapshot ~= nil)
 
     if isViewing then
-        displayFrame.title:SetText("|cFFFFD100Past Session Results|r")
+        displayFrame.title:SetText("|cFFFFD100Past Lobby Results|r")
         displayFrame.endButton:SetText("Close")
     else
         displayFrame.title:SetText("|cFFFFD100Mythic+ Groups|r")

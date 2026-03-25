@@ -7,7 +7,6 @@ local WHLSN = _G.Wheelson
 ---------------------------------------------------------------------------
 
 local lobbyState = { frame = nil, playerRows = {}, historyRows = {}, specSection = nil }
-local communityPanel = nil
 
 local ROLE_ICON_TEXTURE = "Interface\\LFGFrame\\LFGRole_BW"
 
@@ -57,12 +56,25 @@ local function CreateLobbyFrame(parent)
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
         WHLSN:SpinGroups()
     end)
+    frame.spinButton:SetMotionScriptsWhileDisabled(true)
+    frame.spinButton:SetScript("OnEnter", function(self)
+        if not self:IsEnabled() then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Need at least 5 players to spin", 1, 0.1, 0.1)
+            GameTooltip:Show()
+        end
+    end)
+    frame.spinButton:SetScript("OnLeave", function(self)
+        if GameTooltip:GetOwner() == self then
+            GameTooltip:Hide()
+        end
+    end)
 
     -- Join button (for non-hosts)
     frame.joinButton = CreateFrame("Button", "WHLSNJoinButton", frame, "UIPanelButtonTemplate")
     frame.joinButton:SetSize(100, 32)
     frame.joinButton:SetPoint("BOTTOMLEFT", 8, 8)
-    frame.joinButton:SetText("Join Session")
+    frame.joinButton:SetText("Join Lobby")
     frame.joinButton:SetScript("OnClick", function()
         WHLSN:RequestJoin()
     end)
@@ -76,37 +88,37 @@ local function CreateLobbyFrame(parent)
         WHLSN:LeaveSession()
     end)
 
-    -- Start Session button (shown when no session is active)
+    -- Create Lobby button (shown when no lobby is active)
     frame.startButton = CreateFrame("Button", "WHLSNStartButton", frame, "UIPanelButtonTemplate")
     frame.startButton:SetSize(140, 32)
     frame.startButton:SetPoint("BOTTOMLEFT", 8, 8)
-    frame.startButton:SetText("Start Session")
+    frame.startButton:SetText("Create Lobby")
     frame.startButton:SetScript("OnClick", function()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-        WHLSN:StartSession()
+        WHLSN:CreateLobby()
     end)
 
-    -- Test button (shown when no session is active, next to Start Session)
+    -- Test button (shown when no lobby is active, next to Create Lobby)
     frame.testButton = CreateFrame("Button", "WHLSNTestButton", frame, "UIPanelButtonTemplate")
     frame.testButton:SetSize(80, 32)
     frame.testButton:SetPoint("BOTTOMRIGHT", -8, 8)
     frame.testButton:SetText("Test")
     frame.testButton:SetScript("OnClick", function()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-        WHLSN:StartTestSession()
+        WHLSN:CreateTestLobby()
     end)
 
-    -- End Session button (host only, active session)
+    -- Close Lobby button (host only, active lobby)
     frame.endButton = CreateFrame("Button", "WHLSNEndButton", frame, "UIPanelButtonTemplate")
     frame.endButton:SetSize(100, 32)
     frame.endButton:SetPoint("BOTTOMLEFT", 8, 8)
-    frame.endButton:SetText("End Session")
+    frame.endButton:SetText("Close Lobby")
     frame.endButton:SetScript("OnClick", function()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-        WHLSN:EndSession()
+        WHLSN:CloseLobby()
     end)
 
-    -- Community Roster button (host only, during active session)
+    -- Community Roster button (host only, during active lobby)
     frame.communityRosterButton = CreateFrame("Button", "WHLSNCommunityRosterButton", frame, "UIPanelButtonTemplate")
     frame.communityRosterButton:SetSize(120, 32)
     frame.communityRosterButton:SetPoint("BOTTOMRIGHT", -8, 8)
@@ -116,274 +128,6 @@ local function CreateLobbyFrame(parent)
     end)
 
     return frame
-end
-
-local COMMUNITY_PANEL_BACKDROP = {
-    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-    tile = true, tileSize = 16, edgeSize = 16,
-    insets = { left = 4, right = 4, top = 4, bottom = 4 },
-}
-
-local function CreateCommunityPanel()
-    local mainFrame = _G["WHLSNMainFrame"]
-    if not mainFrame then return nil end
-
-    local panel = CreateFrame("Frame", "WHLSNCommunityPanel", mainFrame, "BackdropTemplate")
-    panel:SetWidth(200)
-    panel:SetPoint("TOPLEFT", mainFrame, "TOPRIGHT", -2, 0)
-    panel:SetPoint("BOTTOMLEFT", mainFrame, "BOTTOMRIGHT", -2, 0)
-    panel:SetBackdrop(COMMUNITY_PANEL_BACKDROP)
-    panel:SetBackdropColor(0.05, 0.05, 0.08, 0.95)
-    panel:SetClampedToScreen(true)
-    panel:SetFrameStrata("DIALOG")
-    panel:EnableMouse(true)
-
-    -- Title
-    panel.title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    panel.title:SetPoint("TOP", 0, -12)
-    panel.title:SetText("|cFFFFD100Community Roster|r")
-
-    -- Member count
-    panel.countText = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    panel.countText:SetPoint("TOP", panel.title, "BOTTOM", 0, -2)
-    panel.countText:SetTextColor(0.6, 0.6, 0.6)
-
-    -- Add player input
-    panel.input = CreateFrame("EditBox", "WHLSNCommunityInput", panel, "InputBoxTemplate")
-    panel.input:SetSize(140, 20)
-    panel.input:SetPoint("TOPLEFT", 12, -48)
-    panel.input:SetFontObject("ChatFontNormal")
-    panel.input:SetAutoFocus(false)
-    panel.input.Instructions = panel.input:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    panel.input.Instructions:SetPoint("LEFT", 6, 0)
-    panel.input.Instructions:SetText("Character name...")
-    panel.input.Instructions:SetTextColor(0.5, 0.5, 0.5)
-    panel.input:SetScript("OnEditFocusGained", function(self)
-        self.Instructions:Hide()
-    end)
-    panel.input:SetScript("OnEditFocusLost", function(self)
-        if self:GetText() == "" then
-            self.Instructions:Show()
-        end
-    end)
-
-    -- Autocomplete dropdown (GetAutoCompleteResults signature changed in 12.0)
-    local acInclude = AUTOCOMPLETE_FLAG_ALL or 0xFFFFFFFF
-    local acExclude = AUTOCOMPLETE_FLAG_NONE or 0
-    local acDropdown = CreateFrame("Frame", nil, panel.input, "BackdropTemplate")
-    acDropdown:SetBackdrop(COMMUNITY_PANEL_BACKDROP)
-    acDropdown:SetBackdropColor(0.1, 0.1, 0.12, 0.95)
-    acDropdown:SetPoint("TOPLEFT", panel.input, "BOTTOMLEFT", 0, -2)
-    acDropdown:SetPoint("RIGHT", panel.input, "RIGHT")
-    acDropdown:SetFrameStrata("TOOLTIP")
-    acDropdown:Hide()
-    acDropdown.buttons = {}
-
-    local function HideAC() acDropdown:Hide() end
-
-    local function UpdateAC()
-        local text = panel.input:GetText()
-        if not text or #text == 0 then HideAC(); return end
-        local MAX_AC_RESULTS = 8
-        local ok, results = pcall(GetAutoCompleteResults, text, MAX_AC_RESULTS, #text, true, acInclude, acExclude)
-        if not ok or not results or #results == 0 then HideAC(); return end
-        local count = math.min(#results, MAX_AC_RESULTS)
-        for i = 1, count do
-            local btn = acDropdown.buttons[i]
-            if not btn then
-                btn = CreateFrame("Button", nil, acDropdown)
-                btn:SetHeight(18)
-                btn:SetNormalFontObject("GameFontHighlightSmall")
-                local hl = btn:CreateTexture(nil, "HIGHLIGHT")
-                hl:SetAllPoints()
-                hl:SetColorTexture(1, 0.82, 0, 0.15)
-                btn:SetScript("OnClick", function(self)
-                    panel.input:SetText(self.acName)
-                    panel.input:SetCursorPosition(#self.acName)
-                    HideAC()
-                end)
-                acDropdown.buttons[i] = btn
-            end
-            btn:ClearAllPoints()
-            btn:SetPoint("TOPLEFT", 4, -(i - 1) * 18 - 4)
-            btn:SetPoint("RIGHT", -4, 0)
-            local r = results[i]
-            local name = type(r) == "table" and r.name or tostring(r)
-            if not name:find("-") then
-                name = name .. "-" .. GetNormalizedRealmName()
-            end
-            btn.acName = name
-            btn:SetText(name)
-            local fs = btn:GetFontString()
-            fs:ClearAllPoints()
-            fs:SetPoint("LEFT", btn, "LEFT", 2, 0)
-            fs:SetJustifyH("LEFT")
-            btn:Show()
-        end
-        for i = count + 1, #acDropdown.buttons do acDropdown.buttons[i]:Hide() end
-        acDropdown:SetHeight(count * 18 + 8)
-        acDropdown:Show()
-    end
-
-    panel.input:SetScript("OnTextChanged", function(_, userInput)
-        if userInput then UpdateAC() end
-    end)
-
-    -- OK button
-    panel.okButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    panel.okButton:SetSize(36, 20)
-    panel.okButton:SetPoint("LEFT", panel.input, "RIGHT", 2, 0)
-    panel.okButton:SetText("OK")
-
-    -- Add player logic
-    local function ConfirmAddPlayer()
-        HideAC()
-        local name = panel.input:GetText()
-        if name and strtrim(name) ~= "" then
-            local added, err = WHLSN:AddCommunityPlayer(name)
-            if added then
-                local normalized = WHLSN:NormalizeCommunityName(name)
-                WHLSN:Print("Added " .. normalized .. " to community roster.")
-                if WHLSN.session.status == WHLSN.Status.LOBBY then
-                    local pingData = {
-                        type = "SESSION_PING",
-                        host = WHLSN:GetMyFullName(),
-                        status = WHLSN.session.status,
-                        version = WHLSN.VERSION,
-                    }
-                    local serialized = WHLSN:Serialize(pingData)
-                    WHLSN:SafeSendCommMessage(WHLSN.COMM_PREFIX, serialized, "WHISPER", normalized)
-                end
-                WHLSN:RefreshCommunityPanel()
-                WHLSN:UpdateLobbyView()
-            else
-                WHLSN:Print("Could not add: " .. (err or "unknown error"))
-            end
-        end
-        panel.input:SetText("")
-        panel.input.Instructions:Show()
-        panel.input:ClearFocus()
-    end
-
-    panel.okButton:SetScript("OnClick", ConfirmAddPlayer)
-    panel.input:SetScript("OnEnterPressed", ConfirmAddPlayer)
-    panel.input:SetScript("OnEscapePressed", function(self)
-        HideAC()
-        self:SetText("")
-        self.Instructions:Show()
-        self:ClearFocus()
-    end)
-
-    -- Divider line
-    local divider = panel:CreateTexture(nil, "ARTWORK")
-    divider:SetHeight(1)
-    divider:SetPoint("TOPLEFT", 8, -74)
-    divider:SetPoint("TOPRIGHT", -8, -74)
-    divider:SetColorTexture(0.3, 0.3, 0.3, 0.8)
-
-    -- Container for roster rows
-    panel.rosterContainer = CreateFrame("Frame", nil, panel)
-    panel.rosterContainer:SetPoint("TOPLEFT", 8, -80)
-    panel.rosterContainer:SetPoint("BOTTOMRIGHT", -8, 8)
-
-    panel.rosterRows = {}
-
-    panel:Hide()
-    return panel
-end
-
-function WHLSN:ToggleCommunityPanel()
-    if not communityPanel then
-        communityPanel = CreateCommunityPanel()
-        if not communityPanel then return end
-        UISpecialFrames[#UISpecialFrames + 1] = "WHLSNCommunityPanel"
-    end
-
-    if communityPanel:IsShown() then
-        communityPanel:Hide()
-    else
-        communityPanel:Show()
-        self:RefreshCommunityPanel()
-    end
-end
-
-function WHLSN:HideCommunityPanel()
-    if communityPanel and communityPanel:IsShown() then
-        communityPanel:Hide()
-    end
-end
-
-local function OnRosterRowEnter(r)
-    GameTooltip:SetOwner(r, "ANCHOR_RIGHT")
-    GameTooltip:SetText(r.fullName, 1, 1, 1)
-    GameTooltip:Show()
-end
-
-local function OnRosterRowLeave()
-    GameTooltip:Hide()
-end
-
-local function OnRosterRowMouseUp(r, button)
-    if button == "RightButton" then
-        MenuUtil.CreateContextMenu(r, function(_, rootDescription)
-            rootDescription:CreateTitle(r.fullName)
-            rootDescription:CreateButton("Whisper", function()
-                ChatFrame_OpenChat("/w " .. r.fullName .. " ")
-            end)
-            rootDescription:CreateButton("|cFFFF6666Remove|r", function()
-                WHLSN:RemoveCommunityPlayer(r.fullName)
-                WHLSN:Print("Removed " .. r.fullName .. " from community roster.")
-                WHLSN:RefreshCommunityPanel()
-            end)
-        end)
-    end
-end
-
-function WHLSN:RefreshCommunityPanel()
-    if not communityPanel or not communityPanel:IsShown() then return end
-
-    local roster = self.db.profile.communityRoster
-    communityPanel.countText:SetText(#roster .. " members")
-
-    -- Hide existing rows
-    for _, row in ipairs(communityPanel.rosterRows) do
-        row:Hide()
-    end
-
-    -- Create/update rows
-    for i, entry in ipairs(roster) do
-        local row = communityPanel.rosterRows[i]
-        if not row then
-            row = CreateFrame("Frame", nil, communityPanel.rosterContainer)
-            row:SetHeight(20)
-            row:EnableMouse(true)
-
-            row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            row.nameText:SetPoint("LEFT", 4, 0)
-            row.nameText:SetJustifyH("LEFT")
-
-            local highlight = row:CreateTexture(nil, "HIGHLIGHT")
-            highlight:SetAllPoints()
-            highlight:SetColorTexture(1, 0.82, 0, 0.1)
-
-            row:SetScript("OnEnter", OnRosterRowEnter)
-            row:SetScript("OnLeave", OnRosterRowLeave)
-            row:SetScript("OnMouseUp", OnRosterRowMouseUp)
-
-            communityPanel.rosterRows[i] = row
-        end
-
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", 0, -(i - 1) * 22)
-        row:SetPoint("RIGHT", 0, 0)
-
-        row.nameText:SetText(entry.name)
-        row.nameText:SetTextColor(0.9, 0.9, 0.9)
-        row.fullName = entry.name
-
-        row:Show()
-    end
 end
 
 local function CreatePlayerRow(parent, index)
@@ -481,201 +225,6 @@ local function CreatePlayerRow(parent, index)
     return row
 end
 
---- Create the "Your Specs" override section.
----@param parent Frame  the lobby frame
----@return Frame
-local function CreateSpecOverrideSection(parent)
-    local section = CreateFrame("Frame", nil, parent)
-    section:SetHeight(62)
-    section:SetPoint("BOTTOMLEFT", 8, 44)
-    section:SetPoint("BOTTOMRIGHT", -8, 44)
-
-    -- Divider line at top
-    local divider = section:CreateTexture(nil, "ARTWORK")
-    divider:SetHeight(1)
-    divider:SetPoint("TOPLEFT", 0, 0)
-    divider:SetPoint("TOPRIGHT", 0, 0)
-    divider:SetColorTexture(0.3, 0.3, 0.3, 0.8)
-
-    -- Title
-    local title = section:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    title:SetPoint("TOPLEFT", 0, -6)
-    title:SetText("|cFFFFD100Your Specs|r")
-
-    -- Main spec label
-    local mainLabel = section:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    mainLabel:SetPoint("TOPLEFT", 0, -22)
-    mainLabel:SetText("Main:")
-    mainLabel:SetTextColor(0.6, 0.6, 0.6)
-
-    -- Offspec label
-    local offLabel = section:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    offLabel:SetPoint("TOPLEFT", 0, -40)
-    offLabel:SetText("Off:")
-    offLabel:SetTextColor(0.6, 0.6, 0.6)
-
-    section.mainButtons = {}
-    section.offButtons = {}
-    section.selectedMain = nil
-    section.selectedOffs = {}
-
-    local allRoles = { "tank", "healer", "ranged", "melee" }
-
-    -- Style a role button based on selection state
-    local function StyleButton(btn, role, selected)
-        local rc = WHLSN.RoleColors[role]
-        if selected then
-            btn:GetFontString():SetTextColor(rc.r, rc.g, rc.b)
-        else
-            btn:GetFontString():SetTextColor(0.4, 0.4, 0.4)
-        end
-    end
-
-    local function SendSpecUpdate()
-        local selectedOffspecs = {}
-        for role, enabled in pairs(section.selectedOffs) do
-            if enabled then
-                selectedOffspecs[role] = true
-            end
-        end
-
-        -- Persist spec overrides to character storage
-        if WHLSN.db and WHLSN.db.char then
-            WHLSN.db.char.specOverrides = {
-                mainRole = section.selectedMain,
-                offspecs = selectedOffspecs,
-            }
-        end
-
-        local playerData = WHLSN:DetectLocalPlayer(selectedOffspecs, section.selectedMain)
-        if not playerData then return end
-
-        -- Update local player in session
-        for i, p in ipairs(WHLSN.session.players) do
-            if WHLSN:NamesMatch(p.name, WHLSN:GetMyFullName()) then
-                WHLSN.session.players[i] = playerData
-                break
-            end
-        end
-
-        -- Send to host (unless we are the host — already updated locally)
-        if not WHLSN:NamesMatch(WHLSN.session.host, WHLSN:GetMyFullName()) then
-            local data = {
-                type = "SPEC_UPDATE",
-                player = playerData:ToDict(),
-            }
-            local serialized = WHLSN:Serialize(data)
-            if WHLSN.session.commChannel == "WHISPER" and WHLSN.session.host then
-                WHLSN:SafeSendCommMessage(WHLSN.COMM_PREFIX, serialized, "WHISPER", WHLSN.session.host)
-            else
-                WHLSN:SafeSendCommMessage(WHLSN.COMM_PREFIX, serialized, "GUILD")
-            end
-        else
-            WHLSN:BroadcastSessionUpdate()
-        end
-
-        WHLSN:UpdateLobbyView()
-    end
-
-    local function RefreshOffButtons()
-        for _, btn in ipairs(section.offButtons) do
-            btn:Hide()
-        end
-
-        local idx = 0
-        for _, role in ipairs(allRoles) do
-            if role ~= section.selectedMain then
-                idx = idx + 1
-                local btn = section.offButtons[idx]
-                if not btn then
-                    btn = CreateFrame("Button", nil, section, "UIPanelButtonTemplate")
-                    btn:SetSize(60, 18)
-                    btn:GetFontString():SetJustifyH("CENTER")
-                    section.offButtons[idx] = btn
-                end
-                btn:ClearAllPoints()
-                btn:SetPoint("TOPLEFT", mainLabel, "TOPLEFT", 36 + (idx - 1) * 64, -18)
-                btn:SetText(role)
-                btn.role = role
-
-                local selected = section.selectedOffs[role] or false
-                StyleButton(btn, role, selected)
-
-                btn:SetScript("OnClick", function()
-                    section.selectedOffs[role] = not section.selectedOffs[role]
-                    StyleButton(btn, role, section.selectedOffs[role])
-                    SendSpecUpdate()
-                end)
-                btn:Show()
-            end
-        end
-    end
-
-    -- Create main spec buttons
-    for i, role in ipairs(allRoles) do
-        local btn = CreateFrame("Button", nil, section, "UIPanelButtonTemplate")
-        btn:SetSize(60, 18)
-        btn:SetPoint("TOPLEFT", mainLabel, "TOPLEFT", 36 + (i - 1) * 64, 0)
-        btn:SetText(role)
-        btn:GetFontString():SetJustifyH("CENTER")
-        btn.role = role
-
-        btn:SetScript("OnClick", function()
-            if section.selectedMain == role then return end
-            -- Deselect old main from offspecs if it was selected
-            section.selectedOffs[role] = nil
-            -- Update main
-            section.selectedMain = role
-            -- Style all main buttons
-            for _, mb in ipairs(section.mainButtons) do
-                StyleButton(mb, mb.role, mb.role == role)
-            end
-            RefreshOffButtons()
-            SendSpecUpdate()
-        end)
-
-        section.mainButtons[i] = btn
-    end
-
-    --- Initialize the section from saved overrides or the local player's detected spec data.
-    function section:Initialize()
-        local specIndex = C_SpecializationInfo.GetSpecialization()
-        if not specIndex then return end
-        local specID = C_SpecializationInfo.GetSpecializationInfo(specIndex)
-        if not specID then return end
-
-        -- Restore from saved overrides if available
-        self.selectedOffs = {}
-        local saved = WHLSN.db and WHLSN.db.char and WHLSN.db.char.specOverrides
-        if saved and saved.mainRole then
-            self.selectedMain = saved.mainRole
-            if saved.offspecs then
-                for role, enabled in pairs(saved.offspecs) do
-                    if enabled then
-                        self.selectedOffs[role] = true
-                    end
-                end
-            end
-        else
-            self.selectedMain = WHLSN.SpecRoles[specID]
-
-            local allOffspecs = WHLSN:DetectAllOffspecs()
-            for _, offRole in ipairs(allOffspecs) do
-                self.selectedOffs[offRole] = true
-            end
-        end
-
-        -- Style main buttons
-        for _, btn in ipairs(self.mainButtons) do
-            StyleButton(btn, btn.role, btn.role == self.selectedMain)
-        end
-
-        RefreshOffButtons()
-    end
-
-    return section
-end
-
 local function CreateHistoryRow(parent, index)
     local row = CreateFrame("Button", nil, parent)
     row:SetHeight(20)
@@ -709,7 +258,7 @@ end
 function WHLSN:ShowLobbyView(parent)
     if not lobbyState.frame then
         lobbyState.frame = CreateLobbyFrame(parent)
-        lobbyState.specSection = CreateSpecOverrideSection(lobbyState.frame)
+        lobbyState.specSection = WHLSN.CreateSpecOverrideSection(lobbyState.frame)
     end
     lobbyState.frame:SetParent(parent)
     lobbyState.frame:SetAllPoints()
@@ -724,7 +273,7 @@ local function UpdateLobbyStatus(frame, session, hasSession)
     if hasSession then
         frame.statusText:SetText("Lobby - Hosted by " .. WHLSN:StripRealmName(session.host or "Unknown"))
     else
-        frame.statusText:SetText("No active session")
+        frame.statusText:SetText("No active lobby")
     end
 end
 
@@ -747,7 +296,7 @@ local function UpdateLobbyButtons(frame, isHost, hasSession, isInSession, player
         frame.joinButton:SetText("Joining...")
         frame.joinButton:SetEnabled(false)
     else
-        frame.joinButton:SetText("Join Session")
+        frame.joinButton:SetText("Join Lobby")
         frame.joinButton:SetEnabled(true)
     end
 end
@@ -823,7 +372,7 @@ local function PopulatePlayerRows(frame, players)
             row.lustIcon:SetAlpha(0.35)
             row.strikethrough:Show()
             row.kickButton:SetText("+")
-            row.kickButton.tooltipText = "Include in session"
+            row.kickButton.tooltipText = "Include in lobby"
             row.kickButton:SetScript("OnClick", function()
                 WHLSN:UnhidePlayer(player.name)
             end)
@@ -834,7 +383,7 @@ local function PopulatePlayerRows(frame, players)
             row.lustIcon:SetAlpha(1)
             row.strikethrough:Hide()
             row.kickButton:SetText("X")
-            row.kickButton.tooltipText = "Remove from session"
+            row.kickButton.tooltipText = "Remove from lobby"
             row.kickButton:SetScript("OnClick", function()
                 WHLSN:HidePlayer(player.name)
             end)
@@ -849,8 +398,8 @@ end
 
 local function PopulateHistoryRows(frame, history)
     local rows = lobbyState.historyRows
-    frame.statusText:SetText("Recent Sessions")
-    frame.countText:SetText(#history .. " sessions")
+    frame.statusText:SetText("Recent Lobbies")
+    frame.countText:SetText(#history .. " lobbies")
 
     for i, record in ipairs(history) do
         if not rows[i] then
@@ -949,12 +498,12 @@ end
 --- Send a join request to the session host.
 function WHLSN:RequestJoin()
     if not self.session.host then
-        self:Print("No active session to join.")
+        self:Print("No active lobby to join.")
         return
     end
 
     if self.session.hostEnded then
-        self:Print("That session has ended.")
+        self:Print("That lobby has ended.")
         return
     end
 
