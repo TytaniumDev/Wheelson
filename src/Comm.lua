@@ -257,12 +257,11 @@ function WHLSN:IsHost()
 end
 
 --- Common validation for host-side message handlers.
----@param data table
 ---@param sender string
 ---@param distribution string
 ---@param playerName? string Optional player name to validate against sender
 ---@return boolean
-function WHLSN:ValidateSender(data, sender, distribution, playerName)
+function WHLSN:ValidateSender(sender, distribution, playerName)
     -- Only the host processes these requests
     if not self:IsHost() then return false end
 
@@ -284,7 +283,7 @@ end
 
 function WHLSN:HandleJoinRequest(data, sender, distribution)
     if not data.player then return end
-    if not self:ValidateSender(data, sender, distribution, data.player.name) then return end
+    if not self:ValidateSender(sender, distribution, data.player.name) then return end
     if self.session.status ~= self.Status.LOBBY then return end
 
     local player = WHLSN.Player.FromDict(data.player)
@@ -376,7 +375,7 @@ end
 
 function WHLSN:HandleSpecUpdate(data, sender, distribution)
     if not data.player then return end
-    if not self:ValidateSender(data, sender, distribution, data.player.name) then return end
+    if not self:ValidateSender(sender, distribution, data.player.name) then return end
     if self.session.status ~= self.Status.LOBBY then return end
 
     local player = WHLSN.Player.FromDict(data.player)
