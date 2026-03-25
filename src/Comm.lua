@@ -141,7 +141,7 @@ function WHLSN:OnCommReceived(prefix, message, distribution, sender)
     end
 
     if data.type == "SESSION_UPDATE" then
-        self:HandleSessionUpdate(data, sender)
+        self:HandleSessionUpdate(data, sender, distribution)
     elseif data.type == "SESSION_END" then
         self:HandleSessionEnd(sender)
     elseif data.type == "JOIN_REQUEST" then
@@ -179,7 +179,11 @@ function WHLSN:HandleSessionPing(data, sender)
     self:UpdateUI()
 end
 
-function WHLSN:HandleSessionUpdate(data, sender)
+function WHLSN:HandleSessionUpdate(data, sender, distribution)
+    -- Security: Validate communication channel and sender authorization
+    if distribution ~= "GUILD" and distribution ~= "WHISPER" then return end
+    if distribution == "WHISPER" and not self:IsCommunityRosterMember(sender) then return end
+
     -- Suppress updates from the specific host we left (scoped, not global)
     if self.leftSessionHost and self:NamesMatch(sender, self.leftSessionHost) then
         return
