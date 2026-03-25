@@ -11,5 +11,10 @@ permissions:
 
 jobs:
   add-label:
-    if: github.event.review.state == 'approved' && github.event.review.user.login == 'TytaniumDev'
+    if: >-
+      github.event.review.state == 'approved' &&
+      (
+        github.event.review.user.login == 'TytaniumDev' ||
+        (github.event.review.user.login == 'claude' && github.event.pull_request.user.login == 'app/google-labs-jules')
+      )
     uses: TytaniumDev/.github/.github/workflows/automerge-label.yml@main
