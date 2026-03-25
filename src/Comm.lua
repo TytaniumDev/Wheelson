@@ -251,21 +251,40 @@ function WHLSN:HandleSessionEnd(sender)
     self:UpdateUI()
 end
 
-function WHLSN:HandleJoinRequest(data, sender, distribution)
-    -- Only the host processes join requests
-    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
-    if self.session.status ~= self.Status.LOBBY then return end
+--- Return true if the local player is the session host.
+function WHLSN:IsHost()
+    return self:NamesMatch(self.session.host, self:GetMyFullName())
+end
 
-    -- Validate sender matches the player data
-    if not data.player then return end
-    if not self:NamesMatch(data.player.name, sender) then return end
+--- Common validation for host-side message handlers.
+---@param sender string
+---@param distribution string
+---@param playerName? string Optional player name to validate against sender
+---@return boolean
+function WHLSN:ValidateSender(sender, distribution, playerName)
+    -- Only the host processes these requests
+    if not self:IsHost() then return false end
 
-    -- Only accept joins over expected channels
-    if distribution ~= "GUILD" and distribution ~= "WHISPER" then return end
-    -- Whisper joins require community roster membership
-    if distribution == "WHISPER" then
-        if not self:IsCommunityRosterMember(sender) then return end
+    -- Validate sender matches the player data if provided
+    if playerName and not self:NamesMatch(playerName, sender) then
+        return false
     end
+
+    -- Only accept over expected channels
+    if distribution ~= "GUILD" and distribution ~= "WHISPER" then return false end
+
+    -- Whisper joins require community roster membership
+    if distribution == "WHISPER" and not self:IsCommunityRosterMember(sender) then
+        return false
+    end
+
+    return true
+end
+
+function WHLSN:HandleJoinRequest(data, sender, distribution)
+    if not data.player then return end
+    if not self:ValidateSender(sender, distribution, data.player.name) then return end
+    if self.session.status ~= self.Status.LOBBY then return end
 
     local player = WHLSN.Player.FromDict(data.player)
     self:ResolvePlayerName(player, sender)
@@ -315,7 +334,7 @@ end
 
 --- Handle SESSION_QUERY from a non-host (host only).
 function WHLSN:HandleSessionQuery(_sender)
-    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
+    if not self:IsHost() then return end
     if not self.session.status then return end
     self:SendSessionUpdate()
 end
@@ -338,9 +357,9 @@ function WHLSN:SendSessionQuery()
 end
 
 function WHLSN:HandleLeaveRequest(data, sender)
-    -- Only the host processes leave requests
-    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
     if not data.playerName then return end
+    -- Only the host processes leave requests
+    if not self:IsHost() then return end
     if not self:NamesMatch(data.playerName, sender) then return end
 
     for i, p in ipairs(self.session.players) do
@@ -355,19 +374,9 @@ function WHLSN:HandleLeaveRequest(data, sender)
 end
 
 function WHLSN:HandleSpecUpdate(data, sender, distribution)
-    -- Only the host processes spec updates
-    if not self:NamesMatch(self.session.host, self:GetMyFullName()) then return end
-    if self.session.status ~= self.Status.LOBBY then return end
-
-    -- Validate sender matches the player data
     if not data.player then return end
-    if not self:NamesMatch(data.player.name, sender) then return end
-
-    -- Only accept over expected channels
-    if distribution ~= "GUILD" and distribution ~= "WHISPER" then return end
-    if distribution == "WHISPER" then
-        if not self:IsCommunityRosterMember(sender) then return end
-    end
+    if not self:ValidateSender(sender, distribution, data.player.name) then return end
+    if self.session.status ~= self.Status.LOBBY then return end
 
     local player = WHLSN.Player.FromDict(data.player)
     self:ResolvePlayerName(player, sender)
