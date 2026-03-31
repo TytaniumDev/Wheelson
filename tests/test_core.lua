@@ -1317,13 +1317,13 @@ describe("SessionQuery", function()
         WHLSN.SendSessionUpdate = origSendSessionUpdate
     end)
 
-    it("HandleSessionQuery should call SendSessionUpdate when host", function()
+    it("HandleSessionQuery should call SendSessionUpdate with fullSync when host", function()
         WHLSN.session.status = WHLSN.Status.LOBBY
         WHLSN.session.host = "TestPlayer-Illidan"
-        local called = false
-        WHLSN.SendSessionUpdate = function() called = true end
+        local calledWith = nil
+        WHLSN.SendSessionUpdate = function(_, fullSync) calledWith = fullSync end
         WHLSN:HandleSessionQuery("OtherPlayer-Illidan")
-        assert.is_true(called)
+        assert.is_true(calledWith)
     end)
 
     it("HandleSessionQuery should ignore when not host", function()
@@ -1894,6 +1894,75 @@ describe("SendSessionUpdate compactGroups", function()
         assert.is_nil(sentData.compactGroups)
         assert.is_nil(sentData.groups)
     end)
+
+    it("should omit players, community, and removedPlayers for SPINNING", function()
+        WHLSN.session.connectedCommunity = { ["Comm1"] = "Comm1" }
+        WHLSN.session.removedPlayers = { ["Removed1"] = true }
+
+        WHLSN:SendSessionUpdate()
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_nil(sentData.players)
+        assert.is_nil(sentData.community)
+        assert.is_nil(sentData.removedPlayers)
+        -- But status and host are still present
+        assert.equals("spinning", sentData.status)
+        assert.is_not_nil(sentData.host)
+    end)
+
+    it("should omit players for COMPLETED", function()
+        WHLSN.session.status = WHLSN.Status.COMPLETED
+
+        WHLSN:SendSessionUpdate()
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_nil(sentData.players)
+    end)
+
+    it("should include players for LOBBY", function()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+
+        WHLSN:SendSessionUpdate()
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_not_nil(sentData.players)
+        assert.equals(5, #sentData.players)
+    end)
+
+    it("should never include playerCount", function()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN:SendSessionUpdate()
+        assert.is_nil(WHLSN.sent_messages[1].data.playerCount)
+
+        WHLSN.sent_messages = {}
+        WHLSN.session.status = WHLSN.Status.SPINNING
+        WHLSN:SendSessionUpdate()
+        assert.is_nil(WHLSN.sent_messages[1].data.playerCount)
+    end)
+
+    it("should include all fields when fullSync is true even for SPINNING", function()
+        WHLSN.session.connectedCommunity = { ["Comm1"] = "Comm1" }
+        WHLSN.session.removedPlayers = { ["Hidden1"] = true }
+
+        WHLSN:SendSessionUpdate(true)
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_not_nil(sentData.players)
+        assert.equals(5, #sentData.players)
+        assert.is_not_nil(sentData.community)
+        assert.is_not_nil(sentData.removedPlayers)
+        assert.is_not_nil(sentData.compactGroups)
+    end)
+
+    it("should include all fields when fullSync is true for COMPLETED", function()
+        WHLSN.session.status = WHLSN.Status.COMPLETED
+
+        WHLSN:SendSessionUpdate(true)
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_not_nil(sentData.players)
+        assert.is_not_nil(sentData.compactGroups)
+    end)
 end)
 
 describe("HandleSessionUpdate compactGroups", function()
@@ -1981,6 +2050,62 @@ describe("HandleSessionUpdate compactGroups", function()
         WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
 
         assert.equals("Tank1", WHLSN.session.groups[1].tank.name)
+    end)
+
+    it("should use existing player list when SPINNING update omits players", function()
+        -- Simulate having received the player list during LOBBY phase
+        WHLSN.session.host = "HostPlayer"
+        WHLSN.session.status = "lobby"
+        WHLSN.session.players = {
+            WHLSN.Player:New("Tank1", "tank", {}, { "brez" }, "WARRIOR"),
+            WHLSN.Player:New("Healer1", "healer", {}, {}, "PRIEST"),
+            WHLSN.Player:New("DPS1", "ranged", {}, {}, "MAGE"),
+        }
+
+        -- SPINNING update arrives without players (normal compact update)
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "spinning",
+            host = "HostPlayer",
+            compactGroups = {
+                { tank = "Tank1", healer = "Healer1", dps = { "DPS1" } },
+            },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        -- Player list should be preserved from LOBBY phase
+        assert.equals(3, #WHLSN.session.players)
+        assert.equals("Tank1", WHLSN.session.players[1].name)
+        -- Groups should be reconstructed with full player data
+        assert.equals(1, #WHLSN.session.groups)
+        assert.equals("tank", WHLSN.session.groups[1].tank.mainRole)
+        assert.equals("WARRIOR", WHLSN.session.groups[1].tank.classToken)
+        assert.is_true(WHLSN.session.groups[1].tank:HasBrez())
+    end)
+
+    it("should preserve community and removedPlayers when SPINNING update omits them", function()
+        WHLSN.session.host = "HostPlayer"
+        WHLSN.session.status = "lobby"
+        WHLSN.session.players = {
+            WHLSN.Player:New("Tank1", "tank"),
+        }
+        WHLSN.session.connectedCommunity = { ["Comm1"] = "Comm1" }
+        WHLSN.session.removedPlayers = { ["Hidden1"] = true }
+
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "spinning",
+            host = "HostPlayer",
+            compactGroups = {
+                { tank = "Tank1", dps = {} },
+            },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        assert.equals("Comm1", WHLSN.session.connectedCommunity["Comm1"])
+        assert.is_true(WHLSN.session.removedPlayers["Hidden1"])
     end)
 end)
 

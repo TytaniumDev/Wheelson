@@ -77,22 +77,33 @@ function WHLSN:BroadcastSessionUpdate()
 end
 
 --- Send the actual session update message.
-function WHLSN:SendSessionUpdate()
-    local playerList = {}
-    for _, p in ipairs(self.session.players) do
-        playerList[#playerList + 1] = p:ToDict()
-    end
+--- For SPINNING/COMPLETED, only sends the status delta (compact groups) to keep the
+--- message small and reliable over AceComm's chunked GUILD channel. Receivers keep the
+--- player list they already have from the LOBBY phase.
+---@param fullSync? boolean When true, include all fields regardless of status (used for SESSION_QUERY responses)
+function WHLSN:SendSessionUpdate(fullSync)
+    local isLobby = self.session.status == self.Status.LOBBY
+    local includeFull = fullSync or isLobby
 
     local data = {
         type = "SESSION_UPDATE",
         version = self.VERSION,
         status = self.session.status,
         host = self.session.host,
-        playerCount = #self.session.players,
-        players = playerList,
-        community = self.session.connectedCommunity,
-        removedPlayers = self.session.removedPlayers,
     }
+
+    -- Full player list and metadata only for LOBBY updates or explicit full-sync requests.
+    -- SPINNING/COMPLETED transitions omit these to keep the message within a single AceComm
+    -- chunk (~250 bytes), avoiding dropped multi-part messages with large player counts.
+    if includeFull then
+        local playerList = {}
+        for _, p in ipairs(self.session.players) do
+            playerList[#playerList + 1] = p:ToDict()
+        end
+        data.players = playerList
+        data.community = self.session.connectedCommunity
+        data.removedPlayers = self.session.removedPlayers
+    end
 
     if self.session.status == self.Status.SPINNING or
        self.session.status == self.Status.COMPLETED then
@@ -343,10 +354,11 @@ function WHLSN:HandleJoinAck(data, _sender)
 end
 
 --- Handle SESSION_QUERY from a non-host (host only).
+--- Always responds with a full-sync so the querier gets the complete state.
 function WHLSN:HandleSessionQuery(_sender)
     if not self:IsHost() then return end
     if not self.session.status then return end
-    self:SendSessionUpdate()
+    self:SendSessionUpdate(true)
 end
 
 --- Broadcast a SESSION_QUERY to discover or validate an active session.

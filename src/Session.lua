@@ -432,7 +432,7 @@ function WHLSN:RestoreSessionState()
         if saved.connectedCommunity then
             self.session.connectedCommunity = saved.connectedCommunity
         end
-        self:SendSessionUpdate()
+        self:SendSessionUpdate(true)
         self:ResetSessionTimeout()
     else
         self:SendSessionQuery()
