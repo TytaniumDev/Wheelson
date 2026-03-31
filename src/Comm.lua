@@ -229,6 +229,39 @@ function WHLSN:HandleSessionUpdate(data, sender)
             for _, pd in ipairs(data.players) do
                 self.session.players[#self.session.players + 1] = WHLSN.Player.FromDict(pd)
             end
+
+            -- Re-apply local spec overrides for the non-host's own player entry.
+            -- A SESSION_UPDATE already in-flight may carry stale spec data that
+            -- overwrites the optimistic local update from SpecOverride.
+            if not self:NamesMatch(data.host, self:GetMyFullName()) then
+                local saved = self.db and self.db.char and self.db.char.specOverrides
+                if saved and saved.mainRole then
+                    local freshPlayer = self:DetectLocalPlayer(saved.offspecs, saved.mainRole)
+                    if freshPlayer then
+                        for i, p in ipairs(self.session.players) do
+                            if self:NamesMatch(p.name, self:GetMyFullName()) then
+                                self.session.players[i] = freshPlayer
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+
+            -- Implicit ACK: if the local player appears in the host's player list,
+            -- the host has acknowledged our join — clear the pending state.
+            if self.session.joinPending then
+                for _, p in ipairs(self.session.players) do
+                    if self:NamesMatch(p.name, self:GetMyFullName()) then
+                        self.session.joinPending = false
+                        if self.joinAckTimer then
+                            self.joinAckTimer:Cancel()
+                            self.joinAckTimer = nil
+                        end
+                        break
+                    end
+                end
+            end
         end
 
         if data.compactGroups then
