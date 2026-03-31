@@ -16,7 +16,8 @@ function WHLSN:ValidateCommunityName(name)
     local trimmed = strtrim(name)
     if trimmed == "" then return false, "Name cannot be empty" end
     -- Validate format: Name or Name-Realm (realm may contain digits, e.g., Area52)
-    if not trimmed:match("^[%a']+$") and not trimmed:match("^[%a']+%-[%a%d'%-]+$") then
+    -- \128-\255 matches non-ASCII UTF-8 bytes so accented names like Müzaka are accepted
+    if not trimmed:match("^[%a'\128-\255]+$") and not trimmed:match("^[%a'\128-\255]+%-[%a%d'\128-\255%-]+$") then
         return false, "Invalid name format. Use 'Player' or 'Player-Realm'."
     end
     return true
