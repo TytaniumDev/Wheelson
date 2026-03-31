@@ -114,6 +114,7 @@ function WHLSN:LeaveSession()
     end
 
     self:ClearSessionState()
+    self:UpdateUI()
     self:Print("You have left the lobby.")
 end
 

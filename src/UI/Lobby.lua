@@ -541,7 +541,7 @@ function WHLSN:RequestJoin()
 
     self:Print("Join request sent.")
     self.session.joinPending = true
-    self.joinAckTimer = C_Timer.NewTimer(5, function()
+    self.joinAckTimer = C_Timer.NewTimer(10, function()
         WHLSN.session.joinPending = false
         WHLSN.joinAckTimer = nil
         WHLSN:Print("Join request may not have been received. Try again.")

@@ -1965,6 +1965,166 @@ describe("SendSessionUpdate compactGroups", function()
     end)
 end)
 
+describe("LeaveSession UI update", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.sent_messages = {}
+        WHLSN.SendCommMessage = function(self, prefix, msg, channel)
+            self.sent_messages[#self.sent_messages + 1] = { prefix = prefix, msg = msg, channel = channel }
+        end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+        WHLSN.ShowMainFrame = function() end
+        WHLSN.DetectLocalPlayer = function()
+            return WHLSN.Player:New("TestPlayer", "tank", {}, {})
+        end
+    end)
+
+    it("should call UpdateUI after leaving session", function()
+        WHLSN.session.status = "lobby"
+        WHLSN.session.host = "HostA"
+
+        local uiUpdated = false
+        WHLSN.UpdateUI = function() uiUpdated = true end
+
+        WHLSN:LeaveSession()
+
+        assert.is_true(uiUpdated)
+    end)
+end)
+
+-- Save the real DetectLocalPlayer before any tests can monkey-patch it
+local realDetectLocalPlayer = WHLSN.DetectLocalPlayer
+
+describe("HandleSessionUpdate spec override preservation", function()
+    before_each(function()
+        if not mock_db.char then mock_db.char = {} end
+        mock_db.char.activeSession = nil
+        WHLSN:OnInitialize()
+        -- Restore real DetectLocalPlayer (previous tests may have monkey-patched it)
+        WHLSN.DetectLocalPlayer = realDetectLocalPlayer
+        WHLSN.UpdateUI = function() end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+    end)
+
+    it("should re-apply local spec override when receiving stale host data", function()
+        -- Simulate the non-host having saved a spec override to "healer"
+        WHLSN.db.char.specOverrides = { mainRole = "healer", offspecs = {} }
+
+        local data = {
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {
+                { name = "TestPlayer-Illidan", mainRole = "tank", offspecs = {}, utilities = {} },
+                { name = "HostPlayer", mainRole = "tank", offspecs = {}, utilities = {} },
+            },
+        }
+        WHLSN:HandleSessionUpdate(data, "HostPlayer")
+
+        -- The local player's role should be "healer" (from override), not "tank" (from stale data)
+        local localPlayer = nil
+        for _, p in ipairs(WHLSN.session.players) do
+            if WHLSN:NamesMatch(p.name, WHLSN:GetMyFullName()) then
+                localPlayer = p
+                break
+            end
+        end
+        assert.is_not_nil(localPlayer)
+        assert.equals("healer", localPlayer.mainRole)
+    end)
+
+    it("should not re-apply spec overrides for the host", function()
+        -- When we ARE the host, host data is authoritative.
+        -- Call HandleSessionUpdate directly because OnCommReceived filters out
+        -- messages from self (sender == UnitName("player")).
+        WHLSN.db.char.specOverrides = { mainRole = "healer", offspecs = {} }
+
+        local data = {
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "TestPlayer-Illidan",
+            players = {
+                { name = "TestPlayer-Illidan", mainRole = "tank", offspecs = {}, utilities = {} },
+            },
+        }
+        WHLSN:HandleSessionUpdate(data, "TestPlayer-Illidan")
+
+        -- Should remain "tank" since we are the host
+        local localPlayer = WHLSN.session.players[1]
+        assert.equals("tank", localPlayer.mainRole)
+    end)
+
+    it("should not crash when no spec overrides are saved", function()
+        WHLSN.db.char.specOverrides = nil
+
+        local data = {
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {
+                { name = "TestPlayer-Illidan", mainRole = "tank", offspecs = {}, utilities = {} },
+            },
+        }
+        assert.has_no.errors(function()
+            WHLSN:HandleSessionUpdate(data, "HostPlayer")
+        end)
+
+        assert.equals("tank", WHLSN.session.players[1].mainRole)
+    end)
+end)
+
+describe("HandleSessionUpdate implicit joinPending ACK", function()
+    before_each(function()
+        if not mock_db.char then mock_db.char = {} end
+        mock_db.char.activeSession = nil
+        WHLSN:OnInitialize()
+        WHLSN.UpdateUI = function() end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+    end)
+
+    it("should clear joinPending when local player is in host player list", function()
+        WHLSN.session.joinPending = true
+        local timerCancelled = false
+        WHLSN.joinAckTimer = { Cancel = function() timerCancelled = true end }
+
+        local data = {
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {
+                { name = "HostPlayer", mainRole = "tank", offspecs = {}, utilities = {} },
+                { name = "TestPlayer-Illidan", mainRole = "healer", offspecs = {}, utilities = {} },
+            },
+        }
+        WHLSN:HandleSessionUpdate(data, "HostPlayer")
+
+        assert.is_false(WHLSN.session.joinPending)
+        assert.is_true(timerCancelled)
+        assert.is_nil(WHLSN.joinAckTimer)
+    end)
+
+    it("should not clear joinPending when local player is not in player list", function()
+        WHLSN.session.joinPending = true
+        WHLSN.joinAckTimer = { Cancel = function() end }
+
+        local data = {
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {
+                { name = "HostPlayer", mainRole = "tank", offspecs = {}, utilities = {} },
+                { name = "OtherPlayer", mainRole = "healer", offspecs = {}, utilities = {} },
+            },
+        }
+        WHLSN:HandleSessionUpdate(data, "HostPlayer")
+
+        assert.is_true(WHLSN.session.joinPending)
+    end)
+end)
+
 describe("HandleSessionUpdate compactGroups", function()
     before_each(function()
         WHLSN:OnInitialize()
@@ -2145,5 +2305,88 @@ describe("CompleteSession host guard", function()
 
         assert.equals(WHLSN.Status.COMPLETED, WHLSN.session.status)
         assert.is_false(broadcastCalled)
+    end)
+end)
+
+describe("HandleSessionUpdate implicit joinPending ACK", function()
+    before_each(function()
+        if not mock_db.char then mock_db.char = {} end
+        mock_db.char.activeSession = nil
+        WHLSN:OnInitialize()
+        WHLSN.UpdateUI = function() end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+    end)
+
+    it("should clear joinPending when local player is in host player list", function()
+        WHLSN.session.joinPending = true
+        local timerCancelled = false
+        WHLSN.joinAckTimer = { Cancel = function() timerCancelled = true end }
+
+        local data = {
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {
+                { name = "HostPlayer", mainRole = "tank", offspecs = {}, utilities = {} },
+                { name = "TestPlayer-Illidan", mainRole = "healer", offspecs = {}, utilities = {} },
+            },
+        }
+        WHLSN:HandleSessionUpdate(data, "HostPlayer")
+
+        assert.is_false(WHLSN.session.joinPending)
+        assert.is_true(timerCancelled)
+        assert.is_nil(WHLSN.joinAckTimer)
+    end)
+
+    it("should not clear joinPending when local player is not in player list", function()
+        WHLSN.session.joinPending = true
+        WHLSN.joinAckTimer = { Cancel = function() end }
+
+        local data = {
+            version = WHLSN.VERSION,
+            status = "lobby",
+            host = "HostPlayer",
+            players = {
+                { name = "HostPlayer", mainRole = "tank", offspecs = {}, utilities = {} },
+                { name = "OtherPlayer", mainRole = "healer", offspecs = {}, utilities = {} },
+            },
+        }
+        WHLSN:HandleSessionUpdate(data, "HostPlayer")
+
+        assert.is_true(WHLSN.session.joinPending)
+    end)
+end)
+
+describe("JOIN_ACK timer duration", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.sent_messages = {}
+        WHLSN.SendCommMessage = function(self, prefix, msg, channel)
+            self.sent_messages[#self.sent_messages + 1] = { prefix = prefix, msg = msg, channel = channel }
+        end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.UpdateLobbyView = function() end
+        WHLSN.DetectLocalPlayer = function()
+            return WHLSN.Player:New("TestPlayer", "tank", {}, {})
+        end
+    end)
+
+    it("should use a 10 second timeout for JOIN_ACK", function()
+        WHLSN.session.host = "HostPlayer"
+        WHLSN.session.status = "lobby"
+
+        local timerDuration = nil
+        local origNewTimer = _G.C_Timer.NewTimer
+        _G.C_Timer.NewTimer = function(duration, cb)
+            timerDuration = duration
+            return { Cancel = function() end }
+        end
+
+        WHLSN:RequestJoin()
+
+        _G.C_Timer.NewTimer = origNewTimer
+
+        assert.equals(10, timerDuration)
     end)
 end)
