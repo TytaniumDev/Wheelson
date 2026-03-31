@@ -77,30 +77,49 @@ function WHLSN:BroadcastSessionUpdate()
 end
 
 --- Send the actual session update message.
-function WHLSN:SendSessionUpdate()
-    local playerList = {}
-    for _, p in ipairs(self.session.players) do
-        playerList[#playerList + 1] = p:ToDict()
-    end
+--- For SPINNING/COMPLETED, only sends the status delta (compact groups) to keep the
+--- message small and reliable over AceComm's chunked GUILD channel. Receivers keep the
+--- player list they already have from the LOBBY phase.
+---@param fullSync? boolean When true, include all fields regardless of status (used for SESSION_QUERY responses)
+function WHLSN:SendSessionUpdate(fullSync)
+    local isLobby = self.session.status == self.Status.LOBBY
+    local includeFull = fullSync or isLobby
 
     local data = {
         type = "SESSION_UPDATE",
         version = self.VERSION,
         status = self.session.status,
         host = self.session.host,
-        playerCount = #self.session.players,
-        players = playerList,
-        community = self.session.connectedCommunity,
-        removedPlayers = self.session.removedPlayers,
     }
+
+    -- Full player list and metadata only for LOBBY updates or explicit full-sync requests.
+    -- SPINNING/COMPLETED transitions omit these to keep the message within a single AceComm
+    -- chunk (~250 bytes), avoiding dropped multi-part messages with large player counts.
+    if includeFull then
+        local playerList = {}
+        for _, p in ipairs(self.session.players) do
+            playerList[#playerList + 1] = p:ToDict()
+        end
+        data.players = playerList
+        data.community = self.session.connectedCommunity
+        data.removedPlayers = self.session.removedPlayers
+    end
 
     if self.session.status == self.Status.SPINNING or
        self.session.status == self.Status.COMPLETED then
-        local groupData = {}
+        local compactGroups = {}
         for _, g in ipairs(self.session.groups) do
-            groupData[#groupData + 1] = g:ToDict()
+            local dpsNames = {}
+            for _, p in ipairs(g.dps) do
+                dpsNames[#dpsNames + 1] = p.name
+            end
+            compactGroups[#compactGroups + 1] = {
+                tank = g.tank and g.tank.name or nil,
+                healer = g.healer and g.healer.name or nil,
+                dps = dpsNames,
+            }
         end
-        data.groups = groupData
+        data.compactGroups = compactGroups
     end
 
     local serialized = self:Serialize(data)
@@ -212,7 +231,9 @@ function WHLSN:HandleSessionUpdate(data, sender)
             end
         end
 
-        if data.groups then
+        if data.compactGroups then
+            self.session.groups = self:ReconstructGroups(data.compactGroups, self.session.players)
+        elseif data.groups then
             self.session.groups = {}
             for _, gd in ipairs(data.groups) do
                 self.session.groups[#self.session.groups + 1] = WHLSN.Group.FromDict(gd)
@@ -333,10 +354,11 @@ function WHLSN:HandleJoinAck(data, _sender)
 end
 
 --- Handle SESSION_QUERY from a non-host (host only).
+--- Always responds with a full-sync so the querier gets the complete state.
 function WHLSN:HandleSessionQuery(_sender)
     if not self:IsHost() then return end
     if not self.session.status then return end
-    self:SendSessionUpdate()
+    self:SendSessionUpdate(true)
 end
 
 --- Broadcast a SESSION_QUERY to discover or validate an active session.
@@ -371,6 +393,37 @@ function WHLSN:HandleLeaveRequest(data, sender)
             return
         end
     end
+end
+
+--- Reconstruct full Group objects from compact name-only format.
+---@param compactGroups table[] Array of {tank=name, healer=name, dps={name,...}}
+---@param players WHLSNPlayer[] Current player list to look up full player data
+---@return WHLSNGroup[]
+function WHLSN:ReconstructGroups(compactGroups, players)
+    -- Build name->player lookup table
+    local lookup = {}
+    for _, p in ipairs(players) do
+        lookup[p.name] = p
+        -- Also index by short name for cross-realm compatibility
+        local short = self:StripRealmName(p.name)
+        if short ~= p.name then
+            lookup[short] = lookup[short] or p
+        end
+    end
+
+    local groups = {}
+    for _, cg in ipairs(compactGroups) do
+        local tank = cg.tank and (lookup[cg.tank] or WHLSN.Player:New(cg.tank)) or nil
+        local healer = cg.healer and (lookup[cg.healer] or WHLSN.Player:New(cg.healer)) or nil
+        local dps = {}
+        if cg.dps then
+            for _, name in ipairs(cg.dps) do
+                dps[#dps + 1] = lookup[name] or WHLSN.Player:New(name)
+            end
+        end
+        groups[#groups + 1] = WHLSN.Group:New(tank, healer, dps)
+    end
+    return groups
 end
 
 function WHLSN:HandleSpecUpdate(data, sender, distribution)

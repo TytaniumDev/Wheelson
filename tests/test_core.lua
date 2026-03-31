@@ -102,6 +102,9 @@ dofile("src/UI/GroupDisplay.lua")
 
 local WHLSN = _G.Wheelson
 
+-- Save original methods before any test can override them
+local originalSendSessionUpdate = WHLSN.SendSessionUpdate
+
 describe("Core", function()
     describe("OnInitialize", function()
         local original_tostring
@@ -1314,13 +1317,13 @@ describe("SessionQuery", function()
         WHLSN.SendSessionUpdate = origSendSessionUpdate
     end)
 
-    it("HandleSessionQuery should call SendSessionUpdate when host", function()
+    it("HandleSessionQuery should call SendSessionUpdate with fullSync when host", function()
         WHLSN.session.status = WHLSN.Status.LOBBY
         WHLSN.session.host = "TestPlayer-Illidan"
-        local called = false
-        WHLSN.SendSessionUpdate = function() called = true end
+        local calledWith = nil
+        WHLSN.SendSessionUpdate = function(_, fullSync) calledWith = fullSync end
         WHLSN:HandleSessionQuery("OtherPlayer-Illidan")
-        assert.is_true(called)
+        assert.is_true(calledWith)
     end)
 
     it("HandleSessionQuery should ignore when not host", function()
@@ -1691,5 +1694,456 @@ describe("SessionPersistence", function()
         WHLSN.session.status = nil
         WHLSN:PersistSessionState()
         assert.is_nil(WHLSN.db.char.activeSession)
+    end)
+end)
+
+describe("ReconstructGroups", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+    end)
+
+    it("should rebuild full Group objects from compact format", function()
+        local players = {
+            WHLSN.Player:New("Tank1", "tank", {}, { "brez" }, "WARRIOR"),
+            WHLSN.Player:New("Healer1", "healer", { "ranged" }, { "lust" }, "SHAMAN"),
+            WHLSN.Player:New("DPS1", "ranged", {}, {}, "MAGE"),
+            WHLSN.Player:New("DPS2", "melee", {}, {}, "ROGUE"),
+            WHLSN.Player:New("DPS3", "ranged", {}, { "brez" }, "DRUID"),
+        }
+
+        local compactGroups = {
+            {
+                tank = "Tank1",
+                healer = "Healer1",
+                dps = { "DPS1", "DPS2", "DPS3" },
+            },
+        }
+
+        local groups = WHLSN:ReconstructGroups(compactGroups, players)
+
+        assert.equals(1, #groups)
+        local g = groups[1]
+        assert.is_not_nil(g.tank)
+        assert.equals("Tank1", g.tank.name)
+        assert.equals("tank", g.tank.mainRole)
+        assert.equals("WARRIOR", g.tank.classToken)
+        assert.is_not_nil(g.healer)
+        assert.equals("Healer1", g.healer.name)
+        assert.equals("healer", g.healer.mainRole)
+        assert.equals(3, #g.dps)
+        assert.equals("DPS1", g.dps[1].name)
+        assert.equals("ranged", g.dps[1].mainRole)
+        assert.equals("MAGE", g.dps[1].classToken)
+    end)
+
+    it("should handle missing players gracefully by creating placeholders", function()
+        local players = {
+            WHLSN.Player:New("Tank1", "tank", {}, {}, "WARRIOR"),
+            WHLSN.Player:New("Healer1", "healer", {}, {}, "PRIEST"),
+        }
+
+        local compactGroups = {
+            {
+                tank = "Tank1",
+                healer = "Healer1",
+                dps = { "UnknownDPS1", "UnknownDPS2", "UnknownDPS3" },
+            },
+        }
+
+        local groups = WHLSN:ReconstructGroups(compactGroups, players)
+
+        assert.equals(1, #groups)
+        local g = groups[1]
+        assert.equals("Tank1", g.tank.name)
+        assert.equals("tank", g.tank.mainRole)
+        assert.equals(3, #g.dps)
+        -- Placeholder players should have the name but no role/class data
+        assert.equals("UnknownDPS1", g.dps[1].name)
+        assert.is_nil(g.dps[1].mainRole)
+        assert.is_nil(g.dps[1].classToken)
+    end)
+
+    it("should handle cross-realm name lookup via short name", function()
+        local players = {
+            WHLSN.Player:New("Tank1-Illidan", "tank", {}, {}, "WARRIOR"),
+            WHLSN.Player:New("Healer1-Illidan", "healer", {}, {}, "PRIEST"),
+        }
+
+        local compactGroups = {
+            {
+                tank = "Tank1",
+                healer = "Healer1",
+                dps = {},
+            },
+        }
+
+        local groups = WHLSN:ReconstructGroups(compactGroups, players)
+
+        assert.equals(1, #groups)
+        assert.equals("Tank1-Illidan", groups[1].tank.name)
+        assert.equals("tank", groups[1].tank.mainRole)
+    end)
+
+    it("should handle nil tank and healer in compact format", function()
+        local players = {
+            WHLSN.Player:New("DPS1", "ranged", {}, {}, "MAGE"),
+        }
+
+        local compactGroups = {
+            {
+                tank = nil,
+                healer = nil,
+                dps = { "DPS1" },
+            },
+        }
+
+        local groups = WHLSN:ReconstructGroups(compactGroups, players)
+
+        assert.equals(1, #groups)
+        assert.is_nil(groups[1].tank)
+        assert.is_nil(groups[1].healer)
+        assert.equals(1, #groups[1].dps)
+        assert.equals("DPS1", groups[1].dps[1].name)
+    end)
+
+    it("should handle multiple groups", function()
+        local players = {
+            WHLSN.Player:New("Tank1", "tank", {}, {}, "WARRIOR"),
+            WHLSN.Player:New("Tank2", "tank", {}, {}, "PALADIN"),
+            WHLSN.Player:New("Healer1", "healer", {}, {}, "PRIEST"),
+            WHLSN.Player:New("Healer2", "healer", {}, {}, "SHAMAN"),
+            WHLSN.Player:New("DPS1", "ranged", {}, {}, "MAGE"),
+            WHLSN.Player:New("DPS2", "melee", {}, {}, "ROGUE"),
+        }
+
+        local compactGroups = {
+            { tank = "Tank1", healer = "Healer1", dps = { "DPS1" } },
+            { tank = "Tank2", healer = "Healer2", dps = { "DPS2" } },
+        }
+
+        local groups = WHLSN:ReconstructGroups(compactGroups, players)
+
+        assert.equals(2, #groups)
+        assert.equals("Tank1", groups[1].tank.name)
+        assert.equals("Tank2", groups[2].tank.name)
+        assert.equals("DPS1", groups[1].dps[1].name)
+        assert.equals("DPS2", groups[2].dps[1].name)
+    end)
+end)
+
+describe("SendSessionUpdate compactGroups", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.SendSessionUpdate = originalSendSessionUpdate
+        WHLSN.session.status = WHLSN.Status.SPINNING
+        WHLSN.session.host = "TestPlayer"
+        WHLSN.session.players = {
+            WHLSN.Player:New("Tank1", "tank", {}, {}, "WARRIOR"),
+            WHLSN.Player:New("Healer1", "healer", {}, {}, "PRIEST"),
+            WHLSN.Player:New("DPS1", "ranged", {}, {}, "MAGE"),
+            WHLSN.Player:New("DPS2", "melee", {}, {}, "ROGUE"),
+            WHLSN.Player:New("DPS3", "ranged", {}, {}, "WARLOCK"),
+        }
+        WHLSN.session.groups = {
+            WHLSN.Group:New(
+                WHLSN.Player:New("Tank1", "tank", {}, {}, "WARRIOR"),
+                WHLSN.Player:New("Healer1", "healer", {}, {}, "PRIEST"),
+                {
+                    WHLSN.Player:New("DPS1", "ranged", {}, {}, "MAGE"),
+                    WHLSN.Player:New("DPS2", "melee", {}, {}, "ROGUE"),
+                    WHLSN.Player:New("DPS3", "ranged", {}, {}, "WARLOCK"),
+                }
+            ),
+        }
+        WHLSN.session.connectedCommunity = {}
+        WHLSN.sent_messages = {}
+        WHLSN.SendCommMessage = function(self, prefix, msg, channel, target)
+            self.sent_messages[#self.sent_messages + 1] = { channel = channel, data = msg }
+        end
+        WHLSN.Serialize = function(self, data) return data end
+    end)
+
+    it("should use compactGroups instead of groups for SPINNING status", function()
+        WHLSN:SendSessionUpdate()
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_not_nil(sentData.compactGroups)
+        assert.is_nil(sentData.groups)
+        assert.equals(1, #sentData.compactGroups)
+        assert.equals("Tank1", sentData.compactGroups[1].tank)
+        assert.equals("Healer1", sentData.compactGroups[1].healer)
+        assert.same({ "DPS1", "DPS2", "DPS3" }, sentData.compactGroups[1].dps)
+    end)
+
+    it("should use compactGroups for COMPLETED status", function()
+        WHLSN.session.status = WHLSN.Status.COMPLETED
+
+        WHLSN:SendSessionUpdate()
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_not_nil(sentData.compactGroups)
+        assert.is_nil(sentData.groups)
+    end)
+
+    it("should not include compactGroups for LOBBY status", function()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+
+        WHLSN:SendSessionUpdate()
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_nil(sentData.compactGroups)
+        assert.is_nil(sentData.groups)
+    end)
+
+    it("should omit players, community, and removedPlayers for SPINNING", function()
+        WHLSN.session.connectedCommunity = { ["Comm1"] = "Comm1" }
+        WHLSN.session.removedPlayers = { ["Removed1"] = true }
+
+        WHLSN:SendSessionUpdate()
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_nil(sentData.players)
+        assert.is_nil(sentData.community)
+        assert.is_nil(sentData.removedPlayers)
+        -- But status and host are still present
+        assert.equals("spinning", sentData.status)
+        assert.is_not_nil(sentData.host)
+    end)
+
+    it("should omit players for COMPLETED", function()
+        WHLSN.session.status = WHLSN.Status.COMPLETED
+
+        WHLSN:SendSessionUpdate()
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_nil(sentData.players)
+    end)
+
+    it("should include players for LOBBY", function()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+
+        WHLSN:SendSessionUpdate()
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_not_nil(sentData.players)
+        assert.equals(5, #sentData.players)
+    end)
+
+    it("should never include playerCount", function()
+        WHLSN.session.status = WHLSN.Status.LOBBY
+        WHLSN:SendSessionUpdate()
+        assert.is_nil(WHLSN.sent_messages[1].data.playerCount)
+
+        WHLSN.sent_messages = {}
+        WHLSN.session.status = WHLSN.Status.SPINNING
+        WHLSN:SendSessionUpdate()
+        assert.is_nil(WHLSN.sent_messages[1].data.playerCount)
+    end)
+
+    it("should include all fields when fullSync is true even for SPINNING", function()
+        WHLSN.session.connectedCommunity = { ["Comm1"] = "Comm1" }
+        WHLSN.session.removedPlayers = { ["Hidden1"] = true }
+
+        WHLSN:SendSessionUpdate(true)
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_not_nil(sentData.players)
+        assert.equals(5, #sentData.players)
+        assert.is_not_nil(sentData.community)
+        assert.is_not_nil(sentData.removedPlayers)
+        assert.is_not_nil(sentData.compactGroups)
+    end)
+
+    it("should include all fields when fullSync is true for COMPLETED", function()
+        WHLSN.session.status = WHLSN.Status.COMPLETED
+
+        WHLSN:SendSessionUpdate(true)
+
+        local sentData = WHLSN.sent_messages[1].data
+        assert.is_not_nil(sentData.players)
+        assert.is_not_nil(sentData.compactGroups)
+    end)
+end)
+
+describe("HandleSessionUpdate compactGroups", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.UpdateUI = function() end
+        WHLSN.Serialize = function(self, data) return data end
+        WHLSN.Deserialize = function(self, msg) return true, msg end
+    end)
+
+    it("should reconstruct groups from compact format", function()
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "spinning",
+            host = "HostPlayer",
+            players = {
+                { name = "Tank1", mainRole = "tank", offspecs = {}, utilities = { "brez" }, classToken = "WARRIOR" },
+                { name = "Healer1", mainRole = "healer", offspecs = {}, utilities = {}, classToken = "PRIEST" },
+                { name = "DPS1", mainRole = "ranged", offspecs = {}, utilities = {}, classToken = "MAGE" },
+                { name = "DPS2", mainRole = "melee", offspecs = {}, utilities = {}, classToken = "ROGUE" },
+                { name = "DPS3", mainRole = "ranged", offspecs = {}, utilities = {}, classToken = "WARLOCK" },
+            },
+            compactGroups = {
+                { tank = "Tank1", healer = "Healer1", dps = { "DPS1", "DPS2", "DPS3" } },
+            },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        assert.equals(1, #WHLSN.session.groups)
+        local g = WHLSN.session.groups[1]
+        assert.equals("Tank1", g.tank.name)
+        assert.equals("tank", g.tank.mainRole)
+        assert.equals("WARRIOR", g.tank.classToken)
+        assert.equals("Healer1", g.healer.name)
+        assert.equals(3, #g.dps)
+        assert.equals("DPS1", g.dps[1].name)
+        assert.equals("ranged", g.dps[1].mainRole)
+    end)
+
+    it("should still handle legacy groups format", function()
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "spinning",
+            host = "HostPlayer",
+            players = {
+                { name = "Tank1", mainRole = "tank", offspecs = {}, utilities = {} },
+            },
+            groups = {
+                {
+                    tank = { name = "Tank1", mainRole = "tank", offspecs = {}, utilities = {} },
+                    healer = nil,
+                    dps = {},
+                },
+            },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        assert.equals(1, #WHLSN.session.groups)
+        assert.equals("Tank1", WHLSN.session.groups[1].tank.name)
+    end)
+
+    it("should prefer compactGroups over legacy groups when both present", function()
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "spinning",
+            host = "HostPlayer",
+            players = {
+                { name = "Tank1", mainRole = "tank", offspecs = {}, utilities = {} },
+                { name = "Healer1", mainRole = "healer", offspecs = {}, utilities = {} },
+            },
+            compactGroups = {
+                { tank = "Tank1", healer = "Healer1", dps = {} },
+            },
+            groups = {
+                {
+                    tank = { name = "WrongTank", mainRole = "tank", offspecs = {}, utilities = {} },
+                    healer = nil,
+                    dps = {},
+                },
+            },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        assert.equals("Tank1", WHLSN.session.groups[1].tank.name)
+    end)
+
+    it("should use existing player list when SPINNING update omits players", function()
+        -- Simulate having received the player list during LOBBY phase
+        WHLSN.session.host = "HostPlayer"
+        WHLSN.session.status = "lobby"
+        WHLSN.session.players = {
+            WHLSN.Player:New("Tank1", "tank", {}, { "brez" }, "WARRIOR"),
+            WHLSN.Player:New("Healer1", "healer", {}, {}, "PRIEST"),
+            WHLSN.Player:New("DPS1", "ranged", {}, {}, "MAGE"),
+        }
+
+        -- SPINNING update arrives without players (normal compact update)
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "spinning",
+            host = "HostPlayer",
+            compactGroups = {
+                { tank = "Tank1", healer = "Healer1", dps = { "DPS1" } },
+            },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        -- Player list should be preserved from LOBBY phase
+        assert.equals(3, #WHLSN.session.players)
+        assert.equals("Tank1", WHLSN.session.players[1].name)
+        -- Groups should be reconstructed with full player data
+        assert.equals(1, #WHLSN.session.groups)
+        assert.equals("tank", WHLSN.session.groups[1].tank.mainRole)
+        assert.equals("WARRIOR", WHLSN.session.groups[1].tank.classToken)
+        assert.is_true(WHLSN.session.groups[1].tank:HasBrez())
+    end)
+
+    it("should preserve community and removedPlayers when SPINNING update omits them", function()
+        WHLSN.session.host = "HostPlayer"
+        WHLSN.session.status = "lobby"
+        WHLSN.session.players = {
+            WHLSN.Player:New("Tank1", "tank"),
+        }
+        WHLSN.session.connectedCommunity = { ["Comm1"] = "Comm1" }
+        WHLSN.session.removedPlayers = { ["Hidden1"] = true }
+
+        local data = {
+            type = "SESSION_UPDATE",
+            version = WHLSN.VERSION,
+            status = "spinning",
+            host = "HostPlayer",
+            compactGroups = {
+                { tank = "Tank1", dps = {} },
+            },
+        }
+        WHLSN:OnCommReceived(WHLSN.COMM_PREFIX, data, "GUILD", "HostPlayer")
+
+        assert.equals("Comm1", WHLSN.session.connectedCommunity["Comm1"])
+        assert.is_true(WHLSN.session.removedPlayers["Hidden1"])
+    end)
+end)
+
+describe("CompleteSession host guard", function()
+    before_each(function()
+        WHLSN:OnInitialize()
+        WHLSN.session.status = WHLSN.Status.SPINNING
+        WHLSN.session.groups = {
+            WHLSN.Group:New(
+                WHLSN.Player:New("Tank1", "tank"),
+                WHLSN.Player:New("Healer1", "healer"),
+                { WHLSN.Player:New("DPS1", "ranged"), WHLSN.Player:New("DPS2", "melee"),
+                  WHLSN.Player:New("DPS3", "ranged") }
+            ),
+        }
+        WHLSN.session.players = {}
+        WHLSN.SaveSessionResults = function() end
+    end)
+
+    it("should broadcast when host", function()
+        WHLSN.session.host = "TestPlayer-Illidan"
+        local broadcastCalled = false
+        WHLSN.BroadcastSessionUpdate = function() broadcastCalled = true end
+
+        WHLSN:CompleteSession()
+
+        assert.equals(WHLSN.Status.COMPLETED, WHLSN.session.status)
+        assert.is_true(broadcastCalled)
+    end)
+
+    it("should not broadcast when not host", function()
+        WHLSN.session.host = "SomeoneElse-Illidan"
+        local broadcastCalled = false
+        WHLSN.BroadcastSessionUpdate = function() broadcastCalled = true end
+
+        WHLSN:CompleteSession()
+
+        assert.equals(WHLSN.Status.COMPLETED, WHLSN.session.status)
+        assert.is_false(broadcastCalled)
     end)
 end)
