@@ -96,11 +96,19 @@ function WHLSN:SendSessionUpdate()
 
     if self.session.status == self.Status.SPINNING or
        self.session.status == self.Status.COMPLETED then
-        local groupData = {}
+        local compactGroups = {}
         for _, g in ipairs(self.session.groups) do
-            groupData[#groupData + 1] = g:ToDict()
+            local dpsNames = {}
+            for _, p in ipairs(g.dps) do
+                dpsNames[#dpsNames + 1] = p.name
+            end
+            compactGroups[#compactGroups + 1] = {
+                tank = g.tank and g.tank.name or nil,
+                healer = g.healer and g.healer.name or nil,
+                dps = dpsNames,
+            }
         end
-        data.groups = groupData
+        data.compactGroups = compactGroups
     end
 
     local serialized = self:Serialize(data)
@@ -212,7 +220,9 @@ function WHLSN:HandleSessionUpdate(data, sender)
             end
         end
 
-        if data.groups then
+        if data.compactGroups then
+            self.session.groups = self:ReconstructGroups(data.compactGroups, self.session.players)
+        elseif data.groups then
             self.session.groups = {}
             for _, gd in ipairs(data.groups) do
                 self.session.groups[#self.session.groups + 1] = WHLSN.Group.FromDict(gd)
@@ -371,6 +381,37 @@ function WHLSN:HandleLeaveRequest(data, sender)
             return
         end
     end
+end
+
+--- Reconstruct full Group objects from compact name-only format.
+---@param compactGroups table[] Array of {tank=name, healer=name, dps={name,...}}
+---@param players WHLSNPlayer[] Current player list to look up full player data
+---@return WHLSNGroup[]
+function WHLSN:ReconstructGroups(compactGroups, players)
+    -- Build name->player lookup table
+    local lookup = {}
+    for _, p in ipairs(players) do
+        lookup[p.name] = p
+        -- Also index by short name for cross-realm compatibility
+        local short = self:StripRealmName(p.name)
+        if short ~= p.name then
+            lookup[short] = lookup[short] or p
+        end
+    end
+
+    local groups = {}
+    for _, cg in ipairs(compactGroups) do
+        local tank = cg.tank and (lookup[cg.tank] or WHLSN.Player:New(cg.tank)) or nil
+        local healer = cg.healer and (lookup[cg.healer] or WHLSN.Player:New(cg.healer)) or nil
+        local dps = {}
+        if cg.dps then
+            for _, name in ipairs(cg.dps) do
+                dps[#dps + 1] = lookup[name] or WHLSN.Player:New(name)
+            end
+        end
+        groups[#groups + 1] = WHLSN.Group:New(tank, healer, dps)
+    end
+    return groups
 end
 
 function WHLSN:HandleSpecUpdate(data, sender, distribution)

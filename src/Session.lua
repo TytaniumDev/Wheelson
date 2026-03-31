@@ -174,6 +174,14 @@ function WHLSN:SpinGroups()
 
     self.lastActivity = time()
     self:BroadcastSessionUpdate()
+    -- Re-send after a short delay for reliability with large groups
+    if #self.session.groups > 1 then
+        C_Timer.After(2, function()
+            if WHLSN.session.status == WHLSN.Status.SPINNING then
+                WHLSN:SendSessionUpdate()
+            end
+        end)
+    end
     self:UpdateUI()
     self:PersistSessionState()
 end
@@ -182,7 +190,9 @@ end
 function WHLSN:CompleteSession()
     self.session.status = self.Status.COMPLETED
     self:SaveSessionResults()
-    self:BroadcastSessionUpdate()
+    if self:IsHost() then
+        self:BroadcastSessionUpdate()
+    end
     self:PersistSessionState()
 end
 
