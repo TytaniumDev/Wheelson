@@ -126,6 +126,16 @@ describe("CommunityService", function()
             assert.is_true(ok)
         end)
 
+        it("should accept names with accented characters", function()
+            local ok = WHLSN:ValidateCommunityName("Müzaka")
+            assert.is_true(ok)
+        end)
+
+        it("should accept accented names with realm", function()
+            local ok = WHLSN:ValidateCommunityName("Müzaka-Illidan")
+            assert.is_true(ok)
+        end)
+
         it("should treat first hyphen as realm separator", function()
             -- "My-Name-Realm" → character "My" on realm "Name-Realm"
             local ok = WHLSN:ValidateCommunityName("My-NameRealm")
